@@ -1,0 +1,117 @@
+# 默认激活 dev 环境
+spring:
+  profiles:
+    active: dev
+
+  # 文件上传路径配置（全环境通用）
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# Actuator 健康检查（/actuator/health）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# 数据根目录（所有持久化数据存放于此，数据库 + 上传文件）
+# dev 默认: ~/.selfwebblog/ ，prod 默认: /data/selfwebblog/
+blog:
+  data-dir: ${BLOG_DATA_DIR:${user.home}/.selfwebblog}
+
+# 自定义配置
+upload:
+  # 文件上传根路径
+  path: ${blog.data-dir}/uploads
+
+# 登录配置（生产环境务必通过环境变量覆盖）
+auth:
+  admin:
+    username: ${BLOG_ADMIN_USERNAME:admin}
+    password: ${BLOG_ADMIN_PASSWORD:admin123}
+    # 博主 GitHub ID（通过 GitHub 登录时自动识别为博主）
+    github-id: ${BLOG_ADMIN_GITHUB_ID:}
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:this-is-a-dev-only-secret-key-change-in-production}
+  expiration: ${JWT_EXPIRATION:604800}  # 默认7天，单位秒
+
+# GitHub OAuth 配置（生产环境请用环境变量覆盖）
+github:
+  oauth:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+    redirect-uri: ${GITHUB_REDIRECT_URI:http://localhost:8080/auth/github/callback}
+    # Clash Verge 代理（会自动检测系统代理，以下为手动覆盖）
+    proxy-host: ${GH_PROXY_HOST:}
+    proxy-port: ${GH_PROXY_PORT:0}
+
+# 应用配置
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5174}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5174}
+
+server:
+  port: 8080
+
+---
+# dev 环境配置
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:${blog.data-dir}/blog.db?journal_mode=WAL&busy_timeout=5000
+    username: admin
+    password:
+    hikari:
+      maximum-pool-size: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+mybatis-plus:
+  type-aliases-package: org.example.selfwebblog.entity
+  mapper-locations: classpath*:/mapper/**/*.xml
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_id
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+
+---
+# prod 环境配置
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:${blog.data-dir}/blog.db?journal_mode=WAL&busy_timeout=5000
+    username: admin
+    password:
+    hikari:
+      maximum-pool-size: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+
+mybatis-plus:
+  type-aliases-package: org.example.selfwebblog.entity
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_id
+
+# prod 环境安全校验：JWT secret 不能使用默认值
+# 如果 JWT_SECRET 环境变量未设置，启动前会校验失败

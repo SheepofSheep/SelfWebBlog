@@ -1,0 +1,29 @@
+target/
+.idea/
+.git/
+.DS_Store
+*.log
+*.swp
+*.swo
+*~
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+uploads/
+*.db
+github-credentials.md
+*.md.backup
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# Claude Code
+.claude/
+
+# Playwright（E2E 截图/快照）
+.playwright-mcp/
+
+# Windows
+Thumbs.db
+*.tmp
