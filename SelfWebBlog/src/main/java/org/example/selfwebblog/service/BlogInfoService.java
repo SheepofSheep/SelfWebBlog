@@ -17,7 +17,7 @@ public class BlogInfoService extends ServiceImpl<BlogInfoMapper, BlogInfo> {
             info.setId(1); // 显式指定 ID 为 1
             info.setAvatarUrl("https://api.dicebear.com/7.x/avataaars/svg?seed=Felix");
             info.setNickname("博主");
-            info.setBio("欢迎来到我的博客！");
+            info.setBio("OvO");
             // 使用 saveOrUpdate 而不是 save，避免获取生成的 key
             saveOrUpdate(info);
         }
