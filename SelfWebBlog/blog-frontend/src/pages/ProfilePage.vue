@@ -345,7 +345,9 @@ onMounted(async () => { await refresh(); await loadPosters() })
             <button class="pill-btn pill-btn-ghost user-title-btn" @click="openTitleModal(u)">
               {{ u.titleName ? '修改称号' : '授予称号' }}
             </button>
-            <button v-if="u.role !== 'ADMIN'" class="act-btn del" @click="handleDeleteUser(u)" :aria-label="'删除用户' + u.username" style="flex-shrink:0">删除</button>
+            <button v-if="u.role !== 'ADMIN'" class="user-del-btn" @click="handleDeleteUser(u)" :aria-label="'删除用户' + u.username" title="删除用户">
+              <Trash2 :size="14" />
+            </button>
           </div>
         </div>
       </div>
@@ -554,6 +556,14 @@ onMounted(async () => { await refresh(); await loadPosters() })
 .dup-ip-warn { font-size: 0.68rem; color: var(--amber); font-weight: 600; cursor: help; }
 .user-time { font-size: 0.68rem; color: var(--ink-faint); }
 .user-title-btn { flex-shrink: 0; font-size: 0.72rem; padding: 5px 12px; white-space: nowrap; }
+.user-del-btn {
+  flex-shrink: 0; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink-muted); cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+}
+.user-del-btn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
 
 /* ====== 称号主题选择器 ====== */
 .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }

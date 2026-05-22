@@ -39,7 +39,7 @@ public class AdminController {
 
         List<Map<String, Object>> result = users.stream().map(u -> {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", u.getId());
+            m.put("id", String.valueOf(u.getId()));
             m.put("username", u.getUsername());
             m.put("email", u.getEmail());
             m.put("avatarUrl", u.getAvatarUrl());
@@ -85,7 +85,7 @@ public class AdminController {
         userService.updateById(user);
 
         return Result.success(Map.of(
-                "id", user.getId(),
+                "id", String.valueOf(user.getId()),
                 "titleName", user.getTitleName(),
                 "titleStyle", user.getTitleStyle()
         ));
