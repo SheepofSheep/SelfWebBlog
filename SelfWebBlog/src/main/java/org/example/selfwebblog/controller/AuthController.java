@@ -162,9 +162,9 @@ public class AuthController {
         }
 
         try {
-            User user = userService.register(username.trim(), password, email, avatarUrl);
+            User user = userService.register(username.trim(), password, email, avatarUrl, getClientIp(request));
             String token = jwtUtil.generateToken(user.getId(), user.getRole());
-            UserInfo info = new UserInfo(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getRole());
+            UserInfo info = toUserInfo(user);
             Map<String, Object> data = Map.of("token", token, "user", info);
             return Result.success(data);
         } catch (RuntimeException e) {
@@ -191,7 +191,7 @@ public class AuthController {
         if (adminUsername.equals(username) && passwordEncoder.matches(password, adminPasswordHash)) {
             User adminUser = ensureAdminUser();
             String token = jwtUtil.generateToken(adminUser.getId(), "ADMIN");
-            UserInfo info = new UserInfo(adminUser.getId(), adminUser.getUsername(), adminUser.getAvatarUrl(), "ADMIN");
+            UserInfo info = toUserInfo(adminUser);
             log.info("管理员登录成功");
             return Result.success(Map.of("token", token, "user", info));
         }
@@ -199,7 +199,7 @@ public class AuthController {
         try {
             User user = userService.login(username.trim(), password);
             String token = jwtUtil.generateToken(user.getId(), user.getRole());
-            UserInfo info = new UserInfo(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getRole());
+            UserInfo info = toUserInfo(user);
             Map<String, Object> data = Map.of("token", token, "user", info);
             log.info("用户登录成功：{}", username);
             return Result.success(data);
@@ -240,7 +240,7 @@ public class AuthController {
 
         User adminUser = ensureAdminUser();
         String token = jwtUtil.generateToken(adminUser.getId(), "ADMIN");
-        UserInfo info = new UserInfo(adminUser.getId(), adminUser.getUsername(), adminUser.getAvatarUrl(), "ADMIN");
+        UserInfo info = toUserInfo(adminUser);
         log.info("博主登录成功");
         return Result.success(Map.of("token", token, "user", info));
     }
@@ -312,7 +312,7 @@ public class AuthController {
             String avatarUrl = (String) githubUser.get("avatar_url");
 
             // 查找或创建用户，如果是博主 GitHub 账号则赋予 ADMIN 角色
-            User user = userService.findOrCreateGithubUser(githubId, login, avatarUrl, null);
+            User user = userService.findOrCreateGithubUser(githubId, login, avatarUrl, null, "");
             if (githubId.equals(adminGithubId) && !"ADMIN".equals(user.getRole())) {
                 user.setRole("ADMIN");
                 userService.updateById(user);
@@ -322,7 +322,7 @@ public class AuthController {
             log.info("GitHub 用户登录成功：{} (role={})", login, user.getRole());
 
             // 用 Jackson 安全序列化 JSON
-            UserInfo info = new UserInfo(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getRole());
+            UserInfo info = toUserInfo(user);
             String userJson = URLEncoder.encode(objectMapper.writeValueAsString(info), StandardCharsets.UTF_8);
             response.sendRedirect(frontendUrl + "/#/login?token=" + token + "&user=" + userJson);
         } catch (Exception e) {
@@ -343,8 +343,19 @@ public class AuthController {
         if (user == null) {
             return Result.error("用户不存在");
         }
-        UserInfo info = new UserInfo(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getRole());
+        UserInfo info = toUserInfo(user);
         return Result.success(info);
+    }
+
+    private UserInfo toUserInfo(User user) {
+        return new UserInfo(
+            user.getId(),
+            user.getUsername(),
+            user.getAvatarUrl(),
+            user.getRole(),
+            user.getTitleName() != null ? user.getTitleName() : "",
+            user.getTitleStyle() != null ? user.getTitleStyle() : "default"
+        );
     }
 
     // ==================== 退出登录 ====================
@@ -408,14 +419,18 @@ public class AuthController {
         private String username;
         private String avatarUrl;
         private String role;
+        private String titleName;
+        private String titleStyle;
 
         public UserInfo() {}
 
-        public UserInfo(Long id, String username, String avatarUrl, String role) {
+        public UserInfo(Long id, String username, String avatarUrl, String role, String titleName, String titleStyle) {
             this.id = id;
             this.username = username;
             this.avatarUrl = avatarUrl;
             this.role = role;
+            this.titleName = titleName;
+            this.titleStyle = titleStyle;
         }
 
         public Long getId() { return id; }
@@ -426,5 +441,9 @@ public class AuthController {
         public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
         public String getRole() { return role; }
         public void setRole(String role) { this.role = role; }
+        public String getTitleName() { return titleName; }
+        public void setTitleName(String titleName) { this.titleName = titleName; }
+        public String getTitleStyle() { return titleStyle; }
+        public void setTitleStyle(String titleStyle) { this.titleStyle = titleStyle; }
     }
 }

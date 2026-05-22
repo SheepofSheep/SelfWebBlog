@@ -12,7 +12,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public User register(String username, String password, String email, String avatarUrl) {
+    public User register(String username, String password, String email, String avatarUrl, String ipAddress) {
         if (getByUsername(username) != null) {
             throw new RuntimeException("用户名已存在");
         }
@@ -22,6 +22,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         user.setEmail(email);
         user.setAvatarUrl(avatarUrl != null ? avatarUrl : "");
         user.setRole("USER");
+        user.setIpAddress(ipAddress);
         save(user);
         return user;
     }
@@ -45,7 +46,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         return getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
     }
 
-    public User findOrCreateGithubUser(String githubId, String username, String avatarUrl, String email) {
+    public User findOrCreateGithubUser(String githubId, String username, String avatarUrl, String email, String ipAddress) {
         User user = getByGithubId(githubId);
         if (user != null) {
             return user;
@@ -56,6 +57,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         user.setAvatarUrl(avatarUrl);
         user.setEmail(email);
         user.setRole("USER");
+        user.setIpAddress(ipAddress);
         save(user);
         return user;
     }

@@ -29,6 +29,8 @@ public class Comment {
     private String nickname;
     private String avatarUrl;
     private String role;
+    private String titleName;
+    private String titleStyle;
 
     private Integer pinned;
 

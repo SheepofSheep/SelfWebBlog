@@ -445,6 +445,116 @@ hr {
 }
 
 /* ============================================================
+   Title Badge — 称号勋章（8种主题）
+   ============================================================ */
+.title-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* default — 素雅灰 */
+.title-default {
+  background: #f0ece8;
+  color: #6b6660;
+  border: 1px solid #e0dcd6;
+}
+[data-theme='dark'] .title-default {
+  background: #363330;
+  color: #b0aca4;
+  border-color: #4a4640;
+}
+
+/* gold — 金色 */
+.title-gold {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #fbbf24;
+}
+[data-theme='dark'] .title-gold {
+  background: linear-gradient(135deg, #5c4510, #7a5c14);
+  color: #fde68a;
+  border-color: #a37c20;
+}
+
+/* fire — 烈焰 */
+.title-fire {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+  border: 1px solid #f87171;
+}
+[data-theme='dark'] .title-fire {
+  background: linear-gradient(135deg, #5c1a1a, #7a2424);
+  color: #fecaca;
+  border-color: #c94444;
+}
+
+/* ice — 冰霜 */
+.title-ice {
+  background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+  color: #075985;
+  border: 1px solid #7dd3fc;
+}
+[data-theme='dark'] .title-ice {
+  background: linear-gradient(135deg, #0c384b, #155e75);
+  color: #bae6fd;
+  border-color: #3898b4;
+}
+
+/* nature — 自然 */
+.title-nature {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #166534;
+  border: 1px solid #86efac;
+}
+[data-theme='dark'] .title-nature {
+  background: linear-gradient(135deg, #142e1e, #1e4628);
+  color: #bbf7d0;
+  border-color: #3b8258;
+}
+
+/* star — 星空 */
+.title-star {
+  background: linear-gradient(135deg, #f3e8ff, #e9d5ff);
+  color: #6b21a8;
+  border: 1px solid #c084fc;
+}
+[data-theme='dark'] .title-star {
+  background: linear-gradient(135deg, #2e1445, #4a2068);
+  color: #e9d5ff;
+  border-color: #8b5cf6;
+}
+
+/* night — 暗夜 */
+.title-night {
+  background: linear-gradient(135deg, #1e1b2e, #2d2a3d);
+  color: #e0ddf0;
+  border: 1px solid #5a5580;
+}
+[data-theme='dark'] .title-night {
+  background: linear-gradient(135deg, #0f0e17, #1a1826);
+  color: #c4c0e8;
+  border-color: #484468;
+}
+
+/* candy — 糖果 */
+.title-candy {
+  background: linear-gradient(135deg, #ffe4ec, #ffd6e0);
+  color: #b83350;
+  border: 1px solid #f9a8c2;
+}
+[data-theme='dark'] .title-candy {
+  background: linear-gradient(135deg, #3d1a26, #542638);
+  color: #ffd6e0;
+  border-color: #a85878;
+}
+
+/* ============================================================
    Responsive
    ============================================================ */
 @media (max-width: 768px) {

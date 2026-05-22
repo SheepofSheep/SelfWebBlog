@@ -138,6 +138,7 @@ onMounted(async () => {
               <div class="comment-head">
                 <span v-if="c.pinned" class="pinned-badge"><Pin :size="10" /> 置顶</span>
                 <span class="comment-name">{{ c.nickname }}</span>
+                <span v-if="c.titleName" :class="['title-badge', 'title-' + (c.titleStyle || 'default')]">{{ c.titleName }}</span>
                 <span v-if="c.role === 'ADMIN'" class="comment-badge">博主</span>
                 <span class="comment-time">{{ formatRelativeTime(c.createTime) }}</span>
               </div>

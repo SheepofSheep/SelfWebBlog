@@ -1,6 +1,6 @@
 <script setup>
 import { computed, inject, onMounted, ref } from 'vue'
-import { deletePost, getProfile, updateProfile, uploadAvatar, uploadImage, listPosters, savePoster, deletePoster as delPoster } from '../utils/api'
+import { deletePost, getProfile, updateProfile, uploadAvatar, uploadImage, listPosters, savePoster, deletePoster as delPoster, listUsers, grantTitle } from '../utils/api'
 import { navigate } from '../router'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
@@ -17,7 +17,26 @@ const posts = ref([])
 const nicknameModal = ref(false)
 const newNickname = ref('')
 const newBio = ref('')
-const tab = ref('posts') // posts | posters | comments
+const tab = ref('posts') // posts | posters | users
+
+// 用户管理
+const users = ref([])
+const usersLoading = ref(false)
+const titleModal = ref(false)
+const titleUserId = ref(null)
+const titleName = ref('')
+const titleStyle = ref('default')
+
+const titleThemes = [
+  { value: 'default', label: '素雅灰', color: '#6b6660' },
+  { value: 'gold', label: '流金', color: '#fbbf24' },
+  { value: 'fire', label: '烈焰', color: '#f87171' },
+  { value: 'ice', label: '冰霜', color: '#7dd3fc' },
+  { value: 'nature', label: '自然', color: '#86efac' },
+  { value: 'star', label: '星空', color: '#c084fc' },
+  { value: 'night', label: '暗夜', color: '#5a5580' },
+  { value: 'candy', label: '糖果', color: '#f9a8c2' },
+]
 
 // 评论管理
 const comments = ref([])
@@ -150,6 +169,40 @@ async function movePoster(id, direction) {
   } catch (e) { push(e?.message || '排序失败', 'error') }
 }
 
+// ====== 用户管理 ======
+
+async function loadUsers() {
+  usersLoading.value = true
+  try {
+    const data = await listUsers()
+    users.value = data.users || []
+  } catch (e) { push(e?.message || '加载用户失败', 'error') }
+  finally { usersLoading.value = false }
+}
+
+function openTitleModal(user) {
+  titleUserId.value = user.id
+  titleName.value = user.titleName || ''
+  titleStyle.value = user.titleStyle || 'default'
+  titleModal.value = true
+}
+
+function closeTitleModal() { titleModal.value = false }
+
+async function handleGrantTitle() {
+  if (!titleName.value.trim()) { push('请输入称号名称', 'warning'); return }
+  try {
+    await grantTitle(titleUserId.value, titleName.value.trim(), titleStyle.value)
+    push('称号授予成功')
+    closeTitleModal()
+    await loadUsers()
+  } catch (e) { push(e?.message || '操作失败', 'error') }
+}
+
+function tabClass(t) {
+  return ['tab-btn', { active: tab.value === t }]
+}
+
 onMounted(async () => { await refresh(); await loadPosters() })
 </script>
 
@@ -190,8 +243,9 @@ onMounted(async () => { await refresh(); await loadPosters() })
     <!-- 右侧 -->
     <section class="profile-feed">
       <div class="tab-bar">
-        <button :class="['tab-btn', { active: tab === 'posts' }]" @click="tab = 'posts'">文章</button>
-        <button :class="['tab-btn', { active: tab === 'posters' }]" @click="tab = 'posters'">海报</button>
+        <button :class="tabClass('posts')" @click="tab = 'posts'">文章</button>
+        <button :class="tabClass('posters')" @click="tab = 'posters'">海报</button>
+        <button :class="tabClass('users')" @click="tab = 'users'; loadUsers()">用户</button>
       </div>
 
       <!-- 文章列表 -->
@@ -253,6 +307,76 @@ onMounted(async () => { await refresh(); await loadPosters() })
         </div>
       </div>
     </section>
+
+      <!-- 用户管理 -->
+      <div v-if="tab === 'users'">
+        <div class="feed-head">
+          <h2 class="feed-title">用户管理</h2>
+          <span class="badge-count">{{ users.length }} 人</span>
+        </div>
+        <div v-if="usersLoading" class="loading-state">加载中...</div>
+        <div v-else-if="users.length === 0" class="empty-state">
+          <div class="empty-title">暂无用户</div>
+        </div>
+        <div v-else class="user-list">
+          <div v-for="u in users" :key="u.id" class="glass-card user-item">
+            <img :src="u.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + u.username" class="user-avatar" :alt="u.username" />
+            <div class="user-body">
+              <div class="user-head">
+                <span class="user-name">{{ u.username }}</span>
+                <span v-if="u.titleName" :class="['title-badge', 'title-' + (u.titleStyle || 'default')]">{{ u.titleName }}</span>
+                <span v-if="u.role === 'ADMIN'" class="user-role-badge">管理员</span>
+              </div>
+              <div class="user-meta">
+                <span class="user-email">{{ u.email || '未填邮箱' }}</span>
+                <span class="user-ip" v-if="u.ipAddress">IP: {{ u.ipAddress }}</span>
+                <span v-if="u.duplicateIp" class="dup-ip-warn" :title="'同IP账号: ' + (u.sameIpUsers || []).join(', ')">⚠ 同IP多账号</span>
+              </div>
+              <div class="user-time">注册于 {{ formatTime(u.createTime) }}</div>
+            </div>
+            <button class="pill-btn pill-btn-ghost user-title-btn" @click="openTitleModal(u)">
+              {{ u.titleName ? '修改称号' : '授予称号' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 称号弹窗 -->
+    <Transition name="modal">
+      <div v-if="titleModal" class="modal-mask" @click.self="closeTitleModal">
+        <div class="glass-card modal-card">
+          <h3 class="modal-title">授予称号</h3>
+          <div class="modal-field">
+            <label class="field-label">称号名称</label>
+            <input v-model="titleName" class="modal-input" placeholder="如：荣誉会员、星标访客..." @keyup.enter="handleGrantTitle" />
+          </div>
+          <div class="modal-field">
+            <label class="field-label">称号样式</label>
+            <div class="theme-grid">
+              <button
+                v-for="t in titleThemes" :key="t.value"
+                :class="['theme-chip', { active: titleStyle === t.value }]"
+                :style="{ '--chip-color': t.color }"
+                @click="titleStyle = t.value"
+              >
+                <span class="chip-dot"></span>
+                {{ t.label }}
+              </button>
+            </div>
+          </div>
+          <div class="modal-field" v-if="titleName">
+            <label class="field-label">预览</label>
+            <span :class="['title-badge', 'title-' + titleStyle]">{{ titleName }}</span>
+          </div>
+          <div class="modal-btns">
+            <button class="pill-btn pill-btn-ghost" @click="closeTitleModal">取消</button>
+            <button v-if="titleName" class="pill-btn pill-btn-ghost" style="color:var(--danger);border-color:var(--danger)" @click="titleName='';handleGrantTitle()">移除称号</button>
+            <button class="pill-btn pill-btn-primary" @click="handleGrantTitle">保存</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 昵称弹窗 -->
     <Transition name="modal">
@@ -406,8 +530,38 @@ onMounted(async () => { await refresh(); await loadPosters() })
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-state { text-align: center; padding: 24px 0; }
 
+/* ====== 用户管理 ====== */
+.user-list { display: flex; flex-direction: column; gap: 8px; }
+.user-item { padding: 14px 16px; display: flex; gap: 14px; align-items: center; }
+.user-item:hover { transform: none; }
+.user-avatar { width: 40px; height: 40px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.user-body { flex: 1; min-width: 0; }
+.user-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.user-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); }
+.user-role-badge { font-size: 0.6rem; padding: 1px 8px; border-radius: var(--radius-sm); background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.user-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 2px; }
+.user-email { font-size: 0.72rem; color: var(--ink-muted); }
+.user-ip { font-size: 0.68rem; color: var(--ink-faint); font-family: var(--font-mono); }
+.dup-ip-warn { font-size: 0.68rem; color: var(--amber); font-weight: 600; cursor: help; }
+.user-time { font-size: 0.68rem; color: var(--ink-faint); }
+.user-title-btn { flex-shrink: 0; font-size: 0.72rem; padding: 5px 12px; white-space: nowrap; }
+
+/* ====== 称号主题选择器 ====== */
+.theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.theme-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); cursor: pointer;
+  font-size: 0.7rem; color: var(--ink-muted);
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.theme-chip:hover { border-color: var(--ink-muted); }
+.theme-chip.active { border-color: var(--chip-color, var(--primary)); background: var(--primary-soft); color: var(--ink); }
+.chip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--chip-color, #888); flex-shrink: 0; }
+
 @media (max-width: 900px) {
   .profile-main { flex-direction: column; }
   .profile-aside { width: 100%; position: static; }
+  .theme-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

@@ -74,6 +74,8 @@ public class CommentController {
         comment.setNickname(user.getUsername());
         comment.setAvatarUrl(user.getAvatarUrl());
         comment.setRole(user.getRole());
+        comment.setTitleName(user.getTitleName());
+        comment.setTitleStyle(user.getTitleStyle());
         commentService.save(comment);
         log.info("评论成功：{}", user.getUsername());
         return Result.success("评论成功");

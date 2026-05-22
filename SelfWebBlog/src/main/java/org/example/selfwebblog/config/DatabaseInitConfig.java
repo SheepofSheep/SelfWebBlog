@@ -65,6 +65,8 @@ public class DatabaseInitConfig {
                 """);
             log.info("comment 表检查/创建完成");
             tryAddColumn(jdbcTemplate, "comment", "pinned", "INTEGER DEFAULT 0");
+            tryAddColumn(jdbcTemplate, "comment", "title_name", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "comment", "title_style", "TEXT DEFAULT 'default'");
 
             // 创建 user 表
             jdbcTemplate.execute("""
@@ -80,6 +82,9 @@ public class DatabaseInitConfig {
                 )
                 """);
             log.info("user 表检查/创建完成");
+            tryAddColumn(jdbcTemplate, "user", "ip_address", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "user", "title_name", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "user", "title_style", "TEXT DEFAULT 'default'");
 
             // 创建 poster 表
             jdbcTemplate.execute("""
@@ -115,7 +120,7 @@ public class DatabaseInitConfig {
                     1,
                     "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
                     "博主",
-                    "欢迎来到我的博客！",
+                    "OvO",
                     ""
                 );
                 log.info("blog_info 默认数据初始化完成");
