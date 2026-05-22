@@ -90,4 +90,25 @@ public class AdminController {
                 "titleStyle", user.getTitleStyle()
         ));
     }
+
+    // ==================== 删除用户 ====================
+
+    @DeleteMapping("/users/{id}")
+    public Result<?> deleteUser(@PathVariable Long id, HttpServletRequest request) {
+        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+
+        Long adminUserId = AuthHelper.getUserId(request);
+        if (adminUserId != null && adminUserId.equals(id)) {
+            return Result.error("不能删除自己");
+        }
+
+        User user = userService.getById(id);
+        if (user == null) return Result.error("用户不存在");
+        if ("ADMIN".equals(user.getRole())) {
+            return Result.error("不能删除管理员账号");
+        }
+
+        userService.removeById(id);
+        return Result.success("用户已删除");
+    }
 }

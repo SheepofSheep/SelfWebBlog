@@ -1,6 +1,6 @@
 <script setup>
 import { computed, inject, onMounted, ref } from 'vue'
-import { deletePost, getProfile, updateProfile, uploadAvatar, uploadImage, listPosters, savePoster, deletePoster as delPoster, listUsers, grantTitle } from '../utils/api'
+import { deletePost, getProfile, updateProfile, uploadAvatar, uploadImage, listPosters, savePoster, deletePoster as delPoster, listUsers, grantTitle, deleteUser } from '../utils/api'
 import { navigate } from '../router'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
@@ -199,6 +199,15 @@ async function handleGrantTitle() {
   } catch (e) { push(e?.message || '操作失败', 'error') }
 }
 
+async function handleDeleteUser(u) {
+  if (!confirm(`确定要删除用户「${u.username}」吗？此操作不可恢复。`)) return
+  try {
+    await deleteUser(u.id)
+    push('用户已删除')
+    await loadUsers()
+  } catch (e) { push(e?.message || '删除失败', 'error') }
+}
+
 function tabClass(t) {
   return ['tab-btn', { active: tab.value === t }]
 }
@@ -336,6 +345,7 @@ onMounted(async () => { await refresh(); await loadPosters() })
             <button class="pill-btn pill-btn-ghost user-title-btn" @click="openTitleModal(u)">
               {{ u.titleName ? '修改称号' : '授予称号' }}
             </button>
+            <button v-if="u.role !== 'ADMIN'" class="act-btn del" @click="handleDeleteUser(u)" :aria-label="'删除用户' + u.username" style="flex-shrink:0">删除</button>
           </div>
         </div>
       </div>
