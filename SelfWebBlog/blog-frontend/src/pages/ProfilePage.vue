@@ -306,7 +306,6 @@ onMounted(async () => { await refresh(); await loadPosters() })
           </div>
         </div>
       </div>
-    </section>
 
       <!-- 用户管理 -->
       <div v-if="tab === 'users'">
