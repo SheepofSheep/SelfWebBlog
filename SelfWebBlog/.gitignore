@@ -27,3 +27,15 @@ uploads/
 
 # SQLite database (local dev)
 *.db
+
+# Claude Code
+.claude/
+
+# Playwright (E2E)
+.playwright-mcp/
+
+# Windows
+*.tmp
+
+# Backups
+*.md.backup

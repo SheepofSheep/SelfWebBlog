@@ -49,8 +49,8 @@ function handleCancel() {
 .confirm-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
+  background: rgba(60, 45, 45, 0.18);
+  backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;

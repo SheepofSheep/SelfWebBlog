@@ -68,7 +68,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="total > 0" class="carousel">
+  <div v-if="total > 0" class="carousel glass-panel">
     <div class="carousel-track">
       <div
         v-for="(p, i) in posters"
@@ -122,16 +122,24 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   max-width: 1140px;
-  margin: 0 auto 28px;
+  margin: 0 auto var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--paper);
-  border: 1px solid var(--rule);
+}
+
+.carousel:hover {
+  transform: none;
 }
 
 .carousel-track {
   position: relative;
   width: 100%;
-  padding-bottom: 30%;
+  padding-bottom: 45%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: var(--shadow-inner);
 }
 
 .carousel-slide {
@@ -147,7 +155,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: rgba(0,0,0,0.03);
+  background: var(--surface-muted);
 }
 
 .carousel-btn {
@@ -155,20 +163,29 @@ onUnmounted(() => {
   top: 50%;
   transform: translateY(-50%);
   width: 40px; height: 40px;
-  border: none;
-  background: rgba(255,255,255,0.8);
-  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  color: var(--text-main);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity var(--duration-fast);
+  transition: opacity var(--duration-normal) var(--ease-bounce),
+              background var(--duration-normal) var(--ease-bounce),
+              color var(--duration-normal) var(--ease-bounce),
+              transform var(--duration-normal) var(--ease-bounce);
 }
 .carousel:hover .carousel-btn { opacity: 1; }
-.carousel-prev { left: 12px; }
-.carousel-next { right: 12px; }
-.carousel-btn:hover { background: #fff; color: var(--red); }
+.carousel-prev { left: 20px; }
+.carousel-next { right: 20px; }
+.carousel-btn:hover {
+  background: rgba(255, 248, 250, 0.95);
+  color: var(--theme-pink-hover);
+  transform: translateY(-50%) scale(1.05);
+}
 
 .carousel-dots {
   position: absolute;
@@ -181,15 +198,21 @@ onUnmounted(() => {
 .dot {
   width: 8px; height: 8px;
   border: none;
-  background: rgba(255,255,255,0.5);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   padding: 0;
-  transition: background var(--duration-fast), transform var(--duration-fast);
+  transition: background var(--duration-normal) var(--ease-bounce),
+              transform var(--duration-normal) var(--ease-bounce);
 }
-.dot.active { background: #fff; transform: scale(1.3); }
+.dot.active {
+  background: rgba(255, 248, 250, 0.95);
+  transform: scale(1.3);
+  box-shadow: 0 0 8px rgba(244, 164, 184, 0.5);
+}
 
 @media (max-width: 768px) {
-  .carousel-track { padding-bottom: 56%; }
+  .carousel-track { padding-bottom: 50%; }
   .carousel-caption { font-size: 0.75rem; }
 }
 
@@ -198,7 +221,7 @@ onUnmounted(() => {
 /* ====== 全屏预览 ====== */
 .preview-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,0.92);
+  background: rgba(30, 20, 20, 0.94);
   display: flex; align-items: center; justify-content: center;
 }
 .preview-modal {
@@ -228,7 +251,7 @@ onUnmounted(() => {
 .preview-info {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10000;
   display: flex; align-items: center; gap: 16px;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(12px);
+  background: rgba(30, 20, 20, 0.65); backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(12px);
 }
 .preview-title { font-size: 0.85rem; font-weight: 500; color: #fff; }

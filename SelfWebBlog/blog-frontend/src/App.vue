@@ -7,7 +7,7 @@ import ToastHost from './components/ToastHost.vue'
 import MeshBackground from './components/MeshBackground.vue'
 import {
   Home, PenLine, Settings, UserPlus, LogOut, Moon, Sun,
-  ChevronLeft, ChevronRight, Menu, User
+  Menu, User, Search, X, ChevronLeft, ChevronRight
 } from 'lucide-vue-next'
 
 const HomePage = defineAsyncComponent(() => import('./pages/HomePage.vue'))
@@ -15,6 +15,8 @@ const PostPage = defineAsyncComponent(() => import('./pages/PostPage.vue'))
 const ProfilePage = defineAsyncComponent(() => import('./pages/ProfilePage.vue'))
 const LoginPage = defineAsyncComponent(() => import('./pages/LoginPage.vue'))
 const WritePage = defineAsyncComponent(() => import('./pages/WritePage.vue'))
+const VisitorProfilePage = defineAsyncComponent(() => import('./pages/VisitorProfilePage.vue'))
+const ArchivePage = defineAsyncComponent(() => import('./pages/ArchivePage.vue'))
 import loadingStore from './stores/loadingStore'
 
 const currentPage = computed(() => {
@@ -23,6 +25,8 @@ const currentPage = computed(() => {
   if (path.value === '/write') return WritePage
   if (path.value.startsWith('/post')) return PostPage
   if (path.value === '/profile') return ProfilePage
+  if (path.value === '/me') return VisitorProfilePage
+  if (path.value === '/archive') return ArchivePage
   return null
 })
 
@@ -41,8 +45,13 @@ provideToast()
 
 const { path, query } = useRoute()
 const user = ref(null)
-const sidebarCollapsed = ref(false)
 const mobileOpen = ref(false)
+const sidebarCollapsed = ref(localStorage.getItem('sidebarCollapsed') === 'true')
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed.value))
+}
 
 const theme = ref(localStorage.getItem('theme') || 'light')
 function toggleTheme() {
@@ -110,7 +119,12 @@ async function ensureAuthForRoute() {
     try { await loadUserInfo() } catch { user.value = null }
   }
 
-  if (currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/post')) return
+  if (currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/post') || currentPath === '/archive') return
+
+  if (currentPath === '/me') {
+    if (!user.value) { showToast('请先登录', 'warning'); navigate('/login') }
+    return
+  }
 
   if (!user.value) { showToast('请先登录', 'warning'); navigate('/login') }
   else if ((currentPath === '/profile' || currentPath === '/write') && user.value?.role !== 'ADMIN') { showToast('无权访问', 'warning'); navigate('/') }
@@ -119,10 +133,22 @@ async function ensureAuthForRoute() {
 async function handleLogout() {
   try { await logout() } catch {}
   localStorage.removeItem('token'); localStorage.removeItem('user')
-  user.value = null; showToast('已退出登录'); navigate('/login')
+  user.value = null; showToast('已退出登录'); navigate('/')
 }
 
-function toggleSidebar() { sidebarCollapsed.value = !sidebarCollapsed.value }
+function navTo(route) {
+  navigate(route)
+  mobileOpen.value = false
+}
+
+async function loadBackground() {
+  try {
+    const data = await getProfile()
+    if (data?.blogInfo?.bgUrl) {
+      document.body.style.backgroundImage = `url(${data.blogInfo.bgUrl})`
+    }
+  } catch {}
+}
 
 watch(() => path.value, async () => {
   NProgress.start(); loadingStore.setRouterLoading(true)
@@ -133,53 +159,61 @@ watch(() => path.value, async () => {
 onMounted(async () => {
   document.documentElement.setAttribute('data-theme', theme.value)
   loadingStore.setRouterLoading(true)
-  try { await ensureAuthForRoute() } finally { loadingStore.setRouterLoading(false); NProgress.done() }
+  try {
+    await Promise.all([ensureAuthForRoute(), loadBackground()])
+  } finally {
+    loadingStore.setRouterLoading(false); NProgress.done()
+  }
 })
 
 onUnmounted(() => {})
 </script>
 
 <template>
-  <div class="app" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'is-login': path === '/login', 'mobile-open': mobileOpen }">
+  <div class="app" :class="{ 'is-login': path === '/login', 'mobile-open': mobileOpen, 'sidebar-collapsed': sidebarCollapsed }">
     <MeshBackground />
 
-    <!-- 侧边栏（登录页隐藏） -->
-    <aside v-if="path !== '/login'" class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-      <!-- 品牌区 -->
-      <div class="sb-brand" @click="navigate('/')">
-        <h1 v-show="!sidebarCollapsed" class="sb-title">Anon's Blog</h1>
-        <span v-show="sidebarCollapsed" class="sb-mark">A</span>
-      </div>
-
-      <!-- 导航项 -->
+    <aside v-if="path !== '/login'" class="sidebar glass-panel" :class="{ collapsed: sidebarCollapsed }" aria-label="站点导航">
       <nav class="sb-nav">
-        <a class="sb-item" :class="{ active: path === '/' }" @click="navigate('/')">
+        <a class="sb-link" :class="{ active: path === '/' }" title="首页" @click="navTo('/')">
           <Home :size="18" />
-          <span class="sb-label">Home</span>
+          <span v-show="!sidebarCollapsed">首页</span>
         </a>
-        <a v-if="user?.role === 'ADMIN'" class="sb-item" :class="{ active: path === '/write' }" @click="navigate('/write')">
+        <a class="sb-link" :class="{ active: path === '/archive' }" title="归档" @click="navTo('/archive')">
+          <Search :size="18" />
+          <span v-show="!sidebarCollapsed">归档</span>
+        </a>
+        <a v-if="user?.role === 'ADMIN'" class="sb-link" :class="{ active: path === '/write' }" title="写作" @click="navTo('/write')">
           <PenLine :size="18" />
-          <span class="sb-label">Write</span>
+          <span v-show="!sidebarCollapsed">写作</span>
         </a>
-        <a v-if="user?.role === 'ADMIN'" class="sb-item" :class="{ active: path === '/profile' }" @click="navigate('/profile')">
+        <a v-if="user?.role === 'ADMIN'" class="sb-link" :class="{ active: path === '/profile' }" title="管理" @click="navTo('/profile')">
           <Settings :size="18" />
-          <span class="sb-label">Manage</span>
+          <span v-show="!sidebarCollapsed">管理</span>
         </a>
-        <a v-if="!user" class="sb-item" :class="{ active: path === '/login' }" @click="navigate('/login')">
+        <a v-if="user && user.role !== 'ADMIN'" class="sb-link" :class="{ active: path === '/me' }" title="我的" @click="navTo('/me')">
+          <User :size="18" />
+          <span v-show="!sidebarCollapsed">我的</span>
+        </a>
+        <a v-if="!user" class="sb-link" :class="{ active: path === '/login' }" title="登录" @click="navTo('/login')">
           <UserPlus :size="18" />
-          <span class="sb-label">Sign In</span>
+          <span v-show="!sidebarCollapsed">登录</span>
         </a>
       </nav>
 
-      <!-- 底部区域 -->
       <div class="sb-footer">
-        <button class="sb-item sb-theme" @click="toggleTheme" aria-label="切换主题">
+        <button
+          class="sb-link"
+          :title="theme === 'light' ? '深色模式' : '浅色模式'"
+          @click="toggleTheme"
+          :aria-label="theme === 'light' ? '切换深色模式' : '切换浅色模式'"
+        >
           <Moon v-if="theme === 'light'" :size="18" />
           <Sun v-else :size="18" />
-          <span class="sb-label">Theme</span>
+          <span v-show="!sidebarCollapsed">{{ theme === 'light' ? '深色模式' : '浅色模式' }}</span>
         </button>
 
-        <div v-if="user" class="sb-user" @click="navigate('/profile')">
+        <div v-if="user" class="sb-user" :title="user?.nickname || user?.username" @click="navTo(user.role === 'ADMIN' ? '/profile' : '/me')">
           <img
             :src="toAbsoluteUrl(user?.avatarUrl) || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'"
             :alt="user?.nickname || user?.username || '用户头像'"
@@ -187,40 +221,42 @@ onUnmounted(() => {})
             :class="{ loaded: user?.avatarUrl }"
             @load="(e) => e.target.classList.add('loaded')"
           />
-          <div class="sb-user-info">
+          <div v-show="!sidebarCollapsed" class="sb-user-info">
             <span class="sb-username">{{ user?.nickname || user?.username }}</span>
-            <span v-if="user?.role === 'ADMIN'" class="sb-badge">Owner</span>
+            <span v-if="user?.role === 'ADMIN'" class="sb-badge">博主</span>
           </div>
         </div>
 
-        <a v-if="user" class="sb-item sb-logout" @click="handleLogout">
+        <a v-if="user" class="sb-link sb-logout" title="退出登录" @click="handleLogout">
           <LogOut :size="18" />
-          <span class="sb-label">Logout</span>
+          <span v-show="!sidebarCollapsed">退出登录</span>
         </a>
       </div>
 
-      <!-- 折叠按钮 -->
-      <button class="sb-collapse-btn" @click="toggleSidebar" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
+      <button
+        class="sb-collapse-btn"
+        @click="toggleSidebar"
+        :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+        :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+      >
         <ChevronLeft v-if="!sidebarCollapsed" :size="16" />
         <ChevronRight v-else :size="16" />
       </button>
     </aside>
 
-    <!-- 移动端遮罩 -->
-    <div v-if="mobileOpen" class="mobile-overlay" @click="mobileOpen = false"></div>
-
-    <!-- 移动端菜单按钮 -->
-    <button v-if="path !== '/login'" class="mobile-menu-btn" @click="mobileOpen = !mobileOpen" aria-label="菜单">
-      <Menu :size="20" />
+    <button v-if="path !== '/login'" class="mobile-menu-btn" @click="mobileOpen = !mobileOpen" :aria-label="mobileOpen ? '关闭菜单' : '打开菜单'">
+      <X v-if="mobileOpen" :size="20" />
+      <Menu v-else :size="20" />
     </button>
 
-    <!-- 主内容 -->
+    <div v-if="mobileOpen" class="mobile-overlay" @click="mobileOpen = false"></div>
+
     <main :class="['main-content', { 'login-content': path === '/login' }]">
       <Transition name="page" mode="out-in">
         <KeepAlive v-if="currentPage" :include="['HomePage', 'ProfilePage']">
           <component :is="currentPage" :key="pageKey + '-' + refreshKey" />
         </KeepAlive>
-        <div v-else class="not-found">Page not found</div>
+        <div v-else class="not-found">页面未找到</div>
       </Transition>
     </main>
 
@@ -231,194 +267,202 @@ onUnmounted(() => {})
 <style scoped>
 .app {
   min-height: 100vh;
-  background: var(--bg);
-  padding-left: 200px;
-  transition: padding-left 0.25s var(--ease-out);
+  background: transparent;
 }
-.sidebar-collapsed .app {
-  padding-left: 56px;
+
+.app:not(.is-login) {
+  padding-left: calc(var(--sidebar-width) + var(--space-xl));
+  transition: padding-left var(--duration-normal) var(--ease-bounce);
+}
+
+.app.sidebar-collapsed:not(.is-login) {
+  padding-left: calc(76px + var(--space-xl));
 }
 
 /* ============================================================
-   Sidebar
+   悬浮胶囊侧边栏
    ============================================================ */
 .sidebar {
   position: fixed;
-  top: 0; left: 0; bottom: 0;
-  width: 200px;
+  left: var(--space-md);
+  top: var(--space-md);
+  bottom: var(--space-md);
+  width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  padding: var(--space-md) var(--space-sm);
+  border-radius: var(--radius-xl);
   z-index: 200;
-  padding: 16px 12px 12px;
-  transition: width 0.25s var(--ease-out);
   overflow: hidden;
+  transition: width var(--duration-normal) var(--ease-bounce),
+              padding var(--duration-normal) var(--ease-bounce);
 }
 
 .sidebar.collapsed {
-  width: 56px;
+  width: 76px;
+  padding: var(--space-md) 10px;
 }
 
-/* Brand */
-.sb-brand {
-  padding: 8px 10px 20px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.sb-title {
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
-  font-weight: var(--fw-bold);
-  color: var(--text);
-  margin: 0;
-  letter-spacing: -0.01em;
-}
-.sb-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-sans);
-  font-size: 1.1rem;
-  font-weight: var(--fw-bold);
-  color: var(--primary);
-  width: 36px; height: 36px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin: 0 auto;
+.sidebar:hover {
+  transform: none;
 }
 
-/* Nav items */
 .sb-nav {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  padding: 0 4px;
 }
 
-.sb-item {
+.sb-link {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 10px;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
+  padding: 10px 14px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
   text-decoration: none;
-  white-space: nowrap;
-  border-radius: var(--radius-sm);
-  transition: color var(--duration-fast), background var(--duration-fast);
-}
-.sb-item:hover {
-  color: var(--text);
-  background: var(--surface-muted);
-}
-.sb-item.active {
-  color: var(--primary);
-  background: var(--primary-soft);
-  font-weight: var(--fw-bold);
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition: color var(--duration-normal) var(--ease-bounce),
+              background var(--duration-normal) var(--ease-bounce),
+              transform var(--duration-normal) var(--ease-bounce);
 }
 
-.sb-label {
-  transition: opacity 0.2s var(--ease-out);
-}
-.sidebar.collapsed .sb-label {
-  display: none;
+.sb-link:hover {
+  color: var(--theme-pink-hover);
+  background: rgba(244, 164, 184, 0.1);
+  transform: translateX(2px);
 }
 
-/* Footer */
+.sidebar.collapsed .sb-link {
+  justify-content: center;
+  padding: 10px;
+  gap: 0;
+}
+
+.sidebar.collapsed .sb-link:hover {
+  transform: translateY(-2px);
+}
+
+.sidebar.collapsed .sb-user {
+  justify-content: center;
+  padding: 10px 8px;
+}
+
+.sb-link.active {
+  color: var(--theme-pink-hover);
+  background: rgba(244, 164, 184, 0.18);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(244, 164, 184, 0.25);
+}
+
 .sb-footer {
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
+  margin-top: auto;
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(244, 164, 184, 0.15);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .sb-user {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background var(--duration-fast);
+  transition: background var(--duration-normal) var(--ease-bounce);
 }
+
 .sb-user:hover {
-  background: var(--surface-muted);
-}
-.sidebar.collapsed .sb-user {
-  justify-content: center;
-  padding: 8px 0;
+  background: rgba(244, 164, 184, 0.1);
 }
 
 .sb-avatar {
-  width: 30px; height: 30px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
 }
+
 .sb-user-info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
-}
-.sidebar.collapsed .sb-user-info {
-  display: none;
 }
 
 .sb-username {
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-  color: var(--text);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-main);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
 .sb-badge {
   font-size: 0.6rem;
-  font-weight: var(--fw-bold);
-  color: var(--primary);
-  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--theme-pink-hover);
 }
 
-.sb-theme,
-.sb-logout {
-  border: none;
-  background: none;
-  width: 100%;
-  text-align: left;
+.sb-logout:hover {
+  color: var(--danger);
+  background: rgba(212, 114, 122, 0.1);
 }
 
-/* Collapse toggle */
 .sb-collapse-btn {
   position: absolute;
-  bottom: 20px;
   right: -12px;
-  width: 24px; height: 24px;
-  border: 1px solid var(--border);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 50%;
-  background: var(--surface);
+  background: linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.45));
+  backdrop-filter: blur(8px);
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: color var(--duration-fast), border-color var(--duration-fast);
+  box-shadow: var(--shadow-soft);
+  transition: color var(--duration-normal) var(--ease-bounce),
+              border-color var(--duration-normal) var(--ease-bounce),
+              transform var(--duration-normal) var(--ease-bounce);
   z-index: 10;
 }
+
 .sb-collapse-btn:hover {
-  color: var(--primary);
-  border-color: var(--primary);
+  color: var(--theme-pink-hover);
+  border-color: rgba(244, 164, 184, 0.45);
+  transform: translateY(-50%) scale(1.08);
+}
+
+[data-theme='dark'] .sb-collapse-btn {
+  background: linear-gradient(135deg, rgba(50,44,50,0.85), rgba(38,34,38,0.65));
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 /* ============================================================
-   Main content
+   主内容区
    ============================================================ */
 .main-content {
-  max-width: 1060px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 36px 40px;
+  padding: var(--space-md) var(--space-xl) var(--space-xl);
   width: 100%;
 }
 
@@ -430,103 +474,86 @@ onUnmounted(() => {})
   justify-content: center;
   min-height: 100vh;
 }
+
 .is-login {
   padding-left: 0 !important;
 }
 
 .not-found {
   padding: 80px 40px;
-  font-size: var(--fs-body);
   text-align: center;
-  color: var(--ink-muted);
+  color: var(--text-muted);
 }
 
-/* Page transitions */
-.page-enter-active { transition: opacity 0.3s var(--ease-out), transform 0.3s var(--ease-out); }
-.page-leave-active { transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out); }
-.page-enter-from { opacity: 0; transform: translateY(8px); }
-.page-leave-to { opacity: 0; transform: translateY(-4px); }
+.page-enter-active {
+  transition: opacity 0.6s var(--ease-bounce), transform 0.6s var(--ease-bounce);
+}
+.page-leave-active {
+  transition: opacity 0.35s var(--ease-bounce), transform 0.35s var(--ease-bounce);
+}
+.page-enter-from { opacity: 0; transform: translateY(12px); }
+.page-leave-to { opacity: 0; transform: translateY(-6px); }
 
-/* ============================================================
-   Mobile menu button
-   ============================================================ */
 .mobile-menu-btn {
   display: none;
   position: fixed;
-  top: 12px;
-  left: 12px;
+  top: 16px;
+  left: 16px;
   z-index: 210;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text);
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, rgba(255,255,255,0.65), rgba(255,255,255,0.35));
+  backdrop-filter: blur(12px);
+  color: var(--text-main);
   cursor: pointer;
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-soft);
 }
-.mobile-menu-btn:active {
-  background: var(--surface-muted);
-}
 
-/* ============================================================
-   Mobile overlay
-   ============================================================ */
 .mobile-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.2);
+  background: rgba(92, 77, 77, 0.12);
+  backdrop-filter: blur(4px);
   z-index: 190;
 }
 
-/* ============================================================
-   Responsive
-   ============================================================ */
-@media (max-width: 768px) {
-  .app {
-    padding-left: 200px;
-  }
-  .sidebar-collapsed .app {
-    padding-left: 56px;
-  }
-  .main-content {
-    padding: 20px 16px;
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 640px) {
-  .app,
-  .sidebar-collapsed .app {
+@media (max-width: 900px) {
+  .app:not(.is-login),
+  .app.sidebar-collapsed:not(.is-login) {
     padding-left: 0;
   }
-  .sidebar {
-    width: 200px;
-    transform: translateX(-100%);
-    border-right: none;
-    box-shadow: var(--shadow-raised);
-  }
+
+  .sidebar,
   .sidebar.collapsed {
-    width: 200px;
-    transform: translateX(-100%);
+    left: 12px;
+    top: 12px;
+    bottom: 12px;
+    width: min(280px, calc(100vw - 24px));
+    padding: var(--space-md) var(--space-sm);
+    transform: translateX(calc(-100% - 24px));
+    transition: transform 0.4s var(--ease-bounce);
+    box-shadow: var(--shadow-hover);
   }
+
   .mobile-open .sidebar,
   .mobile-open .sidebar.collapsed {
     transform: translateX(0);
   }
-  .mobile-menu-btn {
-    display: flex;
-    left: 12px;
-    top: 12px;
-  }
-  .main-content {
-    padding: 16px 16px;
-    max-width: 100%;
-  }
+
   .sb-collapse-btn {
     display: none;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .main-content {
+    padding: 72px var(--space-md) var(--space-lg);
   }
 }
 </style>

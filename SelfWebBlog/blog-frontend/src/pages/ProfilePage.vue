@@ -1,6 +1,6 @@
 <script setup>
 import { computed, inject, onMounted, ref } from 'vue'
-import { deletePost, getProfile, updateProfile, uploadAvatar, uploadImage, listPosters, savePoster, deletePoster as delPoster, listUsers, grantTitle, deleteUser } from '../utils/api'
+import { deletePost, getProfile, updateProfile, updateBackground, uploadAvatar, uploadImage, listPosters, savePoster, deletePoster as delPoster, listUsers, grantTitle, deleteUser, listDrafts } from '../utils/api'
 import { navigate } from '../router'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
@@ -17,7 +17,11 @@ const posts = ref([])
 const nicknameModal = ref(false)
 const newNickname = ref('')
 const newBio = ref('')
-const tab = ref('posts') // posts | posters | users
+const tab = ref('posts') // posts | posters | users | drafts
+
+// 草稿管理
+const drafts = ref([])
+const draftsLoading = ref(false)
 
 // 用户管理
 const users = ref([])
@@ -96,15 +100,19 @@ async function onPickAvatar(e) {
 async function onPickBg(e) {
   const file = e?.target?.files?.[0]
   if (!file) return
-  try { const url = await uploadImage(file); await updateProfile({ bgUrl: url }); push('背景图更新成功'); await refresh() }
+  try { const url = await uploadImage(file); await updateBackground(url); push('背景图更新成功'); await refresh() }
   catch (err) { push(err?.message || '上传失败', 'error') }
   finally { e.target.value = '' }
 }
 
-async function clearBg() { try { await updateProfile({ bgUrl: '' }); push('背景图已清除'); await refresh() } catch (e) { push(e?.message || '操作失败', 'error') } }
+async function clearBg() { try { await updateBackground(''); push('背景图已清除'); await refresh() } catch (e) { push(e?.message || '操作失败', 'error') } }
 
 function editPost(p) {
-  sessionStorage.setItem('editingPost', JSON.stringify({ id: p.id, title: p.title, content: p.content }))
+  sessionStorage.setItem('editingPost', JSON.stringify({
+    id: p.id, title: p.title, content: p.content,
+    summary: p.summary || '', coverUrl: p.coverUrl || '',
+    category: p.category || '', tags: p.tags || ''
+  }))
   navigate('/write')
 }
 
@@ -178,6 +186,25 @@ async function loadUsers() {
     users.value = data.users || []
   } catch (e) { push(e?.message || '加载用户失败', 'error') }
   finally { usersLoading.value = false }
+}
+
+async function loadDrafts() {
+  draftsLoading.value = true
+  try {
+    const data = await listDrafts()
+    drafts.value = Array.isArray(data?.records) ? data.records : (Array.isArray(data) ? data : [])
+  } catch (e) { push(e?.message || '加载草稿失败', 'error') }
+  finally { draftsLoading.value = false }
+}
+
+function editDraft(p) {
+  sessionStorage.setItem('editingPost', JSON.stringify({
+    id: p.id, title: p.title, content: p.content,
+    summary: p.summary || '', coverUrl: p.coverUrl || '',
+    category: p.category || '', tags: p.tags || '',
+    postStatus: p.status || 'DRAFT'
+  }))
+  navigate('/write')
 }
 
 function openTitleModal(user) {
@@ -255,6 +282,7 @@ onMounted(async () => { await refresh(); await loadPosters() })
         <button :class="tabClass('posts')" @click="tab = 'posts'">文章</button>
         <button :class="tabClass('posters')" @click="tab = 'posters'">海报</button>
         <button :class="tabClass('users')" @click="tab = 'users'; loadUsers()">用户</button>
+        <button :class="tabClass('drafts')" @click="tab = 'drafts'; loadDrafts()">草稿</button>
       </div>
 
       <!-- 文章列表 -->
@@ -271,13 +299,17 @@ onMounted(async () => { await refresh(); await loadPosters() })
         <div v-else class="post-list">
           <article v-for="p in allPosts" :key="p.id" class="glass-card post-item" @click="openPost(p.id)">
             <div class="post-thumb">
-              <img v-if="getFirstImageUrl(p.content)" :src="toAbsoluteUrl(getFirstImageUrl(p.content))" alt="" />
+              <img v-if="p.coverUrl || getFirstImageUrl(p.content)" :src="p.coverUrl || toAbsoluteUrl(getFirstImageUrl(p.content))" alt="" />
               <Image v-else :size="22" class="thumb-icon" />
             </div>
             <div class="post-body">
-              <h3 class="post-title">{{ p.title }}</h3>
+              <div class="post-head-row">
+                <h3 class="post-title">{{ p.title }}</h3>
+                <span v-if="p.status === 'DRAFT'" class="status-dot draft">草稿</span>
+                <span v-else class="status-dot published">已发布</span>
+              </div>
               <span class="post-date">{{ formatTime(p.createTime) }}</span>
-              <p class="post-excerpt">{{ toPlainText(p.content).slice(0, 80) }}{{ toPlainText(p.content).length > 80 ? '...' : '' }}</p>
+              <p class="post-excerpt">{{ p.summary || toPlainText(p.content).slice(0, 80) }}{{ (p.summary || toPlainText(p.content)).length > 80 ? '...' : '' }}</p>
             </div>
             <div class="post-actions" @click.stop>
               <button class="act-btn edit" @click="editPost(p)" aria-label="编辑文章"><Edit3 :size="14" /></button>
@@ -349,6 +381,36 @@ onMounted(async () => { await refresh(); await loadPosters() })
               <Trash2 :size="14" />
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- 草稿列表 -->
+      <div v-if="tab === 'drafts'">
+        <div class="feed-head">
+          <h2 class="feed-title">草稿箱</h2>
+          <span class="badge-count">{{ drafts.length }} 篇</span>
+        </div>
+        <div v-if="draftsLoading" class="loading-state">加载中...</div>
+        <div v-else-if="drafts.length === 0" class="empty-state">
+          <div class="empty-title">暂无草稿</div>
+          <div class="empty-desc">在写作页保存为草稿的文章会显示在这里</div>
+        </div>
+        <div v-else class="post-list">
+          <article v-for="p in drafts" :key="p.id" class="glass-card post-item" @click="editDraft(p)">
+            <div class="post-thumb">
+              <img v-if="p.coverUrl" :src="p.coverUrl" alt="" />
+              <Image v-else :size="22" class="thumb-icon" />
+            </div>
+            <div class="post-body">
+              <h3 class="post-title">{{ p.title || '未命名草稿' }}</h3>
+              <span class="post-date">{{ formatTime(p.updateTime || p.createTime) }}</span>
+              <p class="post-excerpt">{{ p.summary || toPlainText(p.content).slice(0, 80) }}{{ (p.summary || toPlainText(p.content)).length > 80 ? '...' : '' }}</p>
+            </div>
+            <div class="post-actions" @click.stop>
+              <span class="draft-badge">草稿</span>
+              <button class="act-btn del" @click="remove(p.id)" aria-label="删除草稿"><Trash2 :size="14" /></button>
+            </div>
+          </article>
         </div>
       </div>
     </section>
@@ -462,8 +524,29 @@ onMounted(async () => { await refresh(); await loadPosters() })
 
 /* ====== Feed ====== */
 .profile-feed { flex: 1; min-width: 0; }
-.tab-btn { padding: 8px 24px; border: none; background: transparent; color: var(--ink-muted); font-size: 0.82rem; font-family: var(--font-body); cursor: pointer; font-weight: 500; transition: background var(--duration-fast), color var(--duration-fast); }
-.tab-btn.active { background: var(--red); color: #fff; font-weight: 600; }
+.tab-bar {
+  display: flex; gap: 6px; padding: 6px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 20px;
+  width: fit-content;
+}
+[data-theme='dark'] .tab-bar {
+  background: rgba(30,28,30,0.80);
+  border-color: rgba(255,255,255,0.08);
+}
+
+.tab-btn {
+  padding: 8px 20px; border: none; border-radius: var(--radius-pill);
+  background: transparent; color: var(--text-secondary);
+  font-size: 0.82rem; font-family: var(--font-body); cursor: pointer; font-weight: 500;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.tab-btn:hover { color: var(--primary-hover); background: var(--primary-soft); }
+.tab-btn.active { background: var(--primary); color: var(--on-primary); font-weight: 600; }
 
 .feed-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .feed-title { margin: 0; font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; }
@@ -472,7 +555,15 @@ onMounted(async () => { await refresh(); await loadPosters() })
 .post-list { display: flex; flex-direction: column; gap: 10px; }
 .post-item { padding: 16px; display: flex; gap: 16px; align-items: center; cursor: pointer; transition: border-color var(--duration-normal) var(--ease-out), background var(--duration-normal) var(--ease-out); }
 .post-item:hover { transform: none; }
-.post-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.post-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm); }
+
+.post-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.status-dot {
+  font-size: 0.6rem; font-weight: 600; padding: 1px 8px; border-radius: var(--radius-pill);
+  white-space: nowrap; flex-shrink: 0;
+}
+.status-dot.draft { color: var(--amber); background: rgba(212, 154, 90, 0.15); }
+.status-dot.published { color: var(--success); background: rgba(109, 168, 138, 0.12); }
 .thumb-icon { color: var(--red); opacity: 0.4; }
 .post-body { flex: 1; min-width: 0; }
 .post-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 0.9rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -507,7 +598,7 @@ onMounted(async () => { await refresh(); await loadPosters() })
 .poster-uploading { font-size: 0.78rem; color: var(--red); font-weight: 500; }
 
 /* ====== 弹窗 ====== */
-.modal-mask { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(8px); }
+.modal-mask { position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center; background: rgba(60, 45, 45, 0.18); backdrop-filter: blur(12px); }
 .modal-card { width: min(400px, calc(100vw - 32px)); padding: 24px; }
 .modal-title { margin: 0 0 1rem; font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; }
 .modal-field { margin-bottom: 0.75rem; }
@@ -564,6 +655,13 @@ onMounted(async () => { await refresh(); await loadPosters() })
   transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
 }
 .user-del-btn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.draft-badge {
+  font-size: 0.65rem; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  background: rgba(212, 154, 90, 0.15); color: var(--amber);
+  white-space: nowrap;
+}
 
 /* ====== 称号主题选择器 ====== */
 .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }

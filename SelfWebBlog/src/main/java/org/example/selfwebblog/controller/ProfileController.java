@@ -1,7 +1,6 @@
 package org.example.selfwebblog.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import jakarta.validation.Valid;
 import org.example.selfwebblog.controller.AuthHelper;
 import org.example.selfwebblog.entity.BlogInfo;
 import org.example.selfwebblog.entity.Post;
@@ -47,18 +46,40 @@ public class ProfileController {
             data.put("total", total);
             data.put("pages", Math.max(1, (int) Math.ceil((double) total / size)));
         } else {
-            data.put("posts", postService.list());
+            Page<Post> all = postService.listByPage(1, Integer.MAX_VALUE);
+            data.put("posts", all.getRecords());
         }
 
         return Result.success(data);
     }
 
-    // 更新个人信息（统一接口）
+    // 更新个人信息（只更新非空字段，避免清空未传入的字段）
     @PostMapping("/update")
-    public Result<Void> updateProfile(@Valid @RequestBody BlogInfo blogInfo, HttpServletRequest request) {
+    public Result<Void> updateProfile(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
-        blogInfo.setId(1);
-        blogInfoService.updateById(blogInfo);
+
+        BlogInfo existing = blogInfoService.getBlogInfo();
+
+        if (body.containsKey("nickname")) {
+            String nickname = (String) body.get("nickname");
+            if (nickname != null && !nickname.trim().isEmpty()) {
+                existing.setNickname(nickname.trim());
+            }
+        }
+        if (body.containsKey("bio")) {
+            existing.setBio((String) body.get("bio"));
+        }
+        if (body.containsKey("avatarUrl")) {
+            String avatarUrl = (String) body.get("avatarUrl");
+            if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {
+                existing.setAvatarUrl(avatarUrl.trim());
+            }
+        }
+        if (body.containsKey("bgUrl")) {
+            existing.setBgUrl((String) body.get("bgUrl"));
+        }
+
+        blogInfoService.updateById(existing);
         return Result.success();
     }
 

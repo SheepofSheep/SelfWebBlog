@@ -351,6 +351,7 @@ public class AuthController {
         return new UserInfo(
             user.getId(),
             user.getUsername(),
+            user.getNickname() != null ? user.getNickname() : "",
             user.getAvatarUrl(),
             user.getRole(),
             user.getTitleName() != null ? user.getTitleName() : "",
@@ -417,6 +418,7 @@ public class AuthController {
     private static class UserInfo {
         private Long id;
         private String username;
+        private String nickname;
         private String avatarUrl;
         private String role;
         private String titleName;
@@ -424,9 +426,10 @@ public class AuthController {
 
         public UserInfo() {}
 
-        public UserInfo(Long id, String username, String avatarUrl, String role, String titleName, String titleStyle) {
+        public UserInfo(Long id, String username, String nickname, String avatarUrl, String role, String titleName, String titleStyle) {
             this.id = id;
             this.username = username;
+            this.nickname = nickname;
             this.avatarUrl = avatarUrl;
             this.role = role;
             this.titleName = titleName;
@@ -437,6 +440,8 @@ public class AuthController {
         public void setId(Long id) { this.id = id; }
         public String getUsername() { return username; }
         public void setUsername(String username) { this.username = username; }
+        public String getNickname() { return nickname; }
+        public void setNickname(String nickname) { this.nickname = nickname; }
         public String getAvatarUrl() { return avatarUrl; }
         public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
         public String getRole() { return role; }

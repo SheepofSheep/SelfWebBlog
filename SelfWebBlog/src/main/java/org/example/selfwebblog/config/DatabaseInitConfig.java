@@ -49,6 +49,12 @@ public class DatabaseInitConfig {
                 )
                 """);
             log.info("post 表检查/创建完成");
+            tryAddColumn(jdbcTemplate, "post", "summary", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "post", "cover_url", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "post", "category", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "post", "tags", "TEXT DEFAULT ''");
+            tryAddColumn(jdbcTemplate, "post", "status", "TEXT DEFAULT 'PUBLISHED'");
+            tryAddColumn(jdbcTemplate, "post", "update_time", "TIMESTAMP");
 
             // 创建 comment 表
             jdbcTemplate.execute("""
@@ -82,6 +88,7 @@ public class DatabaseInitConfig {
                 )
                 """);
             log.info("user 表检查/创建完成");
+            tryAddColumn(jdbcTemplate, "user", "nickname", "TEXT DEFAULT ''");
             tryAddColumn(jdbcTemplate, "user", "ip_address", "TEXT DEFAULT ''");
             tryAddColumn(jdbcTemplate, "user", "title_name", "TEXT DEFAULT ''");
             tryAddColumn(jdbcTemplate, "user", "title_style", "TEXT DEFAULT 'default'");
@@ -98,6 +105,17 @@ public class DatabaseInitConfig {
                 )
                 """);
             log.info("poster 表检查/创建完成");
+
+            // create tag table
+            jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS tag (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    slug TEXT,
+                    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+            log.info("tag 表检查/创建完成");
 
             // 初始化默认管理员（密码写入合法 bcrypt hash）
             Integer adminCount = jdbcTemplate.queryForObject(

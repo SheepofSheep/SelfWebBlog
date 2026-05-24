@@ -15,6 +15,10 @@ uploads/
 *.db
 github-credentials.md
 *.md.backup
+
+# Template files
+**/blog-frontend/README.md
+
 .mvn/wrapper/maven-wrapper.jar
 .mvn/wrapper/maven-wrapper.properties
 

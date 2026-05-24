@@ -4,12 +4,13 @@ import { getProfile, deletePost } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
 import { navigate } from '../router'
-import { Trash2, PenLine, Clock } from 'lucide-vue-next'
+import { Trash2, PenLine, Clock, Tag, Folder, Eye, Sparkles } from 'lucide-vue-next'
 import { gsap } from 'gsap'
 import WriteModal from '../components/WriteModal.vue'
 import PosterCarousel from '../components/PosterCarousel.vue'
 import PersonalLinks from '../components/PersonalLinks.vue'
 import SkeletonCard from '../components/SkeletonCard.vue'
+import MiniCalendar from '../components/MiniCalendar.vue'
 import { formatTime, toPlainText } from '../utils/format'
 
 const { push } = useToast()
@@ -24,6 +25,24 @@ const loading = ref(true)
 
 const displayPosts = computed(() => posts.value)
 
+const calendarPosts = computed(() => displayPosts.value.map(p => ({ id: p.id, title: p.title, createTime: p.createTime })))
+
+function postTags(p) {
+  if (!p?.tags) return []
+  return p.tags.split(/[,，\s]+/).filter(Boolean).slice(0, 3)
+}
+
+function postSummary(p) {
+  const text = p?.summary || toPlainText(p?.content || '')
+  return text.slice(0, 100) + (text.length > 100 ? '…' : '')
+}
+
+function readMinutes(p) {
+  if (!p?.content) return 1
+  const text = p.content.replace(/[#*_`\[\]!\(\)>\-\s]/g, '')
+  return Math.max(1, Math.ceil(text.length / 400))
+}
+
 async function refresh() {
   loading.value = true
   try {
@@ -33,8 +52,8 @@ async function refresh() {
     if (data.total) totalPosts.value = data.total
     else totalPosts.value = posts.value.length
     await nextTick()
-    if (document.querySelector('.post-card')) {
-      gsap.from('.post-card', { y: 20, opacity: 0, duration: 0.5, stagger: 0.08, ease: 'power2.out' })
+    if (document.querySelector('.post-row')) {
+      gsap.from('.post-row', { y: 16, opacity: 0, duration: 0.5, stagger: 0.06, ease: 'power2.out' })
     }
   } catch (e) {
     push(e?.message || '加载失败', 'error')
@@ -44,19 +63,14 @@ async function refresh() {
 }
 
 function openPost(id) { navigate(`/post?id=${encodeURIComponent(String(id))}`) }
-function goToProfile() { navigate('/profile') }
 function openWriteModal() { navigate('/write') }
-
-function maybeOpenEditing() {
-  // 由 WritePage 处理，此处不再需要
-}
 
 async function handleDeletePost(postId, event) {
   if (!confirm('确定要删除这篇文章吗？')) return
-  const card = event.currentTarget.closest('.post-card')
+  const card = event.currentTarget.closest('.post-row')
   if (card) {
     gsap.to(card, {
-      scale: 0.9, opacity: 0, duration: 0.25, ease: 'power2.out',
+      scale: 0.98, opacity: 0, duration: 0.25, ease: 'power2.out',
       onComplete: async () => {
         try { await deletePost(postId); await refresh(); push('删除成功') }
         catch (e) { push(e?.message || '删除失败', 'error') }
@@ -68,99 +82,105 @@ async function handleDeletePost(postId, event) {
   }
 }
 
-onMounted(async () => { await refresh(); maybeOpenEditing() })
+onMounted(async () => { await refresh() })
 </script>
 
 <template>
   <main class="home-main">
-    <!-- 海报轮播 -->
+    <!-- 海报轮播 — 全宽 -->
     <PosterCarousel />
 
-    <!-- 内容区 -->
     <div class="home-layout">
-      <!-- 侧边栏 -->
-      <aside class="home-aside">
-        <div class="glass-card profile-card">
-          <div class="avatar-ring">
-            <img
-              class="avatar-img"
-              :class="{ loaded: blogInfo?.avatarUrl }"
-              :src="toAbsoluteUrl(blogInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix')"
-              :alt="blogInfo?.nickname || '博主头像'"
-              @load="(e) => e.target.classList.add('loaded')"
-            />
-          </div>
-          <h2 class="profile-name">{{ blogInfo?.nickname || '加载中...' }}</h2>
-          <p class="profile-bio">{{ blogInfo?.bio || 'OvO' }}</p>
-          <div class="profile-stats">
-            <div class="stat-item">
-              <span class="stat-num">{{ totalPosts }}</span>
-              <span class="stat-label">篇文章</span>
+      <!-- 左侧：文章 -->
+      <div class="home-content">
+        <section class="posts-section glass-panel">
+          <header class="section-head">
+            <div>
+              <h2 class="section-title">最新文章</h2>
+              <p class="section-sub">共 {{ totalPosts }} 篇 · 随手记录的想法</p>
             </div>
-          </div>
-          <PersonalLinks />
-        </div>
-      </aside>
-
-      <!-- 文章 Feed -->
-      <section class="home-feed custom-scrollbar">
-        <div class="feed-topbar">
-          <button v-if="user?.role === 'ADMIN'" class="pill-btn pill-btn-primary" @click="openWriteModal">
-            <PenLine :size="18" />
-            <span>写文章</span>
-          </button>
-        </div>
-
-        <div class="glass-card posts-panel">
-          <div class="panel-header">
-            <h2 class="panel-title">最新文章</h2>
-            <span class="badge-count">{{ totalPosts }} 篇</span>
-          </div>
+          </header>
 
           <div class="posts-list">
             <SkeletonCard v-if="loading" :count="3" />
-            <div v-else-if="displayPosts.length === 0" class="empty-state">
-              <div class="empty-icon">
-                <PenLine :size="40" />
-              </div>
-              <div class="empty-title">还没有文章</div>
-              <div class="empty-desc">写下你的第一篇博客吧</div>
-            </div>
-            <div v-else class="post-grid">
-              <article
-                v-for="(p, index) in displayPosts"
-                :key="p.id"
-                class="glass-card post-card"
-                :style="{ animationDelay: `${index * 0.08}s` }"
-                @click="openPost(p.id)"
-              >
-                <div class="post-accent"></div>
-                <div class="post-inner">
-                  <div class="post-meta">
-                    <Clock :size="13" />
-                    <span class="post-date">{{ formatTime(p.createTime) }}</span>
-                  </div>
-                  <h3 class="post-title">{{ p.title }}</h3>
-                  <p class="post-excerpt">
-                    {{ (() => { const t = toPlainText(p.content); return t.length > 120 ? t.slice(0, 120) + '...' : t })() }}
-                  </p>
-                </div>
-                <div v-if="user?.role === 'ADMIN'" class="post-actions" @click.stop>
-                  <button class="delete-btn" @click="handleDeletePost(p.id, $event)" aria-label="删除文章">
-                    <Trash2 :size="14" />
-                  </button>
-                </div>
-              </article>
-            </div>
-          </div>
 
-          <div v-if="totalPosts > posts.length" class="panel-footer">
-            <button class="pill-btn pill-btn-ghost" @click="goToProfile">
-              查看全部 {{ totalPosts }} 篇文章
+            <div v-else-if="displayPosts.length === 0" class="empty-state">
+              <PenLine :size="36" class="empty-icon" />
+              <p class="empty-title">还没有文章</p>
+              <p class="empty-desc">写下你的第一篇博客吧</p>
+            </div>
+
+            <article
+              v-else
+              v-for="(p, index) in displayPosts"
+              :key="p.id"
+              class="post-row glass-card"
+              :style="{ animationDelay: `${index * 0.06}s` }"
+              @click="openPost(p.id)"
+            >
+              <div class="post-thumb" :class="{ 'no-cover': !p.coverUrl }">
+                <img v-if="p.coverUrl" :src="p.coverUrl" :alt="p.title" loading="lazy" />
+                <span v-else class="thumb-placeholder">{{ p.title?.charAt(0) || '文' }}</span>
+              </div>
+
+              <div class="post-body">
+                <div class="post-meta">
+                  <span class="meta-item"><Clock :size="12" /> {{ formatTime(p.createTime) }}</span>
+                  <span v-if="p.category" class="meta-item"><Folder :size="12" /> {{ p.category }}</span>
+                  <span class="meta-item"><Eye :size="12" /> {{ readMinutes(p) }} 分钟</span>
+                </div>
+                <h3 class="post-title">{{ p.title }}</h3>
+                <p class="post-excerpt">{{ postSummary(p) }}</p>
+                <div v-if="postTags(p).length" class="post-tags" @click.stop>
+                  <span v-for="t in postTags(p)" :key="t" class="tag">{{ t }}</span>
+                </div>
+              </div>
+
+              <div v-if="user?.role === 'ADMIN'" class="post-actions" @click.stop>
+                <button class="delete-btn" @click="handleDeletePost(p.id, $event)" aria-label="删除文章">
+                  <Trash2 :size="14" />
+                </button>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右侧：博主信息卡片 -->
+      <aside class="home-aside">
+        <section
+          class="hero-card glass-panel"
+          :class="{ 'has-bg': blogInfo?.bgUrl }"
+          :style="blogInfo?.bgUrl ? { backgroundImage: 'url(' + toAbsoluteUrl(blogInfo.bgUrl) + ')' } : {}"
+        >
+          <div class="hero-inner">
+            <div class="hero-avatar-wrap">
+              <img
+                class="hero-avatar avatar-img"
+                :class="{ loaded: blogInfo?.avatarUrl }"
+                :src="toAbsoluteUrl(blogInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix')"
+                :alt="blogInfo?.nickname || '博主头像'"
+                @load="(e) => e.target.classList.add('loaded')"
+              />
+            </div>
+            <div class="hero-text">
+              <p class="hero-greeting"><Sparkles :size="14" /> 你好呀，欢迎来逛</p>
+              <h1 class="hero-name">{{ blogInfo?.nickname || '加载中...' }}</h1>
+              <p class="hero-bio">{{ blogInfo?.bio || '记录生活与代码的小角落' }}</p>
+              <div class="hero-meta">
+                <span class="hero-stat"><strong>{{ totalPosts }}</strong> 篇文章</span>
+                <PersonalLinks />
+              </div>
+            </div>
+            <button v-if="user?.role === 'ADMIN'" class="pill-btn pill-btn-primary hero-write" @click="openWriteModal">
+              <PenLine :size="16" />
+              <span>写文章</span>
             </button>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <MiniCalendar :posts="calendarPosts" />
+      </aside>
     </div>
 
     <WriteModal v-model="showWrite" :initial="editingInitial" @success="refresh" />
@@ -169,162 +189,253 @@ onMounted(async () => { await refresh(); maybeOpenEditing() })
 
 <style scoped>
 .home-main {
-  max-width: 1140px;
-  margin: 0 auto;
   width: 100%;
+  padding: var(--space-md) 0;
 }
 
+/* ═══ 左右布局 ═══ */
 .home-layout {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 var(--space-md);
   display: flex;
   gap: 32px;
   align-items: flex-start;
-  justify-content: center;
 }
 
-/* ====== 侧边栏（右侧） ====== */
+.home-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .home-aside {
-  width: 240px;
+  width: 260px;
   flex-shrink: 0;
   position: sticky;
-  top: 24px;
-  order: 1;
+  top: 20px;
 }
 
-.profile-card {
-  padding: 28px 20px 20px;
+/* ====== Hero ====== */
+.hero-card {
+  padding: var(--space-md);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
   text-align: center;
 }
 
-.avatar-ring {
-  width: 88px; height: 88px;
-  padding: 3px;
-  margin: 0 auto 14px;
-  background: linear-gradient(135deg, var(--red), var(--red-hover), var(--secondary-light));
+.hero-card:hover {
+  transform: none;
 }
 
-.avatar-img {
-  width: 100%; height: 100%;
+.hero-card.has-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.88);
+  z-index: 0;
+}
+[data-theme='dark'] .hero-card.has-bg::before {
+  background: rgba(26, 24, 24, 0.82);
+}
+.hero-card.has-bg > * { position: relative; z-index: 1; }
+
+.hero-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.hero-avatar-wrap {
+  width: 80px;
+  height: 80px;
+  padding: 3px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--theme-pink), var(--theme-peach));
+  margin-bottom: 4px;
+}
+
+.hero-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   object-fit: cover;
   display: block;
-  background: #fff;
+  background: rgba(255, 248, 250, 0.95);
 }
 
-.profile-name {
-  margin: 0 0 4px;
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--red), var(--secondary-light));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.hero-text {
+  width: 100%;
+  text-align: center;
 }
 
-.profile-bio {
-  margin: 0 0 14px;
-  font-size: 0.78rem;
-  color: var(--ink-muted);
-  line-height: 1.6;
-}
-
-.profile-stats {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  margin-bottom: 2px;
-}
-.stat-item { display: flex; flex-direction: column; align-items: center; }
-.stat-num { font-family: var(--font-display); font-size: 1.3rem; color: var(--red); font-weight: 700; }
-.stat-label { font-size: 0.65rem; color: var(--ink-muted); margin-top: 2px; }
-
-/* ====== Feed ====== */
-.home-feed { flex: 1; min-width: 0; max-width: 680px; }
-
-.feed-topbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 20px;
-}
-
-.posts-panel { padding: 28px; }
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 18px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.panel-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.badge-count {
+.hero-greeting {
   display: inline-flex;
-  font-size: 0.7rem;
-  background: var(--red-soft);
-  color: var(--red);
-  padding: 4px 10px;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: var(--font-size-xs);
+  color: var(--theme-pink-hover);
+  letter-spacing: 0.04em;
+}
+
+.hero-name {
+  margin: 0 0 4px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-main);
 }
 
-.posts-list { min-height: 200px; }
+.hero-bio {
+  margin: 0 0 10px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-height);
+}
 
-.post-grid { display: grid; gap: 14px; }
+.hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
 
-/* ====== 文章卡片 ====== */
-.post-card {
+.hero-stat {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+.hero-stat strong {
+  font-size: var(--font-size-md);
+  color: var(--theme-pink-hover);
+  margin-right: 4px;
+}
+
+.hero-write {
+  width: 100%;
+  margin-top: var(--space-xs);
+}
+
+/* ====== 文章区 ====== */
+.posts-section {
+  padding: var(--space-lg);
+}
+
+.posts-section:hover {
+  transform: none;
+}
+
+.section-head {
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(244, 164, 184, 0.15);
+}
+
+.section-title {
+  margin: 0 0 4px;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-main);
+}
+
+.section-sub {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.posts-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-height: 120px;
+}
+
+/* ====== 横向文章卡片 ====== */
+.post-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  cursor: pointer;
   position: relative;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  overflow: hidden;
 }
 
-.post-accent {
-  width: 4px;
+.post-row:hover {
+  transform: translateY(-3px);
+}
+
+.post-thumb {
+  width: 128px;
+  height: 96px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, var(--red) 0%, var(--red-hover) 50%, var(--secondary-light) 100%);
-  opacity: 0.5;
-  transition: opacity var(--duration-normal);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(244, 164, 184, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-inner);
 }
-.post-card:hover .post-accent { opacity: 1; }
 
-.post-inner { flex: 1; padding: 20px; position: relative; z-index: 1; }
+.post-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  display: block;
+  transition: transform var(--duration-slow) var(--ease-soft);
+}
 
-.post-actions { position: absolute; top: 12px; right: 12px; z-index: 2; }
-.delete-btn {
-  background: var(--red-wash);
-  color: var(--red);
-  border: 1px solid var(--rule);
-  padding: 5px;
-  cursor: pointer;
-  transition: opacity var(--duration-fast), visibility var(--duration-fast), background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+.post-row:hover .post-thumb img {
+  transform: scale(1.08);
+}
+
+.post-thumb.no-cover {
   display: flex;
-  visibility: hidden;
-  opacity: 0;
+  align-items: center;
+  justify-content: center;
 }
-.post-card:hover .delete-btn {
-  visibility: visible;
-  opacity: 1;
-}
-.delete-btn:hover { background: var(--red); color: var(--on-primary); border-color: var(--red); }
 
-.post-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--ink-muted); }
-.post-date { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; }
+.thumb-placeholder {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--theme-pink-hover);
+  opacity: 0.6;
+}
+
+.post-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.post-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
 .post-title {
-  margin: 0 0 10px;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1.35;
+  margin: 0 0 6px;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -333,32 +444,109 @@ onMounted(async () => { await refresh(); maybeOpenEditing() })
 
 .post-excerpt {
   margin: 0;
-  color: var(--ink-muted);
-  font-size: 0.82rem;
-  line-height: 1.7;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  line-height: 1.65;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* ====== 空状态 ====== */
-.empty-state { text-align: center; padding: 48px 0; }
-.empty-icon { color: var(--ink-muted); margin-bottom: 12px; }
-.empty-title { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
-.empty-desc { font-size: 0.85rem; color: var(--ink-muted); }
-
-.panel-footer { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--rule); text-align: center; }
-
-/* ====== 响应式 ====== */
-@media (max-width: 900px) {
-  .home-layout { flex-direction: column; }
-  .home-aside { width: 100%; position: static; }
-  .profile-card { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; text-align: left; padding: 18px; }
-  .avatar-ring { width: 60px; height: 60px; margin: 0; }
-  .profile-stats { margin-left: auto; }
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
 }
+
+.post-tags .tag {
+  padding: 2px 8px;
+  font-size: 0.62rem;
+}
+
+.post-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.delete-btn {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--theme-pink-hover);
+  border: 1px solid rgba(244, 164, 184, 0.3);
+  padding: 5px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--duration-normal) var(--ease-bounce),
+              visibility var(--duration-normal) var(--ease-bounce),
+              background var(--duration-normal) var(--ease-bounce);
+}
+
+.post-row:hover .delete-btn {
+  visibility: visible;
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: var(--danger);
+  color: var(--on-primary);
+  border-color: var(--danger);
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-xl) 0;
+  color: var(--text-muted);
+}
+
+.empty-icon {
+  opacity: 0.4;
+  margin-bottom: var(--space-sm);
+}
+
+.empty-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.empty-desc {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 860px) {
+  .home-layout {
+    flex-direction: column;
+  }
+  .home-aside {
+    width: 100%;
+    position: static;
+  }
+}
+
 @media (max-width: 640px) {
-  .posts-panel { padding: 16px; }
+  .hero-write {
+    width: 100%;
+  }
+
+  .posts-section,
+  .hero-card {
+    padding: var(--space-md);
+  }
+
+  .post-row {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .post-thumb {
+    width: 100%;
+    height: 140px;
+  }
 }
 </style>

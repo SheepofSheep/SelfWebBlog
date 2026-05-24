@@ -25,8 +25,20 @@ public class Post {
     @NotBlank(message = "内容不能为空")
     private String content;
 
+    private String summary;
+
+    private String coverUrl;
+
+    private String category;
+
+    private String tags;
+
+    private String status; // DRAFT / PUBLISHED
+
     private String imageUrl;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    private LocalDateTime updateTime;
 }

@@ -33,3 +33,18 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code
+.claude/
+
+# Playwright (E2E)
+.playwright-mcp/
+
+# Backups
+*.md.backup
+
+# Uploads (local dev)
+uploads/
+
+# SQLite (local dev)
+*.db

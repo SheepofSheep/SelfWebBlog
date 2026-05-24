@@ -2,7 +2,7 @@
 import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import { savePost, uploadImage } from '../utils/api'
 import { useToast } from '../composables/toast'
-import { Image, Bold, Italic, Code, Quote, List, Heading, X } from 'lucide-vue-next'
+import { Image, Bold, Italic, Code, Quote, List, Heading, X, Check } from 'lucide-vue-next'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -19,6 +19,8 @@ const loading = ref(false)
 const uploading = ref(false)
 const editingId = ref(null)
 const fileInput = ref(null)
+const draftStatus = ref('')
+let draftTimer = null
 
 const canPublish = computed(() => title.value.trim() && content.value.trim())
 
@@ -83,10 +85,13 @@ function insertMarkdown(prefix, suffix = '') {
 }
 
 function saveDraft() {
+  draftStatus.value = 'saving'
   localStorage.setItem('postDraft', JSON.stringify({
     title: title.value, content: content.value, images: images.value,
     editingId: editingId.value, savedAt: new Date().toISOString()
   }))
+  clearTimeout(draftTimer)
+  draftTimer = setTimeout(() => { draftStatus.value = 'saved' }, 300)
 }
 
 function loadDraft() {
@@ -136,7 +141,11 @@ onMounted(() => {
       <div class="write-panel glass-card" @click.stop>
         <div class="write-head">
           <h3 class="write-title">{{ editingId ? '编辑文章' : '写新文章' }}</h3>
-          <button class="close-btn" @click="close" aria-label="关闭"><X :size="18" /></button>
+          <div class="write-head-right">
+            <span v-if="draftStatus === 'saving'" class="draft-indicator saving">保存中...</span>
+            <span v-else-if="draftStatus === 'saved'" class="draft-indicator saved"><Check :size="14" /> 已保存</span>
+            <button class="close-btn" @click="close" aria-label="关闭"><X :size="18" /></button>
+          </div>
         </div>
 
         <input v-model="title" type="text" placeholder="标题..." class="write-input" autocomplete="off" />
@@ -189,9 +198,9 @@ onMounted(() => {
 .write-overlay {
   position: fixed; inset: 0; z-index: 9998;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(80, 60, 60, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding: 24px;
 }
 
@@ -205,6 +214,7 @@ onMounted(() => {
 }
 
 .write-head { display: flex; justify-content: space-between; align-items: center; }
+.write-head-right { display: flex; align-items: center; gap: 10px; }
 .write-title {
   margin: 0;
   font-family: var(--font-display);
@@ -214,6 +224,15 @@ onMounted(() => {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+.draft-indicator {
+  font-size: 0.7rem; font-weight: 500;
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.draft-indicator.saving { color: var(--amber); background: rgba(212, 154, 90, 0.1); }
+.draft-indicator.saved { color: var(--success); background: rgba(109, 168, 138, 0.1); }
 .close-btn {
   background: none; border: none; color: var(--ink-muted);
   cursor: pointer; padding: 4px; border-radius: 8px;
@@ -285,7 +304,7 @@ onMounted(() => {
 .preview-remove {
   position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
   border: none; border-radius: 50%;
-  background: rgba(0,0,0,0.5); color: #fff; font-size: 14px; cursor: pointer;
+  background: rgba(80, 55, 55, 0.6); color: #fff; font-size: 14px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transition: opacity var(--duration-fast);
 }

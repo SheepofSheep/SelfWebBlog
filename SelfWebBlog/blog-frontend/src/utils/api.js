@@ -89,6 +89,11 @@ export async function updateProfile(payload) {
   return unwrap(res.data)
 }
 
+export async function updateBackground(bgUrl) {
+  const res = await api.post('/profile/background', { bgUrl })
+  return unwrap(res.data)
+}
+
 // ==================== 文章相关 ====================
 
 export async function listPosts(opts) {
@@ -109,6 +114,38 @@ export async function savePost(payload) {
 
 export async function deletePost(id) {
   const res = await api.delete(`/posts/${id}`)
+  return unwrap(res.data)
+}
+
+export async function listDrafts(pageNum = 1, pageSize = 20) {
+  const res = await api.get('/posts/drafts', { params: { page: pageNum, size: pageSize } })
+  return unwrap(res.data)
+}
+
+export async function searchPosts({ keyword, category, tag, sort, page = 1, size = 20 } = {}) {
+  const res = await api.get('/posts/search', { params: { keyword, category, tag, sort, page, size } })
+  return unwrap(res.data)
+}
+
+export async function listCategories() {
+  const res = await api.get('/posts/categories')
+  return unwrap(res.data)
+}
+
+// ==================== 标签管理 ====================
+
+export async function listTags() {
+  const res = await api.get('/tags')
+  return unwrap(res.data)
+}
+
+export async function createTag(name) {
+  const res = await api.post('/tags', { name })
+  return unwrap(res.data)
+}
+
+export async function deleteTagFromAdmin(id) {
+  const res = await api.delete(`/tags/${id}`)
   return unwrap(res.data)
 }
 
@@ -181,6 +218,22 @@ export async function uploadAvatar(file) {
   const form = new FormData()
   form.append('file', file)
   const res = await api.post('/upload/avatar', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  return unwrap(res.data)
+}
+
+// ==================== 用户个人资料 ====================
+
+export async function updateUserProfile(payload) {
+  const res = await api.put('/user/profile', payload)
+  return unwrap(res.data)
+}
+
+export async function uploadUserAvatar(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post('/user/avatar', form, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
   return unwrap(res.data)

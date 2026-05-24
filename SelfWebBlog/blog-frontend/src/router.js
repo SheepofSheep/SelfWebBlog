@@ -2,14 +2,14 @@ import { computed, ref } from 'vue'
 
 // 立即同步设置 hash 值，确保在 state 初始化之前就有正确的 hash
 if (!window.location.hash) {
-  window.history.replaceState({}, '', '#/login')
+  window.history.replaceState({}, '', '#/')
 }
 
 function parseHash() {
-  const raw = window.location.hash || '#/login'
+  const raw = window.location.hash || '#/'
   const hash = raw.startsWith('#') ? raw.slice(1) : raw
   const [pathPart, queryPart] = hash.split('?')
-  const path = pathPart || '/login'
+  const path = pathPart || '/'
   const query = new URLSearchParams(queryPart || '')
   return { path, query }
 }

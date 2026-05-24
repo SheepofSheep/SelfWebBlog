@@ -24,6 +24,7 @@ public class User {
     private String avatarUrl;
     private String role;
     private String githubId;
+    private String nickname;
     private String ipAddress;
     private String titleName;
     private String titleStyle;
