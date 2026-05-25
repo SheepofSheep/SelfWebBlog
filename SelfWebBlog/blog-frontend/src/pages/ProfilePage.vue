@@ -555,7 +555,8 @@ onMounted(async () => { await refresh(); await loadPosters() })
 .post-list { display: flex; flex-direction: column; gap: 10px; }
 .post-item { padding: 16px; display: flex; gap: 16px; align-items: center; cursor: pointer; transition: border-color var(--duration-normal) var(--ease-out), background var(--duration-normal) var(--ease-out); }
 .post-item:hover { transform: none; }
-.post-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm); }
+.post-thumb { width: 80px; height: 56px; flex-shrink: 0; border-radius: var(--radius-sm); overflow: hidden; }
+.post-thumb img { width: 100%; height: 100%; object-fit: cover; }
 
 .post-head-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
 .status-dot {

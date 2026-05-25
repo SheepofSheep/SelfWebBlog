@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
 import { navigate } from '../router'
-import { savePost, uploadImage, listTags } from '../utils/api'
+import { savePost, uploadImage, listTags, listCategories } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
 import { ArrowLeft, Eye, Edit3, Image, Bold, Italic, Code, Quote, List, Heading, Send, Loader, Settings2, Check, Upload } from 'lucide-vue-next'
@@ -46,6 +46,13 @@ async function loadAllTags() {
   try { allTags.value = await listTags() } catch { allTags.value = [] }
 }
 
+const allCategories = ref([])
+async function loadAllCategories() {
+  try { allCategories.value = await listCategories() } catch { allCategories.value = [] }
+}
+
+function selectCategory(name) { category.value = name }
+
 function addTag(name) {
   const current = tagList.value
   if (current.includes(name)) return
@@ -75,6 +82,7 @@ onMounted(() => {
   }
   loadDraft()
   loadAllTags()
+  loadAllCategories()
 })
 
 function getDraftData() {
@@ -286,6 +294,15 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
           <div class="settings-field">
             <label class="settings-label">分类</label>
             <input v-model="category" class="settings-input" placeholder="如：技术、随笔、日记..." />
+            <div v-if="allCategories.length" class="tag-suggestions">
+              <span class="suggest-label">已有分类：</span>
+              <span
+                v-for="c in allCategories.filter(c => c !== category)"
+                :key="c"
+                class="tag-chip suggest"
+                @click="selectCategory(c)"
+              >{{ c }}</span>
+            </div>
           </div>
 
           <div class="settings-field">

@@ -60,8 +60,8 @@ const weeks = computed(() => {
 })
 
 function clickDay(d) {
-  if (!d || !d.hasPost) return
-  selectedDay.value = selectedDay.value === d.num ? null : d.num
+  if (!d || !d.hasPost || !d.num) return
+  selectedDay.value = selectedDay.value === d.num ? null : Number(d.num)
 }
 
 function prevMonth() {
@@ -99,7 +99,7 @@ function openPost(id) {
     <!-- 选中日期的文章列表 -->
     <Transition name="cal-fade">
       <div v-if="selectedPosts.length" class="cal-posts">
-        <div class="cal-posts-head">{{ month.value + 1 }}月{{ selectedDay }}日 · {{ selectedPosts.length }} 篇</div>
+        <div class="cal-posts-head">{{ monthLabel }} {{ selectedDay }}日 · {{ selectedPosts.length }} 篇</div>
         <div
           v-for="p in selectedPosts"
           :key="p.id"

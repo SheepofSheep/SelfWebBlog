@@ -31,3 +31,7 @@ github-credentials.md
 # Windows
 Thumbs.db
 *.tmp
+
+# Local dev scripts (machine-specific paths)
+start-dev.bat
+stop-dev.bat

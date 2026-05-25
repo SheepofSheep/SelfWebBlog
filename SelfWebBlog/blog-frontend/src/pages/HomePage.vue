@@ -25,7 +25,16 @@ const loading = ref(true)
 
 const displayPosts = computed(() => posts.value)
 
-const calendarPosts = computed(() => displayPosts.value.map(p => ({ id: p.id, title: p.title, createTime: p.createTime })))
+const calendarPosts = ref([])
+
+async function loadCalendarPosts() {
+  try {
+    const data = await getProfile({ page: 1, size: 50 })
+    if (Array.isArray(data?.posts)) {
+      calendarPosts.value = data.posts.map(p => ({ id: p.id, title: p.title, createTime: p.createTime }))
+    }
+  } catch {}
+}
 
 function postTags(p) {
   if (!p?.tags) return []
@@ -82,7 +91,7 @@ async function handleDeletePost(postId, event) {
   }
 }
 
-onMounted(async () => { await refresh() })
+onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
 </script>
 
 <template>
@@ -233,11 +242,18 @@ onMounted(async () => { await refresh() })
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.85);
   z-index: 0;
+  transition: background 0.4s var(--ease-bounce);
+}
+.hero-card.has-bg:hover::before {
+  background: rgba(255, 255, 255, 0.55);
 }
 [data-theme='dark'] .hero-card.has-bg::before {
-  background: rgba(26, 24, 24, 0.82);
+  background: rgba(26, 24, 24, 0.80);
+}
+[data-theme='dark'] .hero-card.has-bg:hover::before {
+  background: rgba(26, 24, 24, 0.50);
 }
 .hero-card.has-bg > * { position: relative; z-index: 1; }
 

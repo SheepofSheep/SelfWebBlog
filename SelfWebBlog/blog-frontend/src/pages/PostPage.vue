@@ -7,11 +7,22 @@ import { showToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
 import { toAbsoluteUrl } from '../utils/url'
 import loadingStore from '../stores/loadingStore'
-import { ArrowLeft, Send, Trash2, MessageCircle, Clock, MoreHorizontal, Pin, PinOff, Tag, Folder, RefreshCw, Eye, Smile } from 'lucide-vue-next'
+import { ArrowLeft, Send, Trash2, MessageCircle, Clock, MoreHorizontal, Pin, PinOff, Tag, Folder, RefreshCw, Eye, Smile, Edit3 } from 'lucide-vue-next'
 import { gsap } from 'gsap'
 import { formatTime } from '../utils/format'
 
 function goBack() { window.history.back() }
+
+function editPost() {
+  if (!post.value) return
+  sessionStorage.setItem('editingPost', JSON.stringify({
+    id: post.value.id, title: post.value.title, content: post.value.content,
+    summary: post.value.summary || '', coverUrl: post.value.coverUrl || '',
+    category: post.value.category || '', tags: post.value.tags || '',
+    postStatus: post.value.status || 'PUBLISHED'
+  }))
+  navigate('/write')
+}
 
 const { query } = useRoute()
 const postId = computed(() => query.value.get('id'))
@@ -127,9 +138,14 @@ onMounted(async () => {
 <template>
   <div class="post-page">
     <div v-if="post" class="post-container glass-card">
-      <button class="back-btn" @click="goBack">
-        <ArrowLeft :size="16" /> 返回
-      </button>
+      <div class="post-top-actions">
+        <button class="back-btn" @click="goBack">
+          <ArrowLeft :size="16" /> 返回
+        </button>
+        <button v-if="user?.role === 'ADMIN'" class="edit-btn" @click="editPost" aria-label="编辑文章">
+          <Edit3 :size="14" /> 编辑
+        </button>
+      </div>
 
       <!-- 封面图 — 手账相纸风 -->
       <div v-if="post.coverUrl" class="post-cover-photo">
@@ -254,17 +270,40 @@ onMounted(async () => {
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: var(--radius-pill);
   padding: 8px 18px; font-size: var(--font-size-sm); cursor: pointer;
-  margin-bottom: var(--space-md);
   color: var(--text-secondary);
   transition: border-color var(--duration-normal) var(--ease-bounce),
               color var(--duration-normal) var(--ease-bounce),
               background var(--duration-normal) var(--ease-bounce),
               transform var(--duration-normal) var(--ease-bounce);
 }
+.post-top-actions {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: var(--space-md);
+}
+
 .back-btn:hover {
   border-color: var(--theme-pink);
   color: var(--theme-pink-hover);
   background: rgba(244, 164, 184, 0.12);
+  transform: translateY(-2px);
+}
+
+.edit-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--primary-soft);
+  border: 1px solid rgba(244, 164, 184, 0.3);
+  border-radius: var(--radius-pill);
+  padding: 8px 18px; font-size: var(--font-size-sm); cursor: pointer;
+  color: var(--primary-hover);
+  transition: border-color var(--duration-normal) var(--ease-bounce),
+              color var(--duration-normal) var(--ease-bounce),
+              background var(--duration-normal) var(--ease-bounce),
+              transform var(--duration-normal) var(--ease-bounce);
+}
+.edit-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
   transform: translateY(-2px);
 }
 

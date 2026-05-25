@@ -146,10 +146,11 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.6s var(--ease-out);
 }
 
-.carousel-slide.active { opacity: 1; }
+.carousel-slide.active { opacity: 1; pointer-events: auto; }
 
 .carousel-slide img {
   width: 100%;
