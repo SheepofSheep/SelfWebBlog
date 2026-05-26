@@ -103,6 +103,15 @@ public class UserController {
             log.info("用户 {} 上传头像: {}", userId, dest.getAbsolutePath());
 
             String fileUrl = "/uploads/avatars/" + newFilename;
+
+            // 更新用户头像
+            User currentUser = userService.getById(userId);
+            if (currentUser != null) {
+                currentUser.setAvatarUrl(fileUrl);
+                userService.updateById(currentUser);
+                log.info("用户 {} 头像已更新: {}", currentUser.getUsername(), fileUrl);
+            }
+
             return Result.success(fileUrl);
         } catch (IOException e) {
             log.error("用户头像上传失败", e);
