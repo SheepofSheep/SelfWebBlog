@@ -102,7 +102,7 @@ public class UserController {
             file.transferTo(dest);
             log.info("用户 {} 上传头像: {}", userId, dest.getAbsolutePath());
 
-            String fileUrl = frontendUrl.replaceAll("/$", "") + "/uploads/avatars/" + newFilename;
+            String fileUrl = "/uploads/avatars/" + newFilename;
             return Result.success(fileUrl);
         } catch (IOException e) {
             log.error("用户头像上传失败", e);

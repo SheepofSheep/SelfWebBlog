@@ -5,8 +5,10 @@ import org.example.selfwebblog.controller.AuthHelper;
 import org.example.selfwebblog.entity.BlogInfo;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.Result;
+import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.BlogInfoService;
 import org.example.selfwebblog.service.PostService;
+import org.example.selfwebblog.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,10 +25,12 @@ public class ProfileController {
 
     private final BlogInfoService blogInfoService;
     private final PostService postService;
+    private final UserService userService;
 
-    public ProfileController(BlogInfoService blogInfoService, PostService postService) {
+    public ProfileController(BlogInfoService blogInfoService, PostService postService, UserService userService) {
         this.blogInfoService = blogInfoService;
         this.postService = postService;
+        this.userService = userService;
     }
 
     // 获取个人主页数据，支持可选分页
@@ -80,6 +84,19 @@ public class ProfileController {
         }
 
         blogInfoService.updateById(existing);
+
+        // 同步更新 admin 用户记录，确保 /auth/me 返回最新头像和昵称
+        User adminUser = userService.getByUsername("admin");
+        if (adminUser != null) {
+            if (body.containsKey("nickname") && existing.getNickname() != null) {
+                adminUser.setNickname(existing.getNickname());
+            }
+            if (body.containsKey("avatarUrl") && existing.getAvatarUrl() != null) {
+                adminUser.setAvatarUrl(existing.getAvatarUrl());
+            }
+            userService.updateById(adminUser);
+        }
+
         return Result.success();
     }
 

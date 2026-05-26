@@ -1,7 +1,9 @@
 package org.example.selfwebblog.controller;
 
 import org.example.selfwebblog.entity.Result;
+import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.BlogInfoService;
+import org.example.selfwebblog.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,9 +41,11 @@ public class UploadController {
     private String frontendUrl;
 
     private final BlogInfoService blogInfoService;
+    private final UserService userService;
 
-    public UploadController(BlogInfoService blogInfoService) {
+    public UploadController(BlogInfoService blogInfoService, UserService userService) {
         this.blogInfoService = blogInfoService;
+        this.userService = userService;
     }
 
     private String getUploadDir() {
@@ -67,7 +71,14 @@ public class UploadController {
         }
         Result<String> result = uploadFile(file, getAvatarDir(), "/uploads/avatars/", request);
         if (result.getCode() == 200) {
-            blogInfoService.updateAvatar(result.getData());
+            String avatarUrl = result.getData();
+            blogInfoService.updateAvatar(avatarUrl);
+            // 同步更新 admin 用户的头像，保持 /auth/me 和评论区一致
+            User adminUser = userService.getByUsername("admin");
+            if (adminUser != null) {
+                adminUser.setAvatarUrl(avatarUrl);
+                userService.updateById(adminUser);
+            }
         }
         return result;
     }
@@ -103,8 +114,8 @@ public class UploadController {
             file.transferTo(dest);
             log.info("文件保存成功: {}", dest.getAbsolutePath());
 
-            // 3. 用配置的前端 URL 拼接（不信任 Host 头）
-            String fileUrl = frontendUrl.replaceAll("/$", "") + urlPrefix + newFilename;
+            // 3. 存储相对路径，前端通过 toAbsoluteUrl 解析
+            String fileUrl = urlPrefix + newFilename;
             return Result.success(fileUrl);
 
         } catch (IOException e) {

@@ -71,7 +71,9 @@ public class CommentController {
             return Result.error("用户不存在");
         }
 
-        comment.setNickname(user.getUsername());
+        String displayName = (user.getNickname() != null && !user.getNickname().isBlank())
+                ? user.getNickname() : user.getUsername();
+        comment.setNickname(displayName);
         comment.setAvatarUrl(user.getAvatarUrl());
         comment.setRole(user.getRole());
         comment.setTitleName(user.getTitleName());
