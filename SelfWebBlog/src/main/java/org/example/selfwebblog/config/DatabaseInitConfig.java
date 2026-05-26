@@ -73,6 +73,7 @@ public class DatabaseInitConfig {
             tryAddColumn(jdbcTemplate, "comment", "pinned", "INTEGER DEFAULT 0");
             tryAddColumn(jdbcTemplate, "comment", "title_name", "TEXT DEFAULT ''");
             tryAddColumn(jdbcTemplate, "comment", "title_style", "TEXT DEFAULT 'default'");
+            tryAddColumn(jdbcTemplate, "comment", "user_id", "INTEGER");
 
             // 创建 user 表
             jdbcTemplate.execute("""

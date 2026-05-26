@@ -26,6 +26,7 @@ public class Comment {
     @NotBlank(message = "评论内容不能为空")
     private String content;
 
+    private Long userId;
     private String nickname;
     private String avatarUrl;
     private String role;

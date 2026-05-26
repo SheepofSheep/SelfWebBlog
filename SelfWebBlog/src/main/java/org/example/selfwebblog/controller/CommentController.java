@@ -46,13 +46,22 @@ public class CommentController {
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
         Page<Comment> comments = commentService.getCommentsByPostId(postId, pageNum, pageSize);
-        // 管理员评论始终同步博主当前头像
+        // 博主评论同步当前头像
         BlogInfo blogInfo = blogInfoService.getById(1);
         String adminAvatar = blogInfo != null ? blogInfo.getAvatarUrl() : null;
-        if (adminAvatar != null && !adminAvatar.isEmpty()) {
-            for (Comment c : comments.getRecords()) {
-                if ("ADMIN".equals(c.getRole())) {
+        // 普通用户评论同步最新昵称和头像
+        for (Comment c : comments.getRecords()) {
+            if ("ADMIN".equals(c.getRole())) {
+                if (adminAvatar != null && !adminAvatar.isEmpty()) {
                     c.setAvatarUrl(adminAvatar);
+                }
+            } else if (c.getUserId() != null) {
+                User commentUser = userService.getById(c.getUserId());
+                if (commentUser != null) {
+                    String name = (commentUser.getNickname() != null && !commentUser.getNickname().isBlank())
+                            ? commentUser.getNickname() : commentUser.getUsername();
+                    c.setNickname(name);
+                    c.setAvatarUrl(commentUser.getAvatarUrl() != null ? commentUser.getAvatarUrl() : "");
                 }
             }
         }
@@ -73,6 +82,7 @@ public class CommentController {
 
         String displayName = (user.getNickname() != null && !user.getNickname().isBlank())
                 ? user.getNickname() : user.getUsername();
+        comment.setUserId(user.getId());
         comment.setNickname(displayName);
         comment.setAvatarUrl(user.getAvatarUrl());
         comment.setRole(user.getRole());
