@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.example.selfwebblog.entity.Comment;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
+import org.example.selfwebblog.service.CommentRateLimiter;
 import org.example.selfwebblog.service.CommentService;
 import org.example.selfwebblog.service.PostService;
 import org.example.selfwebblog.service.UserService;
@@ -35,14 +36,16 @@ public class CommentController {
     private final CommentService commentService;
     private final UserService userService;
     private final PostService postService;
+    private final CommentRateLimiter commentRateLimiter;
 
     private final BlogInfoService blogInfoService;
 
-    public CommentController(CommentService commentService, UserService userService, BlogInfoService blogInfoService, PostService postService) {
+    public CommentController(CommentService commentService, UserService userService, BlogInfoService blogInfoService, PostService postService, CommentRateLimiter commentRateLimiter) {
         this.commentService = commentService;
         this.userService = userService;
         this.blogInfoService = blogInfoService;
         this.postService = postService;
+        this.commentRateLimiter = commentRateLimiter;
     }
 
     @GetMapping("/post/{postId}")
@@ -91,6 +94,9 @@ public class CommentController {
         }
         if (comment.getContent() != null && comment.getContent().trim().length() > MAX_COMMENT_LENGTH) {
             return Result.error("评论不能超过1000个字符");
+        }
+        if (!commentRateLimiter.tryAcquire(userId, request.getRemoteAddr())) {
+            return Result.error("评论太频繁了，请稍后再试");
         }
 
         String displayName = (user.getNickname() != null && !user.getNickname().isBlank())

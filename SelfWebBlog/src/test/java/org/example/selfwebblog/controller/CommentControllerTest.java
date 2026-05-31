@@ -3,6 +3,7 @@ package org.example.selfwebblog.controller;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.BlogInfoService;
+import org.example.selfwebblog.service.CommentRateLimiter;
 import org.example.selfwebblog.service.CommentService;
 import org.example.selfwebblog.service.PostService;
 import org.example.selfwebblog.service.UserService;
@@ -40,10 +41,13 @@ class CommentControllerTest {
     @Mock
     private PostService postService;
 
+    @Mock
+    private CommentRateLimiter commentRateLimiter;
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CommentController(commentService, userService, blogInfoService, postService))
+                .standaloneSetup(new CommentController(commentService, userService, blogInfoService, postService, commentRateLimiter))
                 .build();
     }
 
@@ -88,6 +92,41 @@ class CommentControllerTest {
 
         mockMvc.perform(post("/comments")
                         .requestAttr("userId", 10L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "postId": 99,
+                                  "content": "hello"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500));
+
+        verify(commentService, never()).save(any());
+    }
+
+    @Test
+    void rejectsCommentWhenRateLimited() throws Exception {
+        User user = new User();
+        user.setId(10L);
+        user.setUsername("reader");
+        user.setRole("USER");
+        when(userService.getById(10L)).thenReturn(user);
+
+        Post post = new Post();
+        post.setId(99L);
+        post.setTitle("published");
+        post.setContent("visible");
+        post.setStatus("PUBLISHED");
+        when(postService.getById(99L)).thenReturn(post);
+        when(commentRateLimiter.tryAcquire(10L, "127.0.0.1")).thenReturn(false);
+
+        mockMvc.perform(post("/comments")
+                        .requestAttr("userId", 10L)
+                        .with(request -> {
+                            request.setRemoteAddr("127.0.0.1");
+                            return request;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
