@@ -72,6 +72,12 @@ function restoreUser() {
 
 function saveUser(u) { user.value = u; localStorage.setItem('user', JSON.stringify(u)) }
 
+function clearUserState() {
+  user.value = null
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+}
+
 async function loadUserInfo() {
   const token = localStorage.getItem('token')
   if (!token) { user.value = null; return }
@@ -88,8 +94,7 @@ async function loadUserInfo() {
       } catch { saveUser(userInfo) }
     } else { saveUser(userInfo) }
   } catch {
-    user.value = null
-    localStorage.removeItem('token'); localStorage.removeItem('user')
+    clearUserState()
   }
 }
 
@@ -132,8 +137,18 @@ async function ensureAuthForRoute() {
 
 async function handleLogout() {
   try { await logout() } catch {}
-  localStorage.removeItem('token'); localStorage.removeItem('user')
-  user.value = null; showToast('已退出登录'); navigate('/')
+  clearUserState(); showToast('已退出登录'); navigate('/')
+}
+
+function handleAuthExpired() {
+  if (!user.value && !localStorage.getItem('token')) return
+  clearUserState()
+  const currentPath = path.value
+  const isPublic = currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/post') || currentPath === '/archive'
+  if (!isPublic) {
+    showToast('登录状态已失效，请重新登录', 'warning')
+    navigate('/login')
+  }
 }
 
 function navTo(route) {
@@ -157,6 +172,7 @@ watch(() => path.value, async () => {
 })
 
 onMounted(async () => {
+  window.addEventListener('auth:expired', handleAuthExpired)
   document.documentElement.setAttribute('data-theme', theme.value)
   loadingStore.setRouterLoading(true)
   try {
@@ -166,7 +182,9 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {})
+onUnmounted(() => {
+  window.removeEventListener('auth:expired', handleAuthExpired)
+})
 </script>
 
 <template>

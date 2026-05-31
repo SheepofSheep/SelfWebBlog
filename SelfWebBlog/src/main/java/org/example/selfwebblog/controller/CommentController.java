@@ -6,9 +6,11 @@ import org.example.selfwebblog.entity.Comment;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.CommentService;
+import org.example.selfwebblog.service.PostService;
 import org.example.selfwebblog.service.UserService;
 import org.example.selfwebblog.service.BlogInfoService;
 import org.example.selfwebblog.entity.BlogInfo;
+import org.example.selfwebblog.entity.Post;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,16 +30,19 @@ import jakarta.servlet.http.HttpServletRequest;
 public class CommentController {
 
     private static final Logger log = LoggerFactory.getLogger(CommentController.class);
+    private static final int MAX_COMMENT_LENGTH = 1000;
 
     private final CommentService commentService;
     private final UserService userService;
+    private final PostService postService;
 
     private final BlogInfoService blogInfoService;
 
-    public CommentController(CommentService commentService, UserService userService, BlogInfoService blogInfoService) {
+    public CommentController(CommentService commentService, UserService userService, BlogInfoService blogInfoService, PostService postService) {
         this.commentService = commentService;
         this.userService = userService;
         this.blogInfoService = blogInfoService;
+        this.postService = postService;
     }
 
     @GetMapping("/post/{postId}")
@@ -78,6 +83,14 @@ public class CommentController {
         User user = userService.getById(userId);
         if (user == null) {
             return Result.error("用户不存在");
+        }
+
+        Post post = postService.getById(comment.getPostId());
+        if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
+            return Result.error("文章不存在或未发布");
+        }
+        if (comment.getContent() != null && comment.getContent().trim().length() > MAX_COMMENT_LENGTH) {
+            return Result.error("评论不能超过1000个字符");
         }
 
         String displayName = (user.getNickname() != null && !user.getNickname().isBlank())

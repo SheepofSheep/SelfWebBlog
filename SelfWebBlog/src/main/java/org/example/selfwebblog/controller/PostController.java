@@ -5,7 +5,6 @@ import jakarta.validation.Valid;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.service.PostService;
-import org.example.selfwebblog.service.impl.PostServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,6 +24,8 @@ import java.time.LocalDateTime;
 public class PostController {
 
     private static final Logger log = LoggerFactory.getLogger(PostController.class);
+    private static final String STATUS_DRAFT = "DRAFT";
+    private static final String STATUS_PUBLISHED = "PUBLISHED";
 
     private final PostService postService;
 
@@ -40,22 +41,36 @@ public class PostController {
     }
 
     @GetMapping("/{id}")
-    public Result<Post> getById(@PathVariable Long id) {
-        return Result.success(postService.getById(id));
+    public Result<Post> getById(@PathVariable Long id, HttpServletRequest request) {
+        Post post = postService.getById(id);
+        if (post == null) {
+            return Result.error("文章不存在");
+        }
+        if (isDraft(post) && !AuthHelper.isAdmin(request)) {
+            return Result.error("文章不存在");
+        }
+        return Result.success(post);
     }
 
     @PostMapping
     public Result<String> saveOrUpdate(@Valid @RequestBody Post post, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
 
-        if (post.getStatus() == null || post.getStatus().isBlank()) {
-            post.setStatus("PUBLISHED");
+        String normalizedStatus = normalizeStatus(post.getStatus());
+        if (!isValidStatus(normalizedStatus)) {
+            return Result.error("文章状态不合法");
         }
+        post.setStatus(normalizedStatus);
 
         if (post.getId() != null) {
-            post.setUpdateTime(LocalDateTime.now());
-            postService.updateById(post);
-            log.info("更新文章 ID:{} status:{}", post.getId(), post.getStatus());
+            Post existing = postService.getById(post.getId());
+            if (existing == null) {
+                return Result.error("文章不存在");
+            }
+            mergePost(existing, post);
+            existing.setUpdateTime(LocalDateTime.now());
+            postService.updateById(existing);
+            log.info("更新文章 ID:{} status:{}", existing.getId(), existing.getStatus());
             return Result.success("修改成功");
         }
         post.setUpdateTime(LocalDateTime.now());
@@ -78,8 +93,7 @@ public class PostController {
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
-        PostServiceImpl impl = (PostServiceImpl) postService;
-        return Result.success(impl.listDrafts(page, size));
+        return Result.success(postService.listDrafts(page, size));
     }
 
     @GetMapping("/search")
@@ -90,13 +104,37 @@ public class PostController {
             @RequestParam(defaultValue = "date") String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        PostServiceImpl impl = (PostServiceImpl) postService;
-        return Result.success(impl.search(keyword, category, tag, sort, page, size));
+        return Result.success(postService.search(keyword, category, tag, sort, page, size));
     }
 
     @GetMapping("/categories")
     public Result<java.util.List<String>> listCategories() {
-        PostServiceImpl impl = (PostServiceImpl) postService;
-        return Result.success(impl.allCategories());
+        return Result.success(postService.allCategories());
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return STATUS_PUBLISHED;
+        }
+        return status.trim().toUpperCase();
+    }
+
+    private boolean isValidStatus(String status) {
+        return STATUS_DRAFT.equals(status) || STATUS_PUBLISHED.equals(status);
+    }
+
+    private boolean isDraft(Post post) {
+        return post != null && STATUS_DRAFT.equalsIgnoreCase(post.getStatus());
+    }
+
+    private void mergePost(Post existing, Post incoming) {
+        existing.setTitle(incoming.getTitle());
+        existing.setContent(incoming.getContent());
+        if (incoming.getSummary() != null) existing.setSummary(incoming.getSummary());
+        if (incoming.getCoverUrl() != null) existing.setCoverUrl(incoming.getCoverUrl());
+        if (incoming.getCategory() != null) existing.setCategory(incoming.getCategory());
+        if (incoming.getTags() != null) existing.setTags(incoming.getTags());
+        if (incoming.getImageUrl() != null) existing.setImageUrl(incoming.getImageUrl());
+        existing.setStatus(incoming.getStatus());
     }
 }

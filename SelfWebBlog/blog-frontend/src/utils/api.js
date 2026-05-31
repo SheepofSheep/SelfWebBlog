@@ -6,6 +6,22 @@ const api = axios.create({
   withCredentials: true
 })
 
+function clearAuthState() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth:expired'))
+  }
+}
+
+function isAuthFailure(payload, status) {
+  if (status === 401 || status === 403) return true
+  if (!payload || typeof payload !== 'object') return false
+  if (payload.code === 401 || payload.code === 403) return true
+  const msg = String(payload.msg || '')
+  return /未登录|请先登录|无权限|登录已过期|token/i.test(msg)
+}
+
 // 请求拦截器：自动附加 JWT Token
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
@@ -17,11 +33,15 @@ api.interceptors.request.use(config => {
 
 // 响应拦截器：401 自动清除 token
 api.interceptors.response.use(
-  response => response,
+  response => {
+    if (isAuthFailure(response.data, response.status)) {
+      clearAuthState()
+    }
+    return response
+  },
   error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+    if (isAuthFailure(error.response?.data, error.response?.status)) {
+      clearAuthState()
     }
     return Promise.reject(error)
   }
@@ -32,7 +52,10 @@ function unwrap(result) {
     throw new Error('接口返回异常')
   }
   if (result.code !== 200) {
-    throw new Error(result.msg || '请求失败')
+    const error = new Error(result.msg || '请求失败')
+    error.code = result.code
+    error.authRequired = isAuthFailure(result)
+    throw error
   }
   return result.data
 }
