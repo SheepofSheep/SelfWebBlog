@@ -1,36 +1,61 @@
+# Build outputs
 target/
+**/target/
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
+*.jar
+*.war
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# IDE / OS
 .idea/
-.git/
+.vscode/
+*.iml
 .DS_Store
+Thumbs.db
+
+# Logs and temporary files
 *.log
+logs/
+*.tmp
 *.swp
 *.swo
 *~
+
+# Environment and local secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-uploads/
-*.db
+.env.*
+!.env.example
+!**/.env.example
 github-credentials.md
+**/github-credentials.md
+
+# Local runtime data
+uploads/
+**/uploads/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Backups
 *.md.backup
 
 # Template files
 **/blog-frontend/README.md
 
-.mvn/wrapper/maven-wrapper.jar
-.mvn/wrapper/maven-wrapper.properties
-
 # Claude Code
 .claude/
+.codex/
 
 # Playwright（E2E 截图/快照）
 .playwright-mcp/
-
-# Windows
-Thumbs.db
-*.tmp
 
 # Local dev scripts (machine-specific paths)
 start-dev.bat

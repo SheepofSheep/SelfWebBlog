@@ -20,6 +20,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return baseMapper.selectPage(p, wrapper);
     }
 
+    @Override
     public Page<Post> listDrafts(int page, int size) {
         Page<Post> p = new Page<>(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
@@ -28,6 +29,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return baseMapper.selectPage(p, wrapper);
     }
 
+    @Override
     public Page<Post> search(String keyword, String category, String tag, String sort, int page, int size) {
         Page<Post> p = new Page<>(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
@@ -52,6 +54,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         return baseMapper.selectPage(p, wrapper);
     }
 
+    @Override
     public java.util.List<String> allCategories() {
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .select(Post::getCategory)
