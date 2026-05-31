@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
 import { navigate } from '../router'
 import { savePost, uploadImage, listTags, listCategories } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
-import { ArrowLeft, Eye, Edit3, Image, Bold, Italic, Code, Quote, List, Heading, Send, Loader, Settings2, Check, Upload } from 'lucide-vue-next'
+import { ArrowLeft, Eye, Edit3, Image, Bold, Italic, Code, Quote, List, Heading, Send, Loader, Settings2, Check, Upload, Link, Minus, ListChecks } from 'lucide-vue-next'
 
 const { push } = useToast()
 const refreshHome = inject('refreshHome', () => {})
@@ -28,12 +28,15 @@ const postStatus = ref('PUBLISHED') // DRAFT | PUBLISHED
 // ── Draft state ──
 const draftStatus = ref('') // '' | 'saving' | 'saved'
 let draftTimer = null
+const LEGACY_DRAFT_KEY = 'postDraft'
+const NEW_DRAFT_KEY = 'postDraft:new'
 
 const isEditing = computed(() => !!editingId.value)
 const canPublish = computed(() => title.value.trim() && content.value.trim())
 const canSubmit = computed(() => postStatus.value === 'DRAFT' ? title.value.trim() && content.value.trim() : title.value.trim() && content.value.trim() && category.value.trim() && summary.value.trim())
 const renderedContent = computed(() => renderMarkdown(content.value))
 const tagList = computed(() => tags.value.split(/[,，\s]+/).filter(Boolean))
+const draftKey = computed(() => getDraftKey(editingId.value))
 
 // 标签建议
 const allTags = ref([])
@@ -64,26 +67,41 @@ function removeTag(name) {
 }
 
 onMounted(() => {
+  migrateLegacyDraft()
   const editing = sessionStorage.getItem('editingPost')
   if (editing) {
     try {
       const e = JSON.parse(editing)
-      editingId.value = e.id || null
-      title.value = e.title || ''
-      content.value = e.content || ''
-      summary.value = e.summary || ''
-      coverUrl.value = e.coverUrl || ''
-      category.value = e.category || ''
-      tags.value = Array.isArray(e.tags) ? e.tags.join(', ') : (e.tags || '')
-      postStatus.value = e.postStatus || e.status || 'PUBLISHED'
+      applyDraftData(e)
       sessionStorage.removeItem('editingPost')
-      return
+      loadDraft()
     } catch {}
+  } else {
+    loadDraft()
   }
-  loadDraft()
   loadAllTags()
   loadAllCategories()
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  clearTimeout(draftTimer)
+})
+
+function getDraftKey(id) {
+  return id ? `postDraft:${id}` : NEW_DRAFT_KEY
+}
+
+function migrateLegacyDraft() {
+  const legacy = localStorage.getItem(LEGACY_DRAFT_KEY)
+  if (!legacy) return
+  try {
+    const d = JSON.parse(legacy)
+    localStorage.setItem(getDraftKey(d.editingId || null), legacy)
+  } catch {}
+  localStorage.removeItem(LEGACY_DRAFT_KEY)
+}
 
 function getDraftData() {
   return {
@@ -96,25 +114,34 @@ function getDraftData() {
 
 function saveDraft() {
   draftStatus.value = 'saving'
-  localStorage.setItem('postDraft', JSON.stringify(getDraftData()))
+  localStorage.setItem(draftKey.value, JSON.stringify(getDraftData()))
   clearTimeout(draftTimer)
   draftTimer = setTimeout(() => { draftStatus.value = 'saved' }, 300)
 }
 
 function loadDraft() {
-  const draft = localStorage.getItem('postDraft')
+  const draft = localStorage.getItem(draftKey.value)
   if (!draft) return
   try {
     const d = JSON.parse(draft)
-    title.value = d.title || ''
-    content.value = d.content || ''
-    summary.value = d.summary || ''
-    coverUrl.value = d.coverUrl || ''
-    category.value = d.category || ''
-    tags.value = d.tags || ''
-    postStatus.value = d.postStatus || 'PUBLISHED'
-    editingId.value = d.editingId || null
+    applyDraftData(d)
   } catch {}
+}
+
+function applyDraftData(d) {
+  editingId.value = d.id || d.editingId || null
+  title.value = d.title || ''
+  content.value = d.content || ''
+  summary.value = d.summary || ''
+  coverUrl.value = d.coverUrl || ''
+  category.value = d.category || ''
+  tags.value = Array.isArray(d.tags) ? d.tags.join(', ') : (d.tags || '')
+  postStatus.value = d.postStatus || d.status || 'PUBLISHED'
+}
+
+function clearCurrentDraft() {
+  localStorage.removeItem(draftKey.value)
+  localStorage.removeItem(LEGACY_DRAFT_KEY)
 }
 
 // ── Image upload ──
@@ -158,6 +185,28 @@ function insertMarkdown(prefix, suffix = '') {
   saveDraft()
 }
 
+function insertLink() { insertMarkdown('[链接文字](', 'https://)') }
+function insertCodeBlock() { insertMarkdown('```\n', '\n```') }
+function insertDivider() { insertMarkdown('\n---\n') }
+function insertTodo() { insertMarkdown('- [ ] ') }
+
+function hasDraftContent() {
+  return Boolean(
+    title.value.trim() ||
+    content.value.trim() ||
+    summary.value.trim() ||
+    coverUrl.value.trim() ||
+    category.value.trim() ||
+    tags.value.trim()
+  )
+}
+
+function handleBeforeUnload(e) {
+  if (!hasDraftContent() || loading.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+
 // ── Submit ──
 function validateBeforePublish() {
   if (postStatus.value === 'DRAFT') return true
@@ -178,7 +227,7 @@ async function submit() {
     if (editingId.value) body.id = editingId.value
     await savePost(body)
     push(postStatus.value === 'DRAFT' ? '草稿已保存' : (isEditing.value ? '更新成功' : '发布成功'))
-    localStorage.removeItem('postDraft')
+    clearCurrentDraft()
     refreshHome()
     navigate('/')
   } catch (err) { push(err?.message || '操作失败', 'error') }
@@ -187,6 +236,7 @@ async function submit() {
 
 function goBack() {
   saveDraft()
+  if (hasDraftContent() && !confirm('本地草稿已保存，确定离开写作页吗？')) return
   navigate('/')
 }
 
@@ -240,8 +290,12 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
             <button class="tb-btn" title="粗体" aria-label="插入粗体" @click="insertMarkdown('**', '**')"><Bold :size="16" /></button>
             <button class="tb-btn" title="斜体" aria-label="插入斜体" @click="insertMarkdown('*', '*')"><Italic :size="16" /></button>
             <button class="tb-btn" title="行内代码" aria-label="插入行内代码" @click="insertMarkdown('`', '`')"><Code :size="16" /></button>
+            <button class="tb-btn" title="代码块" aria-label="插入代码块" @click="insertCodeBlock"><Code :size="16" /></button>
+            <button class="tb-btn" title="链接" aria-label="插入链接" @click="insertLink"><Link :size="16" /></button>
             <button class="tb-btn" title="引用" aria-label="插入引用" @click="insertMarkdown('> ')"><Quote :size="16" /></button>
             <button class="tb-btn" title="无序列表" aria-label="插入无序列表" @click="insertMarkdown('- ')"><List :size="16" /></button>
+            <button class="tb-btn" title="待办" aria-label="插入待办" @click="insertTodo"><ListChecks :size="16" /></button>
+            <button class="tb-btn" title="分割线" aria-label="插入分割线" @click="insertDivider"><Minus :size="16" /></button>
             <span class="tb-divider"></span>
             <button class="tb-btn" title="插入图片" aria-label="插入图片" @click="triggerUpload">
               <Image :size="16" />
