@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, provide, watch, defineAsyncComponent } from 'vue'
-import { useRoute, navigate } from './router'
-import { getCurrentUser, getProfile, logout } from './utils/api'
+import { useRoute, navigate, getRouteMeta } from './router'
+import { getProfile, AUTH_EXPIRED_EVENT } from './api'
+import { useAuthStore } from './stores/authStore'
 import { provideToast, showToast } from './composables/toast'
 import ToastHost from './components/ToastHost.vue'
 import MeshBackground from './components/MeshBackground.vue'
@@ -44,7 +45,7 @@ import { toAbsoluteUrl } from './utils/url'
 provideToast()
 
 const { path, query } = useRoute()
-const user = ref(null)
+const { user, restoreUser, saveUser, clearUserState, loadUserInfo, logoutUser } = useAuthStore()
 const mobileOpen = ref(false)
 const sidebarCollapsed = ref(localStorage.getItem('sidebarCollapsed') === 'true')
 
@@ -65,39 +66,6 @@ provide('refreshUser', loadUserInfo)
 provide('loadingStore', loadingStore)
 provide('refreshHome', () => { refreshKey.value++ })
 
-function restoreUser() {
-  const stored = localStorage.getItem('user')
-  if (stored) { try { user.value = JSON.parse(stored) } catch { user.value = null } }
-}
-
-function saveUser(u) { user.value = u; localStorage.setItem('user', JSON.stringify(u)) }
-
-function clearUserState() {
-  user.value = null
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-}
-
-async function loadUserInfo() {
-  const token = localStorage.getItem('token')
-  if (!token) { user.value = null; return }
-  try {
-    const userInfo = await getCurrentUser()
-    if (userInfo?.role === 'ADMIN') {
-      try {
-        const profile = await getProfile()
-        saveUser({
-          ...userInfo,
-          nickname: profile?.blogInfo?.nickname || userInfo.username,
-          avatarUrl: profile?.blogInfo?.avatarUrl || userInfo.avatarUrl
-        })
-      } catch { saveUser(userInfo) }
-    } else { saveUser(userInfo) }
-  } catch {
-    clearUserState()
-  }
-}
-
 function handleOAuthRedirect() {
   const token = query.value.get('token')
   const userStr = query.value.get('user')
@@ -116,6 +84,7 @@ function handleOAuthRedirect() {
 
 async function ensureAuthForRoute() {
   const currentPath = path.value
+  const meta = getRouteMeta(currentPath)
   const ok = handleOAuthRedirect()
   if (ok) { navigate('/'); return }
 
@@ -124,28 +93,30 @@ async function ensureAuthForRoute() {
     try { await loadUserInfo() } catch { user.value = null }
   }
 
-  if (currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/post') || currentPath === '/archive') return
+  if (meta.public) return
 
-  if (currentPath === '/me') {
-    if (!user.value) { showToast('请先登录', 'warning'); navigate('/login') }
+  if (meta.requiresAuth && !user.value) {
+    showToast('请先登录', 'warning')
+    navigate('/login')
     return
   }
 
-  if (!user.value) { showToast('请先登录', 'warning'); navigate('/login') }
-  else if ((currentPath === '/profile' || currentPath === '/write') && user.value?.role !== 'ADMIN') { showToast('无权访问', 'warning'); navigate('/') }
+  if (meta.requiresRole && user.value?.role !== meta.requiresRole) {
+    showToast('无权访问', 'warning')
+    navigate('/')
+  }
 }
 
 async function handleLogout() {
-  try { await logout() } catch {}
-  clearUserState(); showToast('已退出登录'); navigate('/')
+  await logoutUser()
+  showToast('已退出登录')
+  navigate('/')
 }
 
 function handleAuthExpired() {
   if (!user.value && !localStorage.getItem('token')) return
   clearUserState()
-  const currentPath = path.value
-  const isPublic = currentPath === '/login' || currentPath === '/' || currentPath.startsWith('/post') || currentPath === '/archive'
-  if (!isPublic) {
+  if (!getRouteMeta(path.value).public) {
     showToast('登录状态已失效，请重新登录', 'warning')
     navigate('/login')
   }
@@ -172,7 +143,7 @@ watch(() => path.value, async () => {
 })
 
 onMounted(async () => {
-  window.addEventListener('auth:expired', handleAuthExpired)
+  window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired)
   document.documentElement.setAttribute('data-theme', theme.value)
   loadingStore.setRouterLoading(true)
   try {
@@ -183,7 +154,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('auth:expired', handleAuthExpired)
+  window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired)
 })
 </script>
 
