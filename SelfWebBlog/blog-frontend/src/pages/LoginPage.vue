@@ -30,21 +30,31 @@ function switchTab(t) {
 
   if (illust && panel) {
     // 快速滑出
-    gsap.to([illust, panel], { autoAlpha: 0, x: dir * -40, duration: 0.2, ease: 'power2.in',
+    gsap.to([illust, panel], {
+      autoAlpha: 0,
+      x: dir * -40,
+      duration: 0.2,
+      ease: 'power2.in',
       onComplete: () => {
         tab.value = t
         imageKey.value++
         const newIllust = document.querySelector('.login-illust')
         const newPanel = document.querySelector('.login-panel-wrap')
         if (newIllust && newPanel) {
-          gsap.fromTo([newIllust, newPanel], { autoAlpha: 0, x: dir * 40 }, { autoAlpha: 1, x: 0, duration: 0.3, ease: 'power2.out' })
+          gsap.fromTo(
+            [newIllust, newPanel],
+            { autoAlpha: 0, x: dir * 40 },
+            { autoAlpha: 1, x: 0, duration: 0.3, ease: 'power2.out' }
+          )
         }
       }
     })
   }
 }
 
-const illustSrc = computed(() => `/images/${tab.value === 'login' ? 'login-illust' : 'register-illust'}.jpg`)
+const illustSrc = computed(
+  () => `/images/${tab.value === 'login' ? 'login-illust' : 'register-illust'}.jpg`
+)
 
 function saveAuth(data) {
   localStorage.setItem('token', data.token)
@@ -53,7 +63,8 @@ function saveAuth(data) {
 
 async function handleLogin() {
   if (!loginUsername.value.trim() || !loginPassword.value.trim()) {
-    showToast('请填写用户名和密码'); return
+    showToast('请填写用户名和密码')
+    return
   }
   loading.value = true
   try {
@@ -61,19 +72,25 @@ async function handleLogin() {
     saveAuth(data)
     showToast('登录成功')
     navigate('/')
-  } catch (e) { showToast(e?.message || '登录失败') }
-  finally { loading.value = false }
+  } catch (e) {
+    showToast(e?.message || '登录失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleRegister() {
   if (!regUsername.value.trim() || !regPassword.value.trim()) {
-    showToast('请填写用户名和密码'); return
+    showToast('请填写用户名和密码')
+    return
   }
   if (regUsername.value.trim().length < 2 || regUsername.value.trim().length > 20) {
-    showToast('用户名需要2-20个字符'); return
+    showToast('用户名需要2-20个字符')
+    return
   }
   if (regPassword.value.length < 6) {
-    showToast('密码至少6个字符'); return
+    showToast('密码至少6个字符')
+    return
   }
   loading.value = true
   try {
@@ -86,15 +103,20 @@ async function handleRegister() {
     saveAuth(data)
     showToast('注册成功，已自动登录')
     navigate('/')
-  } catch (e) { showToast(e?.message || '注册失败') }
-  finally { loading.value = false }
+  } catch (e) {
+    showToast(e?.message || '注册失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleGithubLogin() {
   try {
     const url = await getGithubAuthUrl()
     if (url) window.location.href = url
-  } catch (e) { showToast('GitHub 登录暂不可用') }
+  } catch (e) {
+    showToast('GitHub 登录暂不可用')
+  }
 }
 </script>
 
@@ -109,14 +131,21 @@ async function handleGithubLogin() {
             :src="illustSrc"
             :alt="tab === 'login' ? '登录' : '注册'"
             class="illust-img"
-            @error="(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex' }"
+            @error="
+              (e) => {
+                e.target.style.display = 'none'
+                e.target.nextElementSibling.style.display = 'flex'
+              }
+            "
           />
           <!-- 图片未放置时的占位 -->
           <div class="illust-placeholder">
             <div class="placeholder-inner">
               <p class="placeholder-icon">{{ tab === 'login' ? '🌸' : '✨' }}</p>
               <p class="placeholder-text">将图片放在</p>
-              <code class="placeholder-path">public/images/{{ tab === 'login' ? 'login-illust' : 'register-illust' }}.png</code>
+              <code class="placeholder-path"
+                >public/images/{{ tab === 'login' ? 'login-illust' : 'register-illust' }}.png</code
+              >
             </div>
           </div>
         </div>
@@ -127,56 +156,86 @@ async function handleGithubLogin() {
         <div class="login-card glass-panel">
           <!-- Tabs -->
           <div class="tab-row">
-            <button :class="['tab', { active: tab === 'login' }]" @click="switchTab('login')">登录</button>
-            <button :class="['tab', { active: tab === 'register' }]" @click="switchTab('register')">注册</button>
+            <button :class="['tab', { active: tab === 'login' }]" @click="switchTab('login')">
+              登录
+            </button>
+            <button :class="['tab', { active: tab === 'register' }]" @click="switchTab('register')">
+              注册
+            </button>
           </div>
 
           <!-- Forms -->
           <div class="form-area">
-          <Transition name="form-switch" mode="out-in">
-            <form v-if="tab === 'login'" key="login" class="form" @submit.prevent="handleLogin">
-              <div class="field">
-                <label class="field-label">用户名</label>
-                <input v-model="loginUsername" type="text" class="field-control" placeholder="请输入用户名" autocomplete="username" />
-              </div>
-              <div class="field">
-                <label class="field-label">密码</label>
-                <input v-model="loginPassword" type="password" class="field-control" placeholder="请输入密码" autocomplete="current-password" />
-              </div>
-              <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
-                {{ loading ? '登录中...' : '登录' }}
-              </button>
-            </form>
+            <Transition name="form-switch" mode="out-in">
+              <form v-if="tab === 'login'" key="login" class="form" @submit.prevent="handleLogin">
+                <div class="field">
+                  <label class="field-label">用户名</label>
+                  <input
+                    v-model="loginUsername"
+                    type="text"
+                    class="field-control"
+                    placeholder="请输入用户名"
+                    autocomplete="username"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">密码</label>
+                  <input
+                    v-model="loginPassword"
+                    type="password"
+                    class="field-control"
+                    placeholder="请输入密码"
+                    autocomplete="current-password"
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
+                  {{ loading ? '登录中...' : '登录' }}
+                </button>
+              </form>
 
-            <!-- Register -->
-            <form v-else key="register" class="form" @submit.prevent="handleRegister">
-              <div class="field">
-                <label class="field-label">用户名</label>
-                <input v-model="regUsername" type="text" class="field-control" placeholder="2-20个字符" />
-              </div>
-              <div class="field">
-                <label class="field-label">邮箱</label>
-                <input v-model="regEmail" type="email" class="field-control" placeholder="可选" />
-              </div>
-              <div class="field">
-                <label class="field-label">密码</label>
-                <input v-model="regPassword" type="password" class="field-control" placeholder="至少6个字符" />
-              </div>
-              <div class="field">
-                <label class="field-label">头像链接</label>
-                <input v-model="regAvatar" type="url" class="field-control" placeholder="可选" />
-              </div>
-              <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
-                {{ loading ? '注册中...' : '注册' }}
-              </button>
-            </form>
-          </Transition>
+              <!-- Register -->
+              <form v-else key="register" class="form" @submit.prevent="handleRegister">
+                <div class="field">
+                  <label class="field-label">用户名</label>
+                  <input
+                    v-model="regUsername"
+                    type="text"
+                    class="field-control"
+                    placeholder="2-20个字符"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">邮箱</label>
+                  <input v-model="regEmail" type="email" class="field-control" placeholder="可选" />
+                </div>
+                <div class="field">
+                  <label class="field-label">密码</label>
+                  <input
+                    v-model="regPassword"
+                    type="password"
+                    class="field-control"
+                    placeholder="至少6个字符"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">头像链接</label>
+                  <input v-model="regAvatar" type="url" class="field-control" placeholder="可选" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
+                  {{ loading ? '注册中...' : '注册' }}
+                </button>
+              </form>
+            </Transition>
           </div>
 
           <!-- Switch -->
           <p class="switch-text">
-            <button v-if="tab === 'login'" class="link-btn" @click="switchTab('register')">没有账号？<span>去注册</span></button>
-            <button v-if="tab === 'register'" class="link-btn" @click="switchTab('login')">已有账号？<span>去登录</span></button>
+            <button v-if="tab === 'login'" class="link-btn" @click="switchTab('register')">
+              没有账号？<span>去注册</span>
+            </button>
+            <button v-if="tab === 'register'" class="link-btn" @click="switchTab('login')">
+              已有账号？<span>去登录</span>
+            </button>
           </p>
 
           <div class="sep"><span>或</span></div>
@@ -251,11 +310,19 @@ async function handleGithubLogin() {
   text-align: center;
   color: var(--text-muted);
 }
-.placeholder-icon { font-size: 2rem; margin: 0 0 8px; }
-.placeholder-text { font-size: 0.8rem; margin: 0 0 4px; }
+.placeholder-icon {
+  font-size: 2rem;
+  margin: 0 0 8px;
+}
+.placeholder-text {
+  font-size: 0.8rem;
+  margin: 0 0 4px;
+}
 .placeholder-path {
-  font-size: 0.65rem; background: rgba(255,255,255,0.4);
-  padding: 2px 8px; border-radius: 4px;
+  font-size: 0.65rem;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 2px 8px;
+  border-radius: 4px;
   color: var(--primary-hover);
 }
 
@@ -280,70 +347,146 @@ async function handleGithubLogin() {
 
 /* ═══ Tabs ═══ */
 .tab-row {
-  display: flex; gap: 0;
+  display: flex;
+  gap: 0;
   margin-bottom: var(--space-md);
   border-bottom: 2px solid rgba(244, 164, 184, 0.15);
 }
 .tab {
-  flex: 1; padding: 10px 0; border: none; background: none;
-  font-family: var(--font-sans); font-size: 0.95rem; font-weight: 500;
-  color: var(--text-muted); cursor: pointer;
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
   position: relative;
   transition: color var(--duration-fast);
 }
-.tab.active { color: var(--primary-hover); font-weight: 600; }
+.tab.active {
+  color: var(--primary-hover);
+  font-weight: 600;
+}
 .tab.active::after {
-  content: ''; position: absolute;
-  bottom: -2px; left: 20%; right: 20%;
-  height: 2px; background: var(--primary); border-radius: 1px;
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px;
 }
 
 /* ═══ Forms ═══ */
-.form { display: flex; flex-direction: column; gap: var(--space-sm); flex: 1; margin-bottom: var(--space-sm); }
-.field { display: flex; flex-direction: column; gap: 4px; }
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex: 1;
+  margin-bottom: var(--space-sm);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .field-label {
-  font-size: var(--font-size-xs); font-weight: 600;
-  color: var(--text-secondary); letter-spacing: 0.04em;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
 }
 .field-control {
-  width: 100%; padding: 10px 14px; box-sizing: border-box;
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--surface-muted); color: var(--text);
-  font-size: var(--font-size-sm); font-family: var(--font-body); outline: none;
+  width: 100%;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+  outline: none;
   transition: border-color var(--duration-fast);
 }
-.field-control::placeholder { color: var(--text-faint); }
-.field-control:focus { border-color: var(--primary); }
+.field-control::placeholder {
+  color: var(--text-faint);
+}
+.field-control:focus {
+  border-color: var(--primary);
+}
 
-.btn-full { width: 100%; }
+.btn-full {
+  width: 100%;
+}
 
 /* ═══ Switch ═══ */
-.switch-text { text-align: center; margin-bottom: var(--space-sm); }
+.switch-text {
+  text-align: center;
+  margin-bottom: var(--space-sm);
+}
 .link-btn {
-  background: none; border: none; font-size: 0.82rem;
-  color: var(--text-muted); cursor: pointer; font-family: var(--font-body);
+  background: none;
+  border: none;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-body);
   transition: color var(--duration-fast);
 }
-.link-btn span { color: var(--primary-hover); font-weight: 500; }
-.link-btn:hover span { color: var(--primary); }
+.link-btn span {
+  color: var(--primary-hover);
+  font-weight: 500;
+}
+.link-btn:hover span {
+  color: var(--primary);
+}
 
 /* ═══ Sep ═══ */
 .sep {
-  display: flex; align-items: center; gap: var(--space-sm);
-  margin-bottom: var(--space-sm); color: var(--text-faint); font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  color: var(--text-faint);
+  font-size: 0.75rem;
 }
-.sep::before, .sep::after {
-  content: ''; flex: 1; height: 1px;
+.sep::before,
+.sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
   background: var(--border-light);
 }
 
-.skip-btn { margin-top: var(--space-sm); }
+.skip-btn {
+  margin-top: var(--space-sm);
+}
 
 /* ═══ Form transition ═══ */
-.form-switch-enter-active { transition: opacity 0.25s var(--ease-out), transform 0.25s var(--ease-out); position: absolute; }
-.form-switch-leave-active { transition: opacity 0.15s var(--ease-out), transform 0.15s var(--ease-out); position: absolute; }
-.form-switch-enter-from { opacity: 0; transform: translateX(12px); }
-.form-switch-leave-to { opacity: 0; transform: translateX(-12px); }
+.form-switch-enter-active {
+  transition:
+    opacity 0.25s var(--ease-out),
+    transform 0.25s var(--ease-out);
+  position: absolute;
+}
+.form-switch-leave-active {
+  transition:
+    opacity 0.15s var(--ease-out),
+    transform 0.15s var(--ease-out);
+  position: absolute;
+}
+.form-switch-enter-from {
+  opacity: 0;
+  transform: translateX(12px);
+}
+.form-switch-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
+}
 
 .form-area {
   flex: 1;
@@ -352,12 +495,22 @@ async function handleGithubLogin() {
 
 /* ═══ Responsive ═══ */
 @media (min-width: 700px) {
-  .login-illust { display: block; }
+  .login-illust {
+    display: block;
+  }
 }
 
 @media (max-width: 699px) {
-  .login-layout { min-height: auto; box-shadow: none; }
-  .login-panel-wrap { padding: 0; background: transparent; }
-  .login-card { max-width: 100%; }
+  .login-layout {
+    min-height: auto;
+    box-shadow: none;
+  }
+  .login-panel-wrap {
+    padding: 0;
+    background: transparent;
+  }
+  .login-card {
+    max-width: 100%;
+  }
 }
 </style>

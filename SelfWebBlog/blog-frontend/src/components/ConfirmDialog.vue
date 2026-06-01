@@ -13,9 +13,12 @@ const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
 
 const isVisible = ref(props.modelValue)
 
-watch(() => props.modelValue, (newValue) => {
-  isVisible.value = newValue
-})
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    isVisible.value = newValue
+  }
+)
 
 function handleConfirm() {
   emit('confirm')
@@ -30,14 +33,14 @@ function handleCancel() {
 
 <template>
   <div v-if="isVisible" class="confirm-backdrop" @click="handleCancel">
-    <div class="confirm-dialog" @click.stop>
+    <div class="confirm-dialog glass-card" role="dialog" aria-modal="true" @click.stop>
       <h3 class="confirm-title">{{ title }}</h3>
       <p class="confirm-message">{{ message }}</p>
       <div class="confirm-footer">
-        <button class="confirm-btn cancel-btn" @click="handleCancel">
+        <button class="pill-btn pill-btn-ghost" @click="handleCancel">
           {{ cancelText }}
         </button>
-        <button class="confirm-btn confirm-ok" @click="handleConfirm">
+        <button class="pill-btn confirm-ok" @click="handleConfirm">
           {{ confirmText }}
         </button>
       </div>
@@ -59,8 +62,6 @@ function handleCancel() {
 }
 
 .confirm-dialog {
-  background: var(--paper);
-  border: 1px solid var(--rule);
   padding: 2rem;
   max-width: 400px;
   width: 90%;
@@ -69,17 +70,16 @@ function handleCancel() {
 
 .confirm-title {
   margin: 0 0 0.75rem;
-  font-family: var(--font-display);
-  font-size: var(--fs-title);
-  font-weight: var(--fw-bold);
-  color: var(--ink);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-main);
 }
 
 .confirm-message {
   margin: 0 0 1.5rem;
-  font-size: var(--fs-body);
-  color: var(--ink-muted);
-  line-height: var(--lh-body);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-height);
 }
 
 .confirm-footer {
@@ -88,40 +88,40 @@ function handleCancel() {
   justify-content: flex-end;
 }
 
-.confirm-btn {
-  padding: 8px 20px;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-bold);
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
-  border: 1px solid var(--rule);
-  background: transparent;
-  color: var(--ink-muted);
-}
-
-.confirm-btn:hover {
-  background: var(--paper-dim);
-}
-
 .confirm-ok {
-  background: var(--red);
+  background: var(--danger);
   color: var(--on-primary);
-  border-color: var(--red);
+  border-color: var(--danger);
 }
 
 .confirm-ok:hover {
-  background: var(--red-hover);
+  background: #c95f68;
   transform: translateY(-1px);
 }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (max-width: 768px) {
-  .confirm-dialog { padding: 1.5rem; width: 95%; }
+  .confirm-dialog {
+    padding: 1.5rem;
+    width: 95%;
+  }
 }
 </style>

@@ -31,14 +31,21 @@ async function loadCalendarPosts() {
   try {
     const data = await getProfile({ page: 1, size: 50 })
     if (Array.isArray(data?.posts)) {
-      calendarPosts.value = data.posts.map(p => ({ id: p.id, title: p.title, createTime: p.createTime }))
+      calendarPosts.value = data.posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        createTime: p.createTime
+      }))
     }
   } catch {}
 }
 
 function postTags(p) {
   if (!p?.tags) return []
-  return p.tags.split(/[,，\s]+/).filter(Boolean).slice(0, 3)
+  return p.tags
+    .split(/[,，\s]+/)
+    .filter(Boolean)
+    .slice(0, 3)
 }
 
 function postSummary(p) {
@@ -62,7 +69,13 @@ async function refresh() {
     else totalPosts.value = posts.value.length
     await nextTick()
     if (document.querySelector('.post-row')) {
-      gsap.from('.post-row', { y: 16, opacity: 0, duration: 0.5, stagger: 0.06, ease: 'power2.out' })
+      gsap.from('.post-row', {
+        y: 16,
+        opacity: 0,
+        duration: 0.5,
+        stagger: 0.06,
+        ease: 'power2.out'
+      })
     }
   } catch (e) {
     push(e?.message || '加载失败', 'error')
@@ -71,27 +84,46 @@ async function refresh() {
   }
 }
 
-function openPost(id) { navigate(`/post?id=${encodeURIComponent(String(id))}`) }
-function openWriteModal() { navigate('/write') }
+function openPost(id) {
+  navigate(`/post?id=${encodeURIComponent(String(id))}`)
+}
+function openWriteModal() {
+  navigate('/write')
+}
 
 async function handleDeletePost(postId, event) {
   if (!confirm('确定要删除这篇文章吗？')) return
   const card = event.currentTarget.closest('.post-row')
   if (card) {
     gsap.to(card, {
-      scale: 0.98, opacity: 0, duration: 0.25, ease: 'power2.out',
+      scale: 0.98,
+      opacity: 0,
+      duration: 0.25,
+      ease: 'power2.out',
       onComplete: async () => {
-        try { await deletePost(postId); await refresh(); push('删除成功') }
-        catch (e) { push(e?.message || '删除失败', 'error') }
+        try {
+          await deletePost(postId)
+          await refresh()
+          push('删除成功')
+        } catch (e) {
+          push(e?.message || '删除失败', 'error')
+        }
       }
     })
   } else {
-    try { await deletePost(postId); await refresh(); push('删除成功') }
-    catch (e) { push(e?.message || '删除失败', 'error') }
+    try {
+      await deletePost(postId)
+      await refresh()
+      push('删除成功')
+    } catch (e) {
+      push(e?.message || '删除失败', 'error')
+    }
   }
 }
 
-onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
+onMounted(async () => {
+  await Promise.all([refresh(), loadCalendarPosts()])
+})
 </script>
 
 <template>
@@ -135,7 +167,9 @@ onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
               <div class="post-body">
                 <div class="post-meta">
                   <span class="meta-item"><Clock :size="12" /> {{ formatTime(p.createTime) }}</span>
-                  <span v-if="p.category" class="meta-item"><Folder :size="12" /> {{ p.category }}</span>
+                  <span v-if="p.category" class="meta-item"
+                    ><Folder :size="12" /> {{ p.category }}</span
+                  >
                   <span class="meta-item"><Eye :size="12" /> {{ readMinutes(p) }} 分钟</span>
                 </div>
                 <h3 class="post-title">{{ p.title }}</h3>
@@ -146,7 +180,11 @@ onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
               </div>
 
               <div v-if="user?.role === 'ADMIN'" class="post-actions" @click.stop>
-                <button class="delete-btn" @click="handleDeletePost(p.id, $event)" aria-label="删除文章">
+                <button
+                  class="delete-btn"
+                  @click="handleDeletePost(p.id, $event)"
+                  aria-label="删除文章"
+                >
                   <Trash2 :size="14" />
                 </button>
               </div>
@@ -160,14 +198,20 @@ onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
         <section
           class="hero-card glass-panel"
           :class="{ 'has-bg': blogInfo?.bgUrl }"
-          :style="blogInfo?.bgUrl ? { backgroundImage: 'url(' + toAbsoluteUrl(blogInfo.bgUrl) + ')' } : {}"
+          :style="
+            blogInfo?.bgUrl ? { backgroundImage: 'url(' + toAbsoluteUrl(blogInfo.bgUrl) + ')' } : {}
+          "
         >
           <div class="hero-inner">
             <div class="hero-avatar-wrap">
               <img
                 class="hero-avatar avatar-img"
                 :class="{ loaded: blogInfo?.avatarUrl }"
-                :src="toAbsoluteUrl(blogInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix')"
+                :src="
+                  toAbsoluteUrl(
+                    blogInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
+                  )
+                "
                 :alt="blogInfo?.nickname || '博主头像'"
                 @load="(e) => e.target.classList.add('loaded')"
               />
@@ -177,11 +221,17 @@ onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
               <h1 class="hero-name">{{ blogInfo?.nickname || '加载中...' }}</h1>
               <p class="hero-bio">{{ blogInfo?.bio || '记录生活与代码的小角落' }}</p>
               <div class="hero-meta">
-                <span class="hero-stat"><strong>{{ totalPosts }}</strong> 篇文章</span>
+                <span class="hero-stat"
+                  ><strong>{{ totalPosts }}</strong> 篇文章</span
+                >
                 <PersonalLinks />
               </div>
             </div>
-            <button v-if="user?.role === 'ADMIN'" class="pill-btn pill-btn-primary hero-write" @click="openWriteModal">
+            <button
+              v-if="user?.role === 'ADMIN'"
+              class="pill-btn pill-btn-primary hero-write"
+              @click="openWriteModal"
+            >
               <PenLine :size="16" />
               <span>写文章</span>
             </button>
@@ -250,12 +300,15 @@ onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
   background: rgba(255, 255, 255, 0.55);
 }
 [data-theme='dark'] .hero-card.has-bg::before {
-  background: rgba(26, 24, 24, 0.80);
+  background: rgba(26, 24, 24, 0.8);
 }
 [data-theme='dark'] .hero-card.has-bg:hover::before {
-  background: rgba(26, 24, 24, 0.50);
+  background: rgba(26, 24, 24, 0.5);
 }
-.hero-card.has-bg > * { position: relative; z-index: 1; }
+.hero-card.has-bg > * {
+  position: relative;
+  z-index: 1;
+}
 
 .hero-inner {
   display: flex;
@@ -497,9 +550,10 @@ onMounted(async () => { await Promise.all([refresh(), loadCalendarPosts()]) })
   display: flex;
   visibility: hidden;
   opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-bounce),
-              visibility var(--duration-normal) var(--ease-bounce),
-              background var(--duration-normal) var(--ease-bounce);
+  transition:
+    opacity var(--duration-normal) var(--ease-bounce),
+    visibility var(--duration-normal) var(--ease-bounce),
+    background var(--duration-normal) var(--ease-bounce);
 }
 
 .post-row:hover .delete-btn {

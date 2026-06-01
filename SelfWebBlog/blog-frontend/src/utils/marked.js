@@ -7,30 +7,65 @@ marked.setOptions({
 })
 
 const ARTICLE_TAGS = [
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'p', 'br', 'hr',
-  'strong', 'em', 'del',
-  'a', 'img',
-  'ul', 'ol', 'li',
-  'code', 'pre',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'p',
+  'br',
+  'hr',
+  'strong',
+  'em',
+  'del',
+  'a',
+  'img',
+  'ul',
+  'ol',
+  'li',
+  'code',
+  'pre',
   'blockquote',
-  'table', 'thead', 'tbody', 'tr', 'th', 'td',
-  'sup', 'sub',
-  'span', 'div'
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
+  'sup',
+  'sub',
+  'span',
+  'div'
 ]
 
 const COMMENT_TAGS = [
-  'p', 'br',
-  'strong', 'em', 'del',
-  'a', 'img',
-  'ul', 'ol', 'li',
-  'code', 'pre',
+  'p',
+  'br',
+  'strong',
+  'em',
+  'del',
+  'a',
+  'img',
+  'ul',
+  'ol',
+  'li',
+  'code',
+  'pre',
   'blockquote'
 ]
 
 const ARTICLE_ATTR = [
-  'href', 'src', 'alt', 'title', 'class', 'id',
-  'target', 'rel', 'width', 'height'
+  'href',
+  'src',
+  'alt',
+  'title',
+  'class',
+  'id',
+  'target',
+  'rel',
+  'width',
+  'height'
 ]
 
 const COMMENT_ATTR = ['href', 'src', 'alt', 'title', 'target', 'rel']
@@ -66,7 +101,8 @@ function isSafeLink(value, policy) {
   if (!value) return false
   const url = toUrl(value)
   if (!url) return false
-  if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:') return true
+  if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:')
+    return true
   if (policy.allowRelativeLinks && value.startsWith('/') && !value.startsWith('//')) return true
   return false
 }
@@ -89,7 +125,7 @@ function isSafeImage(value, policy) {
 }
 
 function enforceAttributePolicy(policy) {
-  return node => {
+  return (node) => {
     if (policy.stripClassAndId) {
       node.removeAttribute('class')
       node.removeAttribute('id')
@@ -132,17 +168,25 @@ function sanitizeMarkdown(content, config, policy) {
 }
 
 export function renderArticleMarkdown(content) {
-  return sanitizeMarkdown(content, {
-    ALLOWED_TAGS: ARTICLE_TAGS,
-    ALLOWED_ATTR: ARTICLE_ATTR
-  }, ARTICLE_POLICY)
+  return sanitizeMarkdown(
+    content,
+    {
+      ALLOWED_TAGS: ARTICLE_TAGS,
+      ALLOWED_ATTR: ARTICLE_ATTR
+    },
+    ARTICLE_POLICY
+  )
 }
 
 export function renderCommentMarkdown(content) {
-  return sanitizeMarkdown(content, {
-    ALLOWED_TAGS: COMMENT_TAGS,
-    ALLOWED_ATTR: COMMENT_ATTR
-  }, COMMENT_POLICY)
+  return sanitizeMarkdown(
+    content,
+    {
+      ALLOWED_TAGS: COMMENT_TAGS,
+      ALLOWED_ATTR: COMMENT_ATTR
+    },
+    COMMENT_POLICY
+  )
 }
 
 export function renderMarkdown(content) {

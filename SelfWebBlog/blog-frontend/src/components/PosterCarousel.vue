@@ -9,12 +9,24 @@ const previewIdx = ref(-1)
 let timer = null
 
 const total = computed(() => posters.value.length)
-const previewPoster = computed(() => previewIdx.value >= 0 ? posters.value[previewIdx.value] : null)
+const previewPoster = computed(() =>
+  previewIdx.value >= 0 ? posters.value[previewIdx.value] : null
+)
 
-function openPreview(index) { previewIdx.value = index; clearInterval(timer) }
-function closePreview() { previewIdx.value = -1; if (total.value > 1) timer = setInterval(next, 5000) }
-function prevPreview() { previewIdx.value = previewIdx.value === 0 ? total.value - 1 : previewIdx.value - 1 }
-function nextPreview() { previewIdx.value = previewIdx.value === total.value - 1 ? 0 : previewIdx.value + 1 }
+function openPreview(index) {
+  previewIdx.value = index
+  clearInterval(timer)
+}
+function closePreview() {
+  previewIdx.value = -1
+  if (total.value > 1) timer = setInterval(next, 5000)
+}
+function prevPreview() {
+  previewIdx.value = previewIdx.value === 0 ? total.value - 1 : previewIdx.value - 1
+}
+function nextPreview() {
+  previewIdx.value = previewIdx.value === total.value - 1 ? 0 : previewIdx.value + 1
+}
 
 function prev() {
   current.value = current.value === 0 ? total.value - 1 : current.value - 1
@@ -104,10 +116,26 @@ onUnmounted(() => {
     <Transition name="fade">
       <div v-if="previewPoster" class="preview-overlay" @click.self="closePreview">
         <div class="preview-modal">
-          <button class="preview-close" @click="closePreview" aria-label="关闭预览"><X :size="20" /></button>
-          <button v-if="total > 1" class="preview-arrow prev" @click="prevPreview" aria-label="上一张"><ChevronLeft :size="24" /></button>
+          <button class="preview-close" @click="closePreview" aria-label="关闭预览">
+            <X :size="20" />
+          </button>
+          <button
+            v-if="total > 1"
+            class="preview-arrow prev"
+            @click="prevPreview"
+            aria-label="上一张"
+          >
+            <ChevronLeft :size="24" />
+          </button>
           <img :src="previewPoster.imageUrl" class="preview-img" alt="海报预览" />
-          <button v-if="total > 1" class="preview-arrow next" @click="nextPreview" aria-label="下一张"><ChevronRight :size="24" /></button>
+          <button
+            v-if="total > 1"
+            class="preview-arrow next"
+            @click="nextPreview"
+            aria-label="下一张"
+          >
+            <ChevronRight :size="24" />
+          </button>
           <div class="preview-info">
             <span class="preview-index">{{ previewIdx + 1 }} / {{ total }}</span>
           </div>
@@ -150,7 +178,10 @@ onUnmounted(() => {
   transition: opacity 0.6s var(--ease-out);
 }
 
-.carousel-slide.active { opacity: 1; pointer-events: auto; }
+.carousel-slide.active {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .carousel-slide img {
   width: 100%;
@@ -163,7 +194,8 @@ onUnmounted(() => {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 40px; height: 40px;
+  width: 40px;
+  height: 40px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.75);
@@ -174,14 +206,21 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-bounce),
-              background var(--duration-normal) var(--ease-bounce),
-              color var(--duration-normal) var(--ease-bounce),
-              transform var(--duration-normal) var(--ease-bounce);
+  transition:
+    opacity var(--duration-normal) var(--ease-bounce),
+    background var(--duration-normal) var(--ease-bounce),
+    color var(--duration-normal) var(--ease-bounce),
+    transform var(--duration-normal) var(--ease-bounce);
 }
-.carousel:hover .carousel-btn { opacity: 1; }
-.carousel-prev { left: 20px; }
-.carousel-next { right: 20px; }
+.carousel:hover .carousel-btn {
+  opacity: 1;
+}
+.carousel-prev {
+  left: 20px;
+}
+.carousel-next {
+  right: 20px;
+}
 .carousel-btn:hover {
   background: rgba(255, 248, 250, 0.95);
   color: var(--theme-pink-hover);
@@ -197,14 +236,16 @@ onUnmounted(() => {
   gap: 8px;
 }
 .dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   padding: 0;
-  transition: background var(--duration-normal) var(--ease-bounce),
-              transform var(--duration-normal) var(--ease-bounce);
+  transition:
+    background var(--duration-normal) var(--ease-bounce),
+    transform var(--duration-normal) var(--ease-bounce);
 }
 .dot.active {
   background: rgba(255, 248, 250, 0.95);
@@ -213,51 +254,108 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .carousel-track { padding-bottom: 50%; }
-  .carousel-caption { font-size: 0.75rem; }
+  .carousel-track {
+    padding-bottom: 50%;
+  }
+  .carousel-caption {
+    font-size: 0.75rem;
+  }
 }
 
-.carousel-slide { cursor: pointer; }
+.carousel-slide {
+  cursor: pointer;
+}
 
 /* ====== 全屏预览 ====== */
 .preview-overlay {
-  position: fixed; inset: 0; z-index: 9999;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   background: rgba(30, 20, 20, 0.94);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .preview-modal {
   position: relative;
-  width: 100vw; height: 100vh;
-  display: flex; align-items: center; justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent !important;
   border: none !important;
   overflow: visible !important;
 }
 .preview-close {
-  position: fixed; top: 20px; right: 20px; z-index: 10000;
-  border: none; background: rgba(255,255,255,0.12); color: #fff;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background var(--duration-fast);
 }
-.preview-close:hover { background: rgba(255,255,255,0.25); }
+.preview-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
 .preview-arrow {
-  position: fixed; top: 50%; transform: translateY(-50%); z-index: 10000;
-  border: none; background: rgba(255,255,255,0.12); color: #fff;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10000;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background var(--duration-fast);
 }
-.preview-arrow:hover { background: rgba(255,255,255,0.3); }
-.preview-arrow.prev { left: 20px; }
-.preview-arrow.next { right: 20px; }
+.preview-arrow:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.preview-arrow.prev {
+  left: 20px;
+}
+.preview-arrow.next {
+  right: 20px;
+}
 .preview-info {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10000;
-  display: flex; align-items: center; gap: 16px;
-  background: rgba(30, 20, 20, 0.65); backdrop-filter: blur(16px);
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(30, 20, 20, 0.65);
+  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(12px);
 }
-.preview-title { font-size: 0.85rem; font-weight: 500; color: #fff; }
-.preview-index { font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+.preview-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
+}
+.preview-index {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+}
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

@@ -18,6 +18,14 @@ function Add-Pass {
     Write-Host "[PASS] $Message" -ForegroundColor Green
 }
 
+function Get-ResponseText {
+    param($Response)
+    if ($Response.Content -is [byte[]]) {
+        return [System.Text.Encoding]::UTF8.GetString($Response.Content)
+    }
+    return [string]$Response.Content
+}
+
 function Test-HttpEndpoint {
     param(
         [string]$Name,
@@ -49,17 +57,28 @@ Write-Host ""
 
 Test-HttpEndpoint "Backend health" "$BackendUrl/actuator/health" {
     param($Response)
-    $Response.Content -match '"status"\s*:\s*"UP"'
+    try {
+        $health = Get-ResponseText $Response | ConvertFrom-Json
+        $health.status -eq "UP"
+    } catch {
+        $false
+    }
 }
 
 Test-HttpEndpoint "Posts API" "$BackendUrl/posts" {
     param($Response)
-    $Response.Content -match '"code"\s*:\s*200'
+    try {
+        $posts = Get-ResponseText $Response | ConvertFrom-Json
+        $posts.code -eq 200
+    } catch {
+        $false
+    }
 }
 
 Test-HttpEndpoint "Frontend home" $FrontendUrl {
     param($Response)
-    $Response.Content -match '<div id="app"></div>' -or $Response.Content -match "哦Gabriel"
+    $content = Get-ResponseText $Response
+    $content -match '<div id="app"></div>' -or $content -match "哦Gabriel"
 }
 
 try {

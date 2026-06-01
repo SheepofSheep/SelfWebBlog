@@ -18,34 +18,52 @@ onMounted(() => {
 })
 
 const displayName = computed(() => user.value?.nickname || user.value?.username || '访客')
-const avatarSrc = computed(() =>
-  toAbsoluteUrl(user.value?.avatarUrl) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.value?.username || 'guest'}`
+const avatarSrc = computed(
+  () =>
+    toAbsoluteUrl(user.value?.avatarUrl) ||
+    `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.value?.username || 'guest'}`
 )
 
 async function saveNickname() {
   const n = nickname.value.trim()
-  if (!n) { push('请输入昵称', 'warning'); return }
-  if (n.length > 30) { push('昵称不能超过30个字符', 'warning'); return }
+  if (!n) {
+    push('请输入昵称', 'warning')
+    return
+  }
+  if (n.length > 30) {
+    push('昵称不能超过30个字符', 'warning')
+    return
+  }
   saving.value = true
   try {
     await updateUserProfile({ nickname: n })
     push('昵称已更新')
     await refreshUser()
-  } catch (e) { push(e?.message || '保存失败', 'error') }
-  finally { saving.value = false }
+  } catch (e) {
+    push(e?.message || '保存失败', 'error')
+  } finally {
+    saving.value = false
+  }
 }
 
 async function onPickAvatar(e) {
   const file = e?.target?.files?.[0]
   if (!file) return
-  if (!file.type.startsWith('image/')) { push('请选择图片文件', 'error'); e.target.value = ''; return }
+  if (!file.type.startsWith('image/')) {
+    push('请选择图片文件', 'error')
+    e.target.value = ''
+    return
+  }
   try {
     const url = await uploadUserAvatar(file)
     await updateUserProfile({ avatarUrl: url })
     push('头像已更新')
     await refreshUser()
-  } catch (err) { push(err?.message || '上传失败', 'error') }
-  finally { e.target.value = '' }
+  } catch (err) {
+    push(err?.message || '上传失败', 'error')
+  } finally {
+    e.target.value = ''
+  }
 }
 </script>
 
@@ -99,7 +117,9 @@ async function onPickAvatar(e) {
         </div>
         <div v-if="user?.titleName" class="vp-info-row">
           <span class="vp-info-label">称号</span>
-          <span :class="['title-badge', 'title-' + (user?.titleStyle || 'default')]">{{ user.titleName }}</span>
+          <span :class="['title-badge', 'title-' + (user?.titleStyle || 'default')]">{{
+            user.titleName
+          }}</span>
         </div>
       </div>
     </div>
@@ -132,7 +152,9 @@ async function onPickAvatar(e) {
   cursor: pointer;
   margin-bottom: 8px;
 }
-.vp-avatar-wrap:hover .vp-avatar-overlay { opacity: 1; }
+.vp-avatar-wrap:hover .vp-avatar-overlay {
+  opacity: 1;
+}
 
 .vp-avatar {
   width: 88px;
@@ -143,7 +165,9 @@ async function onPickAvatar(e) {
   opacity: 0;
   transition: opacity var(--duration-slow) var(--ease-out);
 }
-.vp-avatar.loaded { opacity: 1; }
+.vp-avatar.loaded {
+  opacity: 1;
+}
 
 .vp-avatar-overlay {
   position: absolute;
@@ -193,7 +217,9 @@ async function onPickAvatar(e) {
   outline: none;
   font-family: var(--font-body);
 }
-.vp-input:focus { border-color: var(--primary); }
+.vp-input:focus {
+  border-color: var(--primary);
+}
 
 .vp-field-hint {
   margin: 6px 0 0;
@@ -223,5 +249,7 @@ async function onPickAvatar(e) {
   font-weight: 500;
 }
 
-.hidden-input { display: none; }
+.hidden-input {
+  display: none;
+}
 </style>

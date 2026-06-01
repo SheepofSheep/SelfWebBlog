@@ -24,7 +24,7 @@ export function isAuthFailure(payload, status) {
   return /未登录|请先登录|无权限|登录已过期|token/i.test(msg)
 }
 
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers = config.headers || {}
@@ -34,13 +34,13 @@ api.interceptors.request.use(config => {
 })
 
 api.interceptors.response.use(
-  response => {
+  (response) => {
     if (isAuthFailure(response.data, response.status)) {
       clearAuthState()
     }
     return response
   },
-  error => {
+  (error) => {
     if (isAuthFailure(error.response?.data, error.response?.status)) {
       clearAuthState()
     }

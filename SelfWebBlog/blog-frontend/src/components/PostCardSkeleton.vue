@@ -12,14 +12,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   isLoading: {
     type: Boolean,
     default: true
   }
-});
+})
 </script>
 
 <style scoped>
@@ -71,7 +71,8 @@ const props = defineProps({
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -80,11 +81,13 @@ const props = defineProps({
 }
 
 /* Vue 3 过渡样式 */
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.3s ease;
 }
 
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 
@@ -92,7 +95,7 @@ const props = defineProps({
   .post-card-skeleton {
     padding: 1rem;
   }
-  
+
   .skeleton-image {
     height: 150px;
   }

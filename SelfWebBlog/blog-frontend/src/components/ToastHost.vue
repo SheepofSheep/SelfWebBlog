@@ -14,7 +14,14 @@ const iconOf = computed(() => (type) => {
 
 <template>
   <div class="toast-container">
-    <div v-for="t in items" :key="t.id" class="toast-item" :class="'toast-' + t.type" role="status" aria-live="polite">
+    <div
+      v-for="t in items"
+      :key="t.id"
+      class="toast-item"
+      :class="'toast-' + t.type"
+      role="status"
+      aria-live="polite"
+    >
       <component :is="iconOf(t.type)" :size="16" class="toast-icon" />
       <span class="msg">{{ t.message }}</span>
     </div>
@@ -49,12 +56,24 @@ const iconOf = computed(() => (type) => {
   animation: toast-in 0.3s var(--ease-spring) forwards;
 }
 
-.toast-success .toast-icon { color: var(--sage); }
-.toast-error .toast-icon { color: var(--danger); }
-.toast-warning .toast-icon { color: var(--amber); }
+.toast-success .toast-icon {
+  color: var(--sage);
+}
+.toast-error .toast-icon {
+  color: var(--danger);
+}
+.toast-warning .toast-icon {
+  color: var(--amber);
+}
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 </style>

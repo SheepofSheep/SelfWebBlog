@@ -28,8 +28,17 @@ defineProps({
   margin-bottom: 10px;
 }
 
-.sk-title { width: 60%; height: 18px; }
-.sk-meta { width: 30%; }
-.sk-text { width: 100%; }
-.sk-text.short { width: 75%; }
+.sk-title {
+  width: 60%;
+  height: 18px;
+}
+.sk-meta {
+  width: 30%;
+}
+.sk-text {
+  width: 100%;
+}
+.sk-text.short {
+  width: 75%;
+}
 </style>

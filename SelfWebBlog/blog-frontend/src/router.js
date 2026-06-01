@@ -45,7 +45,7 @@ export function navigate(to) {
 }
 
 export function matchRoute(path) {
-  return routeRecords.find(route => {
+  return routeRecords.find((route) => {
     if (route.prefix) return path === route.path || path.startsWith(`${route.path}/`)
     return route.path === path
   })
@@ -54,4 +54,3 @@ export function matchRoute(path) {
 export function getRouteMeta(path) {
   return matchRoute(path)?.meta || notFoundMeta
 }
-

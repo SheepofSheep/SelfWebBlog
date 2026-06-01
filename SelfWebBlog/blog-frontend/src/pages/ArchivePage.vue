@@ -54,25 +54,58 @@ async function loadPosts() {
     })
     posts.value = data.records || []
     total.value = data.total || 0
-  } catch { posts.value = [] }
-  finally { loading.value = false }
+  } catch {
+    posts.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadCategories() {
-  try { categories.value = await listCategories() } catch { categories.value = [] }
+  try {
+    categories.value = await listCategories()
+  } catch {
+    categories.value = []
+  }
 }
 
 function clearFilters() {
-  keyword.value = ''; category.value = ''; tag.value = ''; sort.value = 'date'
+  keyword.value = ''
+  category.value = ''
+  tag.value = ''
+  sort.value = 'date'
   loadPosts()
 }
 
-function prevPage() { if (currentPage.value > 1) { currentPage.value--; loadPosts() } }
-function nextPage() { if (currentPage.value < totalPages.value) { currentPage.value++; loadPosts() } }
+function clearKeyword() {
+  keyword.value = ''
+  doSearch()
+}
+
+function clearTag() {
+  tag.value = ''
+  doSearch()
+}
+
+function prevPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    loadPosts()
+  }
+}
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    loadPosts()
+  }
+}
 
 watch([category, sort], () => doSearch())
 
-onMounted(() => { loadPosts(); loadCategories() })
+onMounted(() => {
+  loadPosts()
+  loadCategories()
+})
 </script>
 
 <template>
@@ -84,8 +117,16 @@ onMounted(() => { loadPosts(); loadCategories() })
     <div class="archive-toolbar glass-card">
       <div class="search-box">
         <Search :size="16" />
-        <input v-model="keyword" type="text" placeholder="搜索文章标题或摘要..." @input="doSearch()" class="search-input" />
-        <button v-if="keyword" class="clear-btn" @click="keyword = ''; doSearch()" aria-label="清除搜索"><X :size="14" /></button>
+        <input
+          v-model="keyword"
+          type="text"
+          placeholder="搜索文章标题或摘要..."
+          @input="doSearch()"
+          class="search-input"
+        />
+        <button v-if="keyword" class="clear-btn" @click="clearKeyword" aria-label="清除搜索">
+          <X :size="14" />
+        </button>
       </div>
 
       <div class="filter-row">
@@ -96,8 +137,16 @@ onMounted(() => { loadPosts(); loadCategories() })
 
         <div class="tag-input-wrap">
           <Tag :size="14" />
-          <input v-model="tag" type="text" placeholder="标签筛选..." @input="doSearch()" class="tag-input" />
-          <button v-if="tag" class="clear-btn" @click="tag = ''; doSearch()" aria-label="清除标签"><X :size="14" /></button>
+          <input
+            v-model="tag"
+            type="text"
+            placeholder="标签筛选..."
+            @input="doSearch()"
+            class="tag-input"
+          />
+          <button v-if="tag" class="clear-btn" @click="clearTag" aria-label="清除标签">
+            <X :size="14" />
+          </button>
         </div>
 
         <button :class="['sort-btn', { active: sort === 'date' }]" @click="sort = 'date'">
@@ -119,7 +168,12 @@ onMounted(() => { loadPosts(); loadCategories() })
       <p>没有找到匹配的文章</p>
     </div>
     <div v-else class="archive-grid">
-      <article v-for="p in posts" :key="p.id" class="glass-card archive-card" @click="navigate(`/post?id=${p.id}`)">
+      <article
+        v-for="p in posts"
+        :key="p.id"
+        class="glass-card archive-card"
+        @click="navigate(`/post?id=${p.id}`)"
+      >
         <div v-if="p.coverUrl" class="post-cover-photo">
           <div class="cover-frame">
             <img :src="p.coverUrl" :alt="p.title" />
@@ -146,79 +200,174 @@ onMounted(() => { loadPosts(); loadCategories() })
 
     <!-- 分页 -->
     <div v-if="totalPages > 1" class="pagination">
-      <button class="pill-btn pill-btn-ghost" :disabled="currentPage === 1" @click="prevPage">上一页</button>
+      <button class="pill-btn pill-btn-ghost" :disabled="currentPage === 1" @click="prevPage">
+        上一页
+      </button>
       <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
-      <button class="pill-btn pill-btn-ghost" :disabled="currentPage >= totalPages" @click="nextPage">下一页</button>
+      <button
+        class="pill-btn pill-btn-ghost"
+        :disabled="currentPage >= totalPages"
+        @click="nextPage"
+      >
+        下一页
+      </button>
     </div>
   </main>
 </template>
 
 <style scoped>
-.archive-page { max-width: 1060px; margin: 0 auto; width: 100%; padding: 20px 0; }
+.archive-page {
+  max-width: 1060px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 20px 0;
+}
 
-.archive-title { font-family: var(--font-sans); font-size: 1.5rem; font-weight: 700; color: var(--text); margin: 0 0 4px; }
-.archive-sub { margin: 0 0 24px; color: var(--text-muted); font-size: 0.85rem; }
+.archive-title {
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+.archive-sub {
+  margin: 0 0 24px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
 
 /* ═══ 工具栏 ═══ */
-.archive-toolbar { padding: 16px 20px; margin-bottom: 24px; }
+.archive-toolbar {
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
 
 .search-box {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 14px; border-radius: var(--radius-pill);
-  background: var(--surface-muted); border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
   margin-bottom: 12px;
   color: var(--text-muted);
 }
 .search-input {
-  flex: 1; border: none; outline: none; background: transparent;
-  font-size: 0.88rem; font-family: var(--font-body); color: var(--text);
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
+  color: var(--text);
 }
-.search-input::placeholder { color: var(--text-faint); }
+.search-input::placeholder {
+  color: var(--text-faint);
+}
 .clear-btn {
-  display: flex; border: none; background: none; color: var(--text-muted);
-  cursor: pointer; padding: 2px; border-radius: 50%;
+  display: flex;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
 }
-.clear-btn:hover { color: var(--text); background: var(--surface-muted); }
+.clear-btn:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
 
 .filter-row {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .filter-select {
-  padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-pill);
-  background: var(--surface-muted); color: var(--text); font-size: 0.78rem;
-  font-family: var(--font-body); cursor: pointer; outline: none;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  outline: none;
 }
 
 .tag-input-wrap {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-pill);
-  background: var(--surface-muted); color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 .tag-input {
-  border: none; outline: none; background: transparent;
-  font-size: 0.78rem; font-family: var(--font-body); color: var(--text); width: 100px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  color: var(--text);
+  width: 100px;
 }
-.tag-input::placeholder { color: var(--text-faint); }
+.tag-input::placeholder {
+  color: var(--text-faint);
+}
 
 .sort-btn {
-  display: flex; align-items: center; gap: 5px;
-  padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-pill);
-  background: transparent; color: var(--text-muted); font-size: 0.78rem;
-  font-family: var(--font-body); cursor: pointer;
-  transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast),
+    color var(--duration-fast),
+    background var(--duration-fast);
 }
-.sort-btn:hover { border-color: var(--primary); color: var(--primary-hover); }
-.sort-btn.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-hover); }
+.sort-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary-hover);
+}
+.sort-btn.active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-hover);
+}
 
 .clear-filter-btn {
-  display: flex; align-items: center; gap: 4px;
-  padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-pill);
-  background: transparent; color: var(--text-muted); font-size: 0.76rem;
-  font-family: var(--font-body); cursor: pointer;
-  transition: color var(--duration-fast), border-color var(--duration-fast);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast),
+    border-color var(--duration-fast);
 }
-.clear-filter-btn:hover { color: var(--danger); border-color: var(--danger); }
+.clear-filter-btn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 
 /* ═══ 卡片网格 ═══ */
 .archive-grid {
@@ -250,32 +399,63 @@ onMounted(() => { loadPosts(); loadCategories() })
   object-fit: cover;
   transition: transform var(--duration-slow) var(--ease-soft);
 }
-.archive-card:hover .cover-frame img { transform: scale(1.04); }
+.archive-card:hover .cover-frame img {
+  transform: scale(1.04);
+}
 
-.card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+.card-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
 .card-meta {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 8px; color: var(--text-muted); font-size: 0.66rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
   margin-bottom: 6px;
 }
-.meta-item { display: flex; align-items: center; gap: 3px; }
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
 
 .card-title {
-  margin: 0 0 6px; font-family: var(--font-sans); font-size: 0.95rem;
-  font-weight: 700; color: var(--text); line-height: 1.35;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  margin: 0 0 6px;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-summary {
-  margin: 0 0 8px; color: var(--text-muted); font-size: 0.76rem;
-  line-height: 1.55; flex: 1;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.55;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-tags {
-  display: flex; flex-wrap: wrap; gap: 5px;
-  padding-top: 8px; border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
 }
 .card-tags .tag {
   padding: 2px 8px;
@@ -284,16 +464,36 @@ onMounted(() => { loadPosts(); loadCategories() })
 
 /* ═══ 分页 ═══ */
 .pagination {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
 }
-.page-info { font-size: 0.85rem; color: var(--text-muted); }
+.page-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
 
-.loading-state, .empty-state { text-align: center; padding: 48px 0; color: var(--text-muted); }
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 48px 0;
+  color: var(--text-muted);
+}
 
 @media (max-width: 640px) {
-  .archive-grid { grid-template-columns: 1fr; gap: 14px; }
-  .filter-row { gap: 6px; }
-  .tag-input { width: 70px; }
+  .archive-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .filter-row {
+    gap: 6px;
+  }
+  .tag-input {
+    width: 70px;
+  }
 }
 </style>

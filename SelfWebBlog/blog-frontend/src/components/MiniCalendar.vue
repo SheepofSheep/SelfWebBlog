@@ -18,7 +18,7 @@ const monthLabel = computed(() => `${year.value}年${month.value + 1}月`)
 
 const postsByDay = computed(() => {
   const map = {}
-  props.posts.forEach(p => {
+  props.posts.forEach((p) => {
     if (!p.createTime) return
     const d = new Date(p.createTime)
     if (d.getFullYear() === year.value && d.getMonth() === month.value) {
@@ -48,13 +48,16 @@ const weeks = computed(() => {
 
   const rows = []
   for (let i = 0; i < days.length; i += 7) {
-    rows.push(days.slice(i, i + 7).map(d => {
-      if (d === null) return { num: '', isToday: false, hasPost: false, active: false }
-      const isToday = d === todayDate && month.value === today.getMonth() && year.value === today.getFullYear()
-      const hasPost = !!postsByDay.value[d]
-      const active = selectedDay.value === d
-      return { num: d, isToday, hasPost, active }
-    }))
+    rows.push(
+      days.slice(i, i + 7).map((d) => {
+        if (d === null) return { num: '', isToday: false, hasPost: false, active: false }
+        const isToday =
+          d === todayDate && month.value === today.getMonth() && year.value === today.getFullYear()
+        const hasPost = !!postsByDay.value[d]
+        const active = selectedDay.value === d
+        return { num: d, isToday, hasPost, active }
+      })
+    )
   }
   return rows
 })
@@ -81,9 +84,13 @@ function openPost(id) {
 <template>
   <div class="mini-calendar glass-card">
     <div class="cal-head">
-      <button class="cal-nav" @click="prevMonth" aria-label="上个月"><ChevronLeft :size="14" /></button>
+      <button class="cal-nav" @click="prevMonth" aria-label="上个月">
+        <ChevronLeft :size="14" />
+      </button>
       <span class="cal-title">{{ monthLabel }}</span>
-      <button class="cal-nav" @click="nextMonth" aria-label="下个月"><ChevronRight :size="14" /></button>
+      <button class="cal-nav" @click="nextMonth" aria-label="下个月">
+        <ChevronRight :size="14" />
+      </button>
     </div>
     <div class="cal-grid">
       <span v-for="d in '日一二三四五六'" :key="d" class="cal-dow">{{ d }}</span>
@@ -91,21 +98,25 @@ function openPost(id) {
         v-for="(cell, i) in weeks.flat()"
         :key="i"
         class="cal-day"
-        :class="{ today: cell.isToday, 'has-post': cell.hasPost, active: cell.active, empty: !cell.num, clickable: cell.hasPost }"
+        :class="{
+          today: cell.isToday,
+          'has-post': cell.hasPost,
+          active: cell.active,
+          empty: !cell.num,
+          clickable: cell.hasPost
+        }"
         @click="clickDay(cell)"
-      >{{ cell.num }}</span>
+        >{{ cell.num }}</span
+      >
     </div>
 
     <!-- 选中日期的文章列表 -->
     <Transition name="cal-fade">
       <div v-if="selectedPosts.length" class="cal-posts">
-        <div class="cal-posts-head">{{ monthLabel }} {{ selectedDay }}日 · {{ selectedPosts.length }} 篇</div>
-        <div
-          v-for="p in selectedPosts"
-          :key="p.id"
-          class="cal-post-item"
-          @click="openPost(p.id)"
-        >
+        <div class="cal-posts-head">
+          {{ monthLabel }} {{ selectedDay }}日 · {{ selectedPosts.length }} 篇
+        </div>
+        <div v-for="p in selectedPosts" :key="p.id" class="cal-post-item" @click="openPost(p.id)">
           <span class="cal-post-title">{{ p.title }}</span>
         </div>
       </div>
@@ -121,17 +132,35 @@ function openPost(id) {
 }
 
 .cal-head {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
 }
-.cal-title { font-size: 0.78rem; font-weight: 600; color: var(--text); }
-.cal-nav {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border: none; border-radius: 50%;
-  background: transparent; color: var(--text-muted); cursor: pointer;
-  transition: background var(--duration-fast), color var(--duration-fast);
+.cal-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
 }
-.cal-nav:hover { background: var(--primary-soft); color: var(--primary-hover); }
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+}
+.cal-nav:hover {
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
 
 .cal-grid {
   display: grid;
@@ -139,25 +168,54 @@ function openPost(id) {
   gap: 2px;
   text-align: center;
 }
-.cal-dow { font-size: 0.6rem; color: var(--text-faint); padding: 4px 0; }
+.cal-dow {
+  font-size: 0.6rem;
+  color: var(--text-faint);
+  padding: 4px 0;
+}
 .cal-day {
-  font-size: 0.7rem; color: var(--text-muted);
-  padding: 4px 0; border-radius: 50%;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+  border-radius: 50%;
   transition: background var(--duration-fast);
 }
-.cal-day.empty { color: transparent; }
-.cal-day.today { background: var(--primary); color: var(--on-primary); font-weight: 600; }
-.cal-day.has-post { position: relative; }
+.cal-day.empty {
+  color: transparent;
+}
+.cal-day.today {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+.cal-day.has-post {
+  position: relative;
+}
 .cal-day.has-post::after {
-  content: ''; position: absolute;
-  bottom: 1px; left: 50%; transform: translateX(-50%);
-  width: 4px; height: 4px; border-radius: 50%;
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
   background: var(--primary);
 }
-.cal-day.today.has-post::after { background: rgba(255,255,255,0.8); }
-.cal-day.clickable { cursor: pointer; }
-.cal-day.clickable:hover { background: var(--primary-soft); }
-.cal-day.active { background: var(--primary-soft); font-weight: 600; color: var(--primary-hover); }
+.cal-day.today.has-post::after {
+  background: rgba(255, 255, 255, 0.8);
+}
+.cal-day.clickable {
+  cursor: pointer;
+}
+.cal-day.clickable:hover {
+  background: var(--primary-soft);
+}
+.cal-day.active {
+  background: var(--primary-soft);
+  font-weight: 600;
+  color: var(--primary-hover);
+}
 
 /* ═══ 文章列表 ═══ */
 .cal-posts {
@@ -166,7 +224,9 @@ function openPost(id) {
   border-top: 1px solid var(--border-light);
 }
 .cal-posts-head {
-  font-size: 0.68rem; color: var(--text-muted); font-weight: 600;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 600;
   margin-bottom: 6px;
 }
 .cal-post-item {
@@ -175,16 +235,40 @@ function openPost(id) {
   border-bottom: 1px solid var(--border-light);
   transition: color var(--duration-fast);
 }
-.cal-post-item:last-child { border-bottom: none; }
-.cal-post-item:hover { color: var(--primary-hover); }
+.cal-post-item:last-child {
+  border-bottom: none;
+}
+.cal-post-item:hover {
+  color: var(--primary-hover);
+}
 .cal-post-title {
-  font-size: 0.72rem; color: var(--text);
-  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 0.72rem;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ═══ Transition ═══ */
-.cal-fade-enter-active { transition: opacity 0.25s var(--ease-out), max-height 0.25s var(--ease-out); }
-.cal-fade-leave-active { transition: opacity 0.15s var(--ease-out), max-height 0.15s var(--ease-out); }
-.cal-fade-enter-from, .cal-fade-leave-to { opacity: 0; max-height: 0; overflow: hidden; }
-.cal-fade-enter-to, .cal-fade-leave-from { max-height: 200px; }
+.cal-fade-enter-active {
+  transition:
+    opacity 0.25s var(--ease-out),
+    max-height 0.25s var(--ease-out);
+}
+.cal-fade-leave-active {
+  transition:
+    opacity 0.15s var(--ease-out),
+    max-height 0.15s var(--ease-out);
+}
+.cal-fade-enter-from,
+.cal-fade-leave-to {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+}
+.cal-fade-enter-to,
+.cal-fade-leave-from {
+  max-height: 200px;
+}
 </style>

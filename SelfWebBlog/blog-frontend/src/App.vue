@@ -7,8 +7,19 @@ import { provideToast, showToast } from './composables/toast'
 import ToastHost from './components/ToastHost.vue'
 import MeshBackground from './components/MeshBackground.vue'
 import {
-  Home, PenLine, Settings, UserPlus, LogOut, Moon, Sun,
-  Menu, User, Search, X, ChevronLeft, ChevronRight
+  Home,
+  PenLine,
+  Settings,
+  UserPlus,
+  LogOut,
+  Moon,
+  Sun,
+  Menu,
+  User,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-vue-next'
 
 const HomePage = defineAsyncComponent(() => import('./pages/HomePage.vue'))
@@ -68,20 +79,29 @@ const refreshKey = ref(0)
 provide('user', user)
 provide('refreshUser', loadUserInfo)
 provide('loadingStore', loadingStore)
-provide('refreshHome', () => { refreshKey.value++ })
+provide('refreshHome', () => {
+  refreshKey.value++
+})
 
 function handleOAuthRedirect() {
   const token = query.value.get('token')
   const userStr = query.value.get('user')
   const error = query.value.get('error')
-  if (error) { showToast('GitHub 登录失败: ' + decodeURIComponent(error), 'error'); window.history.replaceState({}, '', '#/login'); return true }
+  if (error) {
+    showToast('GitHub 登录失败: ' + decodeURIComponent(error), 'error')
+    window.history.replaceState({}, '', '#/login')
+    return true
+  }
   if (token && userStr) {
     try {
       const u = JSON.parse(decodeURIComponent(userStr))
-      localStorage.setItem('token', token); saveUser(u)
+      localStorage.setItem('token', token)
+      saveUser(u)
       showToast('GitHub 登录成功', 'success')
       return true
-    } catch { return false }
+    } catch {
+      return false
+    }
   }
   return false
 }
@@ -91,11 +111,18 @@ async function ensureAuthForRoute() {
   const currentPath = path.value
   const meta = getRouteMeta(currentPath)
   const ok = handleOAuthRedirect()
-  if (ok) { navigate('/'); return false }
+  if (ok) {
+    navigate('/')
+    return false
+  }
 
   if (!user.value) {
     restoreUser()
-    try { await loadUserInfo() } catch { user.value = null }
+    try {
+      await loadUserInfo()
+    } catch {
+      user.value = null
+    }
   }
 
   if (meta.public) {
@@ -148,11 +175,20 @@ async function loadBackground() {
   } catch {}
 }
 
-watch(() => path.value, async () => {
-  NProgress.start(); loadingStore.setRouterLoading(true)
-  try { await ensureAuthForRoute() } finally { loadingStore.setRouterLoading(false); NProgress.done() }
-  mobileOpen.value = false
-})
+watch(
+  () => path.value,
+  async () => {
+    NProgress.start()
+    loadingStore.setRouterLoading(true)
+    try {
+      await ensureAuthForRoute()
+    } finally {
+      loadingStore.setRouterLoading(false)
+      NProgress.done()
+    }
+    mobileOpen.value = false
+  }
+)
 
 onMounted(async () => {
   window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired)
@@ -161,7 +197,8 @@ onMounted(async () => {
   try {
     await Promise.all([ensureAuthForRoute(), loadBackground()])
   } finally {
-    loadingStore.setRouterLoading(false); NProgress.done()
+    loadingStore.setRouterLoading(false)
+    NProgress.done()
   }
 })
 
@@ -171,32 +208,73 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app" :class="{ 'is-login': path === '/login', 'mobile-open': mobileOpen, 'sidebar-collapsed': sidebarCollapsed }">
+  <div
+    class="app"
+    :class="{
+      'is-login': path === '/login',
+      'mobile-open': mobileOpen,
+      'sidebar-collapsed': sidebarCollapsed
+    }"
+  >
     <MeshBackground />
 
-    <aside v-if="path !== '/login'" class="sidebar glass-panel" :class="{ collapsed: sidebarCollapsed }" aria-label="站点导航">
+    <aside
+      v-if="path !== '/login'"
+      class="sidebar glass-panel"
+      :class="{ collapsed: sidebarCollapsed }"
+      aria-label="站点导航"
+    >
       <nav class="sb-nav">
         <a class="sb-link" :class="{ active: path === '/' }" title="首页" @click="navTo('/')">
           <Home :size="18" />
           <span v-show="!sidebarCollapsed">首页</span>
         </a>
-        <a class="sb-link" :class="{ active: path === '/archive' }" title="归档" @click="navTo('/archive')">
+        <a
+          class="sb-link"
+          :class="{ active: path === '/archive' }"
+          title="归档"
+          @click="navTo('/archive')"
+        >
           <Search :size="18" />
           <span v-show="!sidebarCollapsed">归档</span>
         </a>
-        <a v-if="user?.role === 'ADMIN'" class="sb-link" :class="{ active: path === '/write' }" title="写作" @click="navTo('/write')">
+        <a
+          v-if="user?.role === 'ADMIN'"
+          class="sb-link"
+          :class="{ active: path === '/write' }"
+          title="写作"
+          @click="navTo('/write')"
+        >
           <PenLine :size="18" />
           <span v-show="!sidebarCollapsed">写作</span>
         </a>
-        <a v-if="user?.role === 'ADMIN'" class="sb-link" :class="{ active: path === '/profile' }" title="管理" @click="navTo('/profile')">
+        <a
+          v-if="user?.role === 'ADMIN'"
+          class="sb-link"
+          :class="{ active: path === '/profile' }"
+          title="管理"
+          @click="navTo('/profile')"
+        >
           <Settings :size="18" />
           <span v-show="!sidebarCollapsed">管理</span>
         </a>
-        <a v-if="user && user.role !== 'ADMIN'" class="sb-link" :class="{ active: path === '/me' }" title="我的" @click="navTo('/me')">
+        <a
+          v-if="user && user.role !== 'ADMIN'"
+          class="sb-link"
+          :class="{ active: path === '/me' }"
+          title="我的"
+          @click="navTo('/me')"
+        >
           <User :size="18" />
           <span v-show="!sidebarCollapsed">我的</span>
         </a>
-        <a v-if="!user" class="sb-link" :class="{ active: path === '/login' }" title="登录" @click="navTo('/login')">
+        <a
+          v-if="!user"
+          class="sb-link"
+          :class="{ active: path === '/login' }"
+          title="登录"
+          @click="navTo('/login')"
+        >
           <UserPlus :size="18" />
           <span v-show="!sidebarCollapsed">登录</span>
         </a>
@@ -214,9 +292,17 @@ onUnmounted(() => {
           <span v-show="!sidebarCollapsed">{{ theme === 'light' ? '深色模式' : '浅色模式' }}</span>
         </button>
 
-        <div v-if="user" class="sb-user" :title="user?.nickname || user?.username" @click="navTo(user.role === 'ADMIN' ? '/profile' : '/me')">
+        <div
+          v-if="user"
+          class="sb-user"
+          :title="user?.nickname || user?.username"
+          @click="navTo(user.role === 'ADMIN' ? '/profile' : '/me')"
+        >
           <img
-            :src="toAbsoluteUrl(user?.avatarUrl) || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'"
+            :src="
+              toAbsoluteUrl(user?.avatarUrl) ||
+              'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
+            "
             :alt="user?.nickname || user?.username || '用户头像'"
             class="sb-avatar avatar-img"
             :class="{ loaded: user?.avatarUrl }"
@@ -245,7 +331,12 @@ onUnmounted(() => {
       </button>
     </aside>
 
-    <button v-if="path !== '/login'" class="mobile-menu-btn" @click="mobileOpen = !mobileOpen" :aria-label="mobileOpen ? '关闭菜单' : '打开菜单'">
+    <button
+      v-if="path !== '/login'"
+      class="mobile-menu-btn"
+      @click="mobileOpen = !mobileOpen"
+      :aria-label="mobileOpen ? '关闭菜单' : '打开菜单'"
+    >
       <X v-if="mobileOpen" :size="20" />
       <Menu v-else :size="20" />
     </button>
@@ -296,8 +387,9 @@ onUnmounted(() => {
   border-radius: var(--radius-xl);
   z-index: 200;
   overflow: hidden;
-  transition: width var(--duration-normal) var(--ease-bounce),
-              padding var(--duration-normal) var(--ease-bounce);
+  transition:
+    width var(--duration-normal) var(--ease-bounce),
+    padding var(--duration-normal) var(--ease-bounce);
 }
 
 .sidebar.collapsed {
@@ -332,9 +424,10 @@ onUnmounted(() => {
   background: none;
   width: 100%;
   text-align: left;
-  transition: color var(--duration-normal) var(--ease-bounce),
-              background var(--duration-normal) var(--ease-bounce),
-              transform var(--duration-normal) var(--ease-bounce);
+  transition:
+    color var(--duration-normal) var(--ease-bounce),
+    background var(--duration-normal) var(--ease-bounce),
+    transform var(--duration-normal) var(--ease-bounce);
 }
 
 .sb-link:hover {
@@ -432,7 +525,7 @@ onUnmounted(() => {
   height: 26px;
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.45));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.45));
   backdrop-filter: blur(8px);
   color: var(--text-muted);
   cursor: pointer;
@@ -441,9 +534,10 @@ onUnmounted(() => {
   justify-content: center;
   padding: 0;
   box-shadow: var(--shadow-soft);
-  transition: color var(--duration-normal) var(--ease-bounce),
-              border-color var(--duration-normal) var(--ease-bounce),
-              transform var(--duration-normal) var(--ease-bounce);
+  transition:
+    color var(--duration-normal) var(--ease-bounce),
+    border-color var(--duration-normal) var(--ease-bounce),
+    transform var(--duration-normal) var(--ease-bounce);
   z-index: 10;
 }
 
@@ -454,7 +548,7 @@ onUnmounted(() => {
 }
 
 [data-theme='dark'] .sb-collapse-btn {
-  background: linear-gradient(135deg, rgba(50,44,50,0.85), rgba(38,34,38,0.65));
+  background: linear-gradient(135deg, rgba(50, 44, 50, 0.85), rgba(38, 34, 38, 0.65));
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -488,13 +582,23 @@ onUnmounted(() => {
 }
 
 .page-enter-active {
-  transition: opacity 0.6s var(--ease-bounce), transform 0.6s var(--ease-bounce);
+  transition:
+    opacity 0.6s var(--ease-bounce),
+    transform 0.6s var(--ease-bounce);
 }
 .page-leave-active {
-  transition: opacity 0.35s var(--ease-bounce), transform 0.35s var(--ease-bounce);
+  transition:
+    opacity 0.35s var(--ease-bounce),
+    transform 0.35s var(--ease-bounce);
 }
-.page-enter-from { opacity: 0; transform: translateY(12px); }
-.page-leave-to { opacity: 0; transform: translateY(-6px); }
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
 
 .mobile-menu-btn {
   display: none;
@@ -506,7 +610,7 @@ onUnmounted(() => {
   height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, rgba(255,255,255,0.65), rgba(255,255,255,0.35));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.35));
   backdrop-filter: blur(12px);
   color: var(--text-main);
   cursor: pointer;

@@ -25,15 +25,19 @@
 }
 
 .glow-a {
-  width: 700px; height: 500px;
+  width: 700px;
+  height: 500px;
   background: radial-gradient(ellipse, rgba(244, 164, 184, 0.06) 0%, transparent 70%);
-  top: -20%; left: -15%;
+  top: -20%;
+  left: -15%;
 }
 
 .glow-b {
-  width: 600px; height: 400px;
+  width: 600px;
+  height: 400px;
   background: radial-gradient(ellipse, rgba(224, 242, 241, 0.05) 0%, transparent 70%);
-  bottom: -15%; right: -10%;
+  bottom: -15%;
+  right: -10%;
 }
 
 [data-theme='dark'] .glow-a {
