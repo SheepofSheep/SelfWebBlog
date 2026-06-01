@@ -4,7 +4,7 @@ import { navigate } from '../router'
 import { savePost, uploadImage, listTags, listCategories } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
-import { ArrowLeft, Eye, Edit3, Image, Bold, Italic, Code, Quote, List, Heading, Send, Loader, Settings2, Check, Upload, Link, Minus, ListChecks } from 'lucide-vue-next'
+import { ArrowLeft, Eye, Edit3, Image, Bold, Italic, Code, Quote, List, Heading, Send, Loader, Settings2, Check, Upload, Link, Minus, ListChecks, Table, AlertCircle, RefreshCw, XCircle } from 'lucide-vue-next'
 
 const { push } = useToast()
 const refreshHome = inject('refreshHome', () => {})
@@ -17,7 +17,6 @@ const coverUrl = ref('')
 const category = ref('')
 const tags = ref('')
 const loading = ref(false)
-const uploading = ref(false)
 const previewMode = ref(false)
 const showSettings = ref(false)
 const fileInput = ref(null)
@@ -32,11 +31,33 @@ const LEGACY_DRAFT_KEY = 'postDraft'
 const NEW_DRAFT_KEY = 'postDraft:new'
 
 const isEditing = computed(() => !!editingId.value)
-const canPublish = computed(() => title.value.trim() && content.value.trim())
-const canSubmit = computed(() => postStatus.value === 'DRAFT' ? title.value.trim() && content.value.trim() : title.value.trim() && content.value.trim() && category.value.trim() && summary.value.trim())
+const canSubmit = computed(() => title.value.trim() && content.value.trim())
 const renderedContent = computed(() => renderMarkdown(content.value))
 const tagList = computed(() => tags.value.split(/[,，\s]+/).filter(Boolean))
 const draftKey = computed(() => getDraftKey(editingId.value))
+const imageUpload = ref(createUploadState())
+const coverUpload = ref(createUploadState())
+const uploading = computed(() => imageUpload.value.state === 'uploading' || coverUpload.value.state === 'uploading')
+
+const publishChecks = computed(() => {
+  const publishing = postStatus.value === 'PUBLISHED'
+  return [
+    { key: 'title', label: '标题', passed: Boolean(title.value.trim()), required: true },
+    { key: 'content', label: '正文', passed: Boolean(content.value.trim()), required: true },
+    { key: 'summary', label: '摘要', passed: Boolean(summary.value.trim()), required: publishing },
+    { key: 'category', label: '分类', passed: Boolean(category.value.trim()), required: publishing },
+    { key: 'cover', label: '封面', passed: Boolean(coverUrl.value.trim()), recommended: publishing },
+    { key: 'tags', label: '标签', passed: tagList.value.length > 0, recommended: publishing },
+    { key: 'status', label: postStatus.value === 'DRAFT' ? '草稿模式' : '发布模式', passed: true }
+  ]
+})
+const blockingChecks = computed(() => publishChecks.value.filter(item => item.required && !item.passed))
+const recommendedChecks = computed(() => publishChecks.value.filter(item => item.recommended && !item.passed))
+const checkSummary = computed(() => {
+  if (blockingChecks.value.length) return `还差 ${blockingChecks.value.length} 项`
+  if (recommendedChecks.value.length) return `建议补 ${recommendedChecks.value.length} 项`
+  return '可以发布'
+})
 
 // 标签建议
 const allTags = ref([])
@@ -145,32 +166,89 @@ function clearCurrentDraft() {
 }
 
 // ── Image upload ──
+function createUploadState(file = null) {
+  return { state: 'idle', progress: 0, message: '', file }
+}
+
+function updateUploadState(target, patch) {
+  target.value = { ...target.value, ...patch }
+}
+
+function trackUploadProgress(target) {
+  return event => {
+    if (!event.total) return
+    updateUploadState(target, {
+      progress: Math.min(99, Math.round((event.loaded / event.total) * 100))
+    })
+  }
+}
+
+function finishUploadSoon(target) {
+  setTimeout(() => {
+    if (target.value.state === 'success') target.value = createUploadState()
+  }, 1800)
+}
+
 function triggerUpload() { fileInput.value?.click() }
 function triggerCoverUpload() { coverInput.value?.click() }
 
 async function onPickImage(e) {
   const file = e.target.files?.[0]
   if (!file) return
-  uploading.value = true
+  await uploadInlineImage(file)
+  e.target.value = ''
+}
+
+async function uploadInlineImage(file) {
+  imageUpload.value = createUploadState(file)
+  updateUploadState(imageUpload, { state: 'uploading', message: '图片上传中...', progress: 0 })
   try {
-    const url = await uploadImage(file)
-    insertMarkdown(`![图片](${url})`)
+    const url = await uploadImage(file, { onUploadProgress: trackUploadProgress(imageUpload) })
+    insertMarkdown(`![${file.name || '图片'}](${url})`)
+    updateUploadState(imageUpload, { state: 'success', message: '已插入正文', progress: 100, file: null })
     push('图片上传成功')
-  } catch (err) { push(err?.message || '上传失败', 'error') }
-  finally { uploading.value = false; e.target.value = '' }
+    finishUploadSoon(imageUpload)
+  } catch (err) {
+    updateUploadState(imageUpload, { state: 'error', message: err?.message || '上传失败', progress: 0, file })
+    push(err?.message || '上传失败', 'error')
+  }
 }
 
 async function onPickCover(e) {
   const file = e.target.files?.[0]
   if (!file) return
-  uploading.value = true
+  await uploadCoverImage(file)
+  e.target.value = ''
+}
+
+async function uploadCoverImage(file) {
+  coverUpload.value = createUploadState(file)
+  updateUploadState(coverUpload, { state: 'uploading', message: '封面上传中...', progress: 0 })
   try {
-    const url = await uploadImage(file)
+    const url = await uploadImage(file, { onUploadProgress: trackUploadProgress(coverUpload) })
     coverUrl.value = url
     saveDraft()
+    updateUploadState(coverUpload, { state: 'success', message: '封面已更新', progress: 100, file: null })
     push('封面上传成功')
-  } catch (err) { push(err?.message || '上传失败', 'error') }
-  finally { uploading.value = false; e.target.value = '' }
+    finishUploadSoon(coverUpload)
+  } catch (err) {
+    updateUploadState(coverUpload, { state: 'error', message: err?.message || '上传失败', progress: 0, file })
+    push(err?.message || '上传失败', 'error')
+  }
+}
+
+function retryInlineUpload() {
+  if (imageUpload.value.file) uploadInlineImage(imageUpload.value.file)
+}
+
+function retryCoverUpload() {
+  if (coverUpload.value.file) uploadCoverImage(coverUpload.value.file)
+}
+
+function clearCover() {
+  coverUrl.value = ''
+  coverUpload.value = createUploadState()
+  saveDraft()
 }
 
 // ── Markdown helpers ──
@@ -189,6 +267,7 @@ function insertLink() { insertMarkdown('[链接文字](', 'https://)') }
 function insertCodeBlock() { insertMarkdown('```\n', '\n```') }
 function insertDivider() { insertMarkdown('\n---\n') }
 function insertTodo() { insertMarkdown('- [ ] ') }
+function insertTable() { insertMarkdown('\n| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n') }
 
 function hasDraftContent() {
   return Boolean(
@@ -209,16 +288,20 @@ function handleBeforeUnload(e) {
 
 // ── Submit ──
 function validateBeforePublish() {
-  if (postStatus.value === 'DRAFT') return true
-  if (!title.value.trim()) { push('请填写标题', 'warning'); return false }
-  if (!content.value.trim()) { push('请填写内容', 'warning'); return false }
-  if (!category.value.trim()) { push('建议填写分类再发布', 'warning'); return false }
-  if (!summary.value.trim()) { push('建议填写摘要再发布', 'warning'); return false }
+  if (blockingChecks.value.length) {
+    showSettings.value = true
+    push(`请先补充：${blockingChecks.value.map(item => item.label).join('、')}`, 'warning')
+    return false
+  }
+  if (postStatus.value === 'PUBLISHED' && recommendedChecks.value.length) {
+    showSettings.value = true
+    push(`建议补充：${recommendedChecks.value.map(item => item.label).join('、')}`, 'warning')
+  }
   return true
 }
 
 async function submit() {
-  if (!canPublish.value || loading.value) return
+  if (!canSubmit.value || loading.value) return
   if (!validateBeforePublish()) return
   const t = title.value.trim(), c = content.value.trim()
   loading.value = true
@@ -269,7 +352,7 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
           <Edit3 v-else :size="16" />
           {{ previewMode ? '编辑' : '预览' }}
         </button>
-        <button class="pill-btn pill-btn-primary" :disabled="!canPublish || loading" @click="submit">
+        <button class="pill-btn pill-btn-primary" :disabled="!canSubmit || loading" @click="submit">
           <Loader v-if="loading" :size="16" class="spin" />
           <Send v-else :size="16" />
           {{ loading ? '保存中...' : (postStatus === 'DRAFT' ? '保存草稿' : (isEditing ? '更新' : '发布')) }}
@@ -295,6 +378,7 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
             <button class="tb-btn" title="引用" aria-label="插入引用" @click="insertMarkdown('> ')"><Quote :size="16" /></button>
             <button class="tb-btn" title="无序列表" aria-label="插入无序列表" @click="insertMarkdown('- ')"><List :size="16" /></button>
             <button class="tb-btn" title="待办" aria-label="插入待办" @click="insertTodo"><ListChecks :size="16" /></button>
+            <button class="tb-btn" title="表格" aria-label="插入表格" @click="insertTable"><Table :size="16" /></button>
             <button class="tb-btn" title="分割线" aria-label="插入分割线" @click="insertDivider"><Minus :size="16" /></button>
             <span class="tb-divider"></span>
             <button class="tb-btn" title="插入图片" aria-label="插入图片" @click="triggerUpload">
@@ -302,6 +386,16 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
               <span v-if="uploading" class="uploading-dot"></span>
             </button>
             <input ref="fileInput" type="file" accept="image/*" class="hidden-input" @change="onPickImage" />
+          </div>
+          <div v-if="imageUpload.state !== 'idle'" class="upload-inline-status" :class="imageUpload.state">
+            <Loader v-if="imageUpload.state === 'uploading'" :size="14" class="spin" />
+            <Check v-else-if="imageUpload.state === 'success'" :size="14" />
+            <AlertCircle v-else :size="14" />
+            <span>{{ imageUpload.message }}</span>
+            <span v-if="imageUpload.state === 'uploading'" class="upload-percent">{{ imageUpload.progress }}%</span>
+            <button v-if="imageUpload.state === 'error'" class="mini-action" @click="retryInlineUpload">
+              <RefreshCw :size="13" /> 重试
+            </button>
           </div>
 
           <textarea
@@ -325,6 +419,27 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
         <aside v-if="showSettings" class="write-settings">
           <h4 class="settings-head">文章设置</h4>
 
+          <div class="publish-check-card" :class="{ blocked: blockingChecks.length, ready: !blockingChecks.length }">
+            <div class="check-card-head">
+              <span>发布检查</span>
+              <strong>{{ checkSummary }}</strong>
+            </div>
+            <div class="check-list">
+              <div
+                v-for="item in publishChecks"
+                :key="item.key"
+                class="check-row"
+                :class="{ passed: item.passed, optional: item.recommended && !item.passed }"
+              >
+                <Check v-if="item.passed" :size="14" />
+                <AlertCircle v-else :size="14" />
+                <span>{{ item.label }}</span>
+                <small v-if="item.recommended && !item.passed">建议</small>
+                <small v-else-if="item.required && !item.passed">必填</small>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-field">
             <label class="settings-label">摘要</label>
             <textarea v-model="summary" class="settings-textarea" placeholder="简要描述文章内容，会展示在文章列表..." rows="3" maxlength="200"></textarea>
@@ -333,12 +448,33 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
 
           <div class="settings-field">
             <label class="settings-label">封面图</label>
-            <div class="cover-area" @click="triggerCoverUpload">
+            <div class="cover-area" :class="{ 'is-uploading': coverUpload.state === 'uploading' }" @click="triggerCoverUpload">
               <img v-if="coverUrl" :src="coverUrl" class="cover-preview" />
               <div v-else class="cover-placeholder">
                 <Upload :size="20" />
                 <span>点击上传封面</span>
               </div>
+              <div v-if="coverUpload.state === 'uploading'" class="cover-upload-overlay">
+                <Loader :size="18" class="spin" />
+                <span>{{ coverUpload.progress }}%</span>
+              </div>
+            </div>
+            <div v-if="coverUpload.state !== 'idle'" class="cover-upload-status" :class="coverUpload.state">
+              <Check v-if="coverUpload.state === 'success'" :size="14" />
+              <AlertCircle v-else-if="coverUpload.state === 'error'" :size="14" />
+              <Loader v-else :size="14" class="spin" />
+              <span>{{ coverUpload.message }}</span>
+            </div>
+            <div v-if="coverUrl || coverUpload.state === 'error'" class="cover-actions">
+              <button type="button" class="mini-action" @click.stop="triggerCoverUpload">
+                <Upload :size="13" /> 重传
+              </button>
+              <button v-if="coverUpload.state === 'error'" type="button" class="mini-action" @click.stop="retryCoverUpload">
+                <RefreshCw :size="13" /> 重试
+              </button>
+              <button v-if="coverUrl" type="button" class="mini-action danger" @click.stop="clearCover">
+                <XCircle :size="13" /> 清除
+              </button>
             </div>
             <input v-if="coverUrl" v-model="coverUrl" class="settings-input" placeholder="或粘贴图片URL..." />
             <input v-else v-model="coverUrl" class="settings-input" placeholder="或粘贴图片URL..." />
@@ -513,6 +649,33 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
 .uploading-dot { width: 6px; height: 6px; background: var(--primary); border-radius: 50%; animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
+.upload-inline-status {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: -4px 0 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem; font-weight: 500;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+.upload-inline-status.success { color: var(--success); background: rgba(109, 168, 138, 0.1); }
+.upload-inline-status.error { color: var(--danger); background: rgba(212, 114, 122, 0.1); }
+.upload-percent { margin-left: auto; color: var(--text-faint); }
+
+.mini-action {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.mini-action:hover { border-color: var(--primary); color: var(--primary-hover); }
+.mini-action.danger:hover { border-color: var(--danger); color: var(--danger); }
+
 .hidden-input { display: none; }
 
 /* ═══ 编辑器 ═══ */
@@ -547,6 +710,48 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
   color: var(--text); letter-spacing: 0.02em;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-light);
+}
+
+.publish-check-card {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  border: 1px solid var(--border-light);
+}
+.publish-check-card.blocked {
+  border-color: rgba(212, 154, 90, 0.35);
+  background: rgba(212, 154, 90, 0.08);
+}
+.publish-check-card.ready {
+  border-color: rgba(109, 168, 138, 0.28);
+}
+.check-card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.check-card-head strong {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.check-list {
+  display: grid;
+  gap: 6px;
+}
+.check-row {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--amber);
+  font-size: 0.72rem;
+}
+.check-row.passed { color: var(--success); }
+.check-row.optional { color: var(--text-muted); }
+.check-row small {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 0.62rem;
 }
 
 .settings-field { display: flex; flex-direction: column; gap: 6px; }
@@ -585,18 +790,38 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
 
 /* ═══ 封面 ═══ */
 .cover-area {
+  position: relative;
   border: 1px dashed var(--border); border-radius: var(--radius-sm);
   overflow: hidden; cursor: pointer; min-height: 100px;
   display: flex; align-items: center; justify-content: center;
   transition: border-color var(--duration-fast);
 }
 .cover-area:hover { border-color: var(--primary); }
+.cover-area.is-uploading { pointer-events: none; }
 
 .cover-preview { width: 100%; display: block; object-fit: cover; }
 
 .cover-placeholder {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   color: var(--text-muted); font-size: 0.75rem; padding: 24px;
+}
+.cover-upload-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--on-primary);
+  background: rgba(36, 31, 36, 0.42);
+  backdrop-filter: blur(3px);
+  font-weight: 700;
+}
+.cover-upload-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.cover-upload-status.success { color: var(--success); }
+.cover-upload-status.error { color: var(--danger); }
+.cover-actions {
+  display: flex; flex-wrap: wrap; gap: 6px;
 }
 
 /* ═══ 状态切换 ═══ */
@@ -635,12 +860,12 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
 
 /* ═══ 预览 ═══ */
 .preview-title {
-  font-family: var(--font-display); font-size: 1.8rem; font-weight: 700;
-  color: var(--text); margin: 0 0 24px;
+  font-family: var(--font-sans); font-size: var(--font-size-xl); font-weight: 600;
+  color: var(--text-main); margin: 0 0 24px;
   padding-bottom: 16px; border-bottom: 1px solid var(--border);
 }
-.preview-content { font-size: 1rem; line-height: 1.85; color: var(--text); }
-.preview-content h2 { font-family: var(--font-display); font-size: 1.3rem; margin: 2rem 0 1rem; }
+.preview-content { font-size: var(--font-size-md); line-height: var(--line-height); color: var(--text-main); }
+.preview-content h2 { font-family: var(--font-sans); font-size: var(--font-size-lg); font-weight: 600; margin: 2rem 0 1rem; letter-spacing: 0.02em; }
 .preview-content p { margin-bottom: 1rem; }
 .preview-content blockquote {
   border-left: 3px solid var(--primary); margin: 1.5rem 0; padding: 0.8rem 1.2rem;
@@ -650,6 +875,18 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
   background: var(--surface-muted); padding: 16px;
   overflow-x: auto; font-size: 0.88rem; border-radius: var(--radius-md);
 }
+.preview-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+.preview-content th,
+.preview-content td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+}
+.preview-content th { background: var(--surface-muted); font-weight: 600; }
 .preview-content code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.88em; }
 
 .spin { animation: spin 0.8s linear infinite; }
@@ -672,8 +909,24 @@ watch([title, content, summary, coverUrl, category, tags], () => { saveDraft() }
 
 @media (max-width: 640px) {
   .title-input { font-size: 1.4rem; }
-  .topbar-actions { gap: 6px; }
-  .tool-pill { padding: 6px 12px; font-size: 0.76rem; }
+  .topbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 52px repeat(3, minmax(72px, 1fr));
+    gap: 8px;
+  }
+  .word-count {
+    min-width: 0;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .tool-pill,
+  .topbar-actions .pill-btn {
+    min-width: 0;
+    padding: 8px 10px;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
   .write-topbar { gap: 8px; }
 }
 </style>
