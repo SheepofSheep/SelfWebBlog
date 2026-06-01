@@ -4,7 +4,7 @@ import { useRoute, navigate } from '../router'
 // navigate used in template
 import { getPost, addComment, deleteComment, getComments, togglePinComment } from '../utils/api'
 import { showToast } from '../composables/toast'
-import { renderMarkdown } from '../utils/marked'
+import { renderArticleMarkdown, renderCommentMarkdown } from '../utils/marked'
 import { toAbsoluteUrl } from '../utils/url'
 import loadingStore from '../stores/loadingStore'
 import { ArrowLeft, Send, Trash2, MessageCircle, Clock, MoreHorizontal, Pin, PinOff, Tag, Folder, RefreshCw, Eye, Smile, Edit3 } from 'lucide-vue-next'
@@ -46,7 +46,7 @@ function insertEmoji(name) {
   showEmoji.value = false
 }
 
-const renderedContent = computed(() => post.value ? renderMarkdown(post.value.content) : '')
+const renderedContent = computed(() => post.value ? renderArticleMarkdown(post.value.content) : '')
 
 const readTime = computed(() => {
   if (!post.value?.content) return 1
@@ -227,7 +227,7 @@ onMounted(async () => {
                 <span v-if="c.role === 'ADMIN'" class="comment-badge">博主</span>
                 <span class="comment-time">{{ formatRelativeTime(c.createTime) }}</span>
               </div>
-              <p class="comment-text" v-html="renderMarkdown(c.content)"></p>
+              <p class="comment-text" v-html="renderCommentMarkdown(c.content)"></p>
             </div>
             <div v-if="user?.role === 'ADMIN'" class="comment-actions" @click.stop>
               <button class="menu-btn" @click="toggleMenu(c.id)" :aria-label="openMenuId === c.id ? '关闭菜单' : '评论操作'">
