@@ -25,6 +25,10 @@ blog:
 upload:
   # 文件上传根路径
   path: ${blog.data-dir}/uploads
+  # 单张图片最大字节数与像素尺寸限制
+  max-image-bytes: ${UPLOAD_MAX_IMAGE_BYTES:10485760}
+  max-width: ${UPLOAD_MAX_WIDTH:6000}
+  max-height: ${UPLOAD_MAX_HEIGHT:6000}
 
 # 登录配置（生产环境务必通过环境变量覆盖）
 auth:
