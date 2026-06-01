@@ -59,7 +59,7 @@ Test-HttpEndpoint "Posts API" "$BackendUrl/posts" {
 
 Test-HttpEndpoint "Frontend home" $FrontendUrl {
     param($Response)
-    $Response.Content -match '<div id="app"></div>' -or $Response.Content -match "Anon's Blog"
+    $Response.Content -match '<div id="app"></div>' -or $Response.Content -match "哦Gabriel"
 }
 
 try {

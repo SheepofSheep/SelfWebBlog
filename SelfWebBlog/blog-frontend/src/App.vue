@@ -20,7 +20,11 @@ const VisitorProfilePage = defineAsyncComponent(() => import('./pages/VisitorPro
 const ArchivePage = defineAsyncComponent(() => import('./pages/ArchivePage.vue'))
 import loadingStore from './stores/loadingStore'
 
+const routeReady = ref(false)
+const isRouteChecking = computed(() => !routeReady.value && !getRouteMeta(path.value).public)
+
 const currentPage = computed(() => {
+  if (isRouteChecking.value) return null
   if (path.value === '/login') return LoginPage
   if (path.value === '/') return HomePage
   if (path.value === '/write') return WritePage
@@ -83,28 +87,36 @@ function handleOAuthRedirect() {
 }
 
 async function ensureAuthForRoute() {
+  routeReady.value = false
   const currentPath = path.value
   const meta = getRouteMeta(currentPath)
   const ok = handleOAuthRedirect()
-  if (ok) { navigate('/'); return }
+  if (ok) { navigate('/'); return false }
 
   if (!user.value) {
     restoreUser()
     try { await loadUserInfo() } catch { user.value = null }
   }
 
-  if (meta.public) return
+  if (meta.public) {
+    routeReady.value = true
+    return true
+  }
 
   if (meta.requiresAuth && !user.value) {
     showToast('请先登录', 'warning')
     navigate('/login')
-    return
+    return false
   }
 
   if (meta.requiresRole && user.value?.role !== meta.requiresRole) {
     showToast('无权访问', 'warning')
     navigate('/')
+    return false
   }
+
+  routeReady.value = true
+  return true
 }
 
 async function handleLogout() {
@@ -245,6 +257,7 @@ onUnmounted(() => {
         <KeepAlive v-if="currentPage" :include="['HomePage', 'ProfilePage']">
           <component :is="currentPage" :key="pageKey + '-' + refreshKey" />
         </KeepAlive>
+        <div v-else-if="isRouteChecking" class="not-found">正在确认登录状态...</div>
         <div v-else class="not-found">页面未找到</div>
       </Transition>
     </main>
