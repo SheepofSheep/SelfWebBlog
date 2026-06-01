@@ -3,9 +3,11 @@ package org.example.selfwebblog.config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 import java.io.File;
 
@@ -21,6 +23,14 @@ public class DataDirConfig {
     private String uploadDir;
 
     @Bean
+    public static BeanFactoryPostProcessor ensureDataDirsBeforeDataSource(Environment environment) {
+        return beanFactory -> {
+            ensureDir(environment.getProperty("blog.data-dir"));
+            ensureDir(environment.getProperty("upload.path"));
+        };
+    }
+
+    @Bean
     public CommandLineRunner ensureDataDirs() {
         return args -> {
             ensureDir(dataDir);
@@ -29,7 +39,10 @@ public class DataDirConfig {
         };
     }
 
-    private void ensureDir(String path) {
+    private static void ensureDir(String path) {
+        if (path == null || path.isBlank()) {
+            return;
+        }
         File dir = new File(path);
         if (!dir.exists()) {
             boolean created = dir.mkdirs();
