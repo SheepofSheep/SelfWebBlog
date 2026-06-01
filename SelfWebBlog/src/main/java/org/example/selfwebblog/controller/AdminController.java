@@ -23,7 +23,7 @@ public class AdminController {
 
     @GetMapping("/users")
     public Result<?> listUsers(HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
 
         List<User> users = userService.list();
 
@@ -72,10 +72,10 @@ public class AdminController {
 
     @PutMapping("/users/{id}/title")
     public Result<?> grantTitle(@PathVariable Long id, @RequestBody Map<String, String> body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
 
         User user = userService.getById(id);
-        if (user == null) return Result.error("用户不存在");
+        if (user == null) return Result.notFound("用户不存在");
 
         String titleName = body.get("titleName");
         String titleStyle = body.get("titleStyle");
@@ -95,17 +95,17 @@ public class AdminController {
 
     @DeleteMapping("/users/{id}")
     public Result<?> deleteUser(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
 
         Long adminUserId = AuthHelper.getUserId(request);
         if (adminUserId != null && adminUserId.equals(id)) {
-            return Result.error("不能删除自己");
+            return Result.badRequest("不能删除自己");
         }
 
         User user = userService.getById(id);
-        if (user == null) return Result.error("用户不存在");
+        if (user == null) return Result.notFound("用户不存在");
         if ("ADMIN".equals(user.getRole())) {
-            return Result.error("不能删除管理员账号");
+            return Result.badRequest("不能删除管理员账号");
         }
 
         userService.removeById(id);

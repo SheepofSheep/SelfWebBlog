@@ -38,7 +38,7 @@ public class UploadController {
     @PostMapping("/image")
     public Result<String> uploadImage(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) {
-            return Result.error("无权限操作");
+            return Result.forbidden("无权限操作");
         }
         return uploadFile(file, UploadTarget.ARTICLE_IMAGE);
     }
@@ -46,7 +46,7 @@ public class UploadController {
     @PostMapping("/avatar")
     public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) {
-            return Result.error("无权限操作");
+            return Result.forbidden("无权限操作");
         }
         Result<String> result = uploadFile(file, UploadTarget.AVATAR);
         if (result.getCode() == 200) {
@@ -68,10 +68,10 @@ public class UploadController {
             log.info("文件保存成功: {}", upload.url());
             return Result.success(upload.url());
         } catch (IllegalArgumentException e) {
-            return Result.error(e.getMessage());
+            return Result.badRequest(e.getMessage());
         } catch (IOException e) {
             log.error("上传失败", e);
-            return Result.error("上传失败，请稍后重试");
+            return Result.serverError("上传失败，请稍后重试");
         }
     }
 }

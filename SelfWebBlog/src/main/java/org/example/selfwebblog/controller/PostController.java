@@ -44,28 +44,28 @@ public class PostController {
     public Result<Post> getById(@PathVariable Long id, HttpServletRequest request) {
         Post post = postService.getById(id);
         if (post == null) {
-            return Result.error("文章不存在");
+            return Result.notFound("文章不存在");
         }
         if (isDraft(post) && !AuthHelper.isAdmin(request)) {
-            return Result.error("文章不存在");
+            return Result.notFound("文章不存在");
         }
         return Result.success(post);
     }
 
     @PostMapping
     public Result<String> saveOrUpdate(@Valid @RequestBody Post post, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
 
         String normalizedStatus = normalizeStatus(post.getStatus());
         if (!isValidStatus(normalizedStatus)) {
-            return Result.error("文章状态不合法");
+            return Result.badRequest("文章状态不合法");
         }
         post.setStatus(normalizedStatus);
 
         if (post.getId() != null) {
             Post existing = postService.getById(post.getId());
             if (existing == null) {
-                return Result.error("文章不存在");
+                return Result.notFound("文章不存在");
             }
             mergePost(existing, post);
             existing.setUpdateTime(LocalDateTime.now());
@@ -81,10 +81,10 @@ public class PostController {
 
     @DeleteMapping("/{id}")
     public Result<String> delete(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         boolean removed = postService.removeById(id);
         log.info("删除文章 ID:{}", id);
-        return removed ? Result.success("删除成功") : Result.error("删除失败，ID不存在: " + id);
+        return removed ? Result.success("删除成功") : Result.notFound("删除失败，ID不存在: " + id);
     }
 
     @GetMapping("/drafts")
@@ -92,7 +92,7 @@ public class PostController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         return Result.success(postService.listDrafts(page, size));
     }
 

@@ -26,14 +26,14 @@ public class PosterController {
 
     @PostMapping
     public Result<String> add(@RequestBody Poster poster, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         posterService.save(poster);
         return Result.success("添加成功");
     }
 
     @PutMapping("/{id}")
     public Result<String> update(@PathVariable Long id, @RequestBody Poster poster, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         poster.setId(id);
         posterService.updatePosterFields(poster);
         return Result.success("更新成功");
@@ -41,14 +41,14 @@ public class PosterController {
 
     @DeleteMapping("/{id}")
     public Result<String> delete(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         posterService.removeById(id);
         return Result.success("删除成功");
     }
 
     @PutMapping("/sort")
     public Result<String> updateSort(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         Long id = Long.valueOf(body.get("id").toString());
         int sortOrder = Integer.parseInt(body.get("sortOrder").toString());
         posterService.updateSort(id, sortOrder);

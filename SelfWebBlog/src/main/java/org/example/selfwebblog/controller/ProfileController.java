@@ -60,7 +60,7 @@ public class ProfileController {
     // 更新个人信息（只更新非空字段，避免清空未传入的字段）
     @PostMapping("/update")
     public Result<Void> updateProfile(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
 
         BlogInfo existing = blogInfoService.getBlogInfo();
 
@@ -103,7 +103,7 @@ public class ProfileController {
     // 更新背景图
     @PostMapping("/background")
     public Result<Void> updateBackground(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         String bgUrl = body.get("bgUrl");
         blogInfoService.updateBackground(bgUrl);
         return Result.success();

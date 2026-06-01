@@ -143,7 +143,7 @@ public class AuthController {
     @PostMapping("/register")
     public Result<?> register(@RequestBody Map<String, String> body, HttpServletRequest request) {
         if (!tryAcquireRateLimit(request)) {
-            return Result.error("请求过于频繁，请稍后再试");
+            return Result.rateLimited("请求过于频繁，请稍后再试");
         }
 
         String username = body.get("username");
@@ -152,13 +152,13 @@ public class AuthController {
         String avatarUrl = body.get("avatarUrl");
 
         if (isBlank(username) || isBlank(password)) {
-            return Result.error("用户名和密码不能为空");
+            return Result.badRequest("用户名和密码不能为空");
         }
         if (username.length() < 2 || username.length() > 20) {
-            return Result.error("用户名长度需在2-20个字符之间");
+            return Result.badRequest("用户名长度需在2-20个字符之间");
         }
         if (password.length() < 6) {
-            return Result.error("密码长度不能少于6位");
+            return Result.badRequest("密码长度不能少于6位");
         }
 
         try {
@@ -168,7 +168,7 @@ public class AuthController {
             Map<String, Object> data = Map.of("token", token, "user", info);
             return Result.success(data);
         } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
+            return Result.badRequest(e.getMessage());
         }
     }
 
@@ -177,14 +177,14 @@ public class AuthController {
     @PostMapping("/login")
     public Result<?> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
         if (!tryAcquireRateLimit(request)) {
-            return Result.error("请求过于频繁，请稍后再试");
+            return Result.rateLimited("请求过于频繁，请稍后再试");
         }
 
         String username = body.get("username");
         String password = body.get("password");
 
         if (isBlank(username) || isBlank(password)) {
-            return Result.error("用户名和密码不能为空");
+            return Result.badRequest("用户名和密码不能为空");
         }
 
         // 管理员可通过此接口登录
@@ -204,7 +204,7 @@ public class AuthController {
             log.info("用户登录成功：{}", username);
             return Result.success(data);
         } catch (RuntimeException e) {
-            return Result.error(e.getMessage());
+            return Result.unauthorized(e.getMessage());
         }
     }
 
@@ -224,18 +224,18 @@ public class AuthController {
     @PostMapping("/admin")
     public Result<?> adminLogin(@RequestBody Map<String, String> body, HttpServletRequest request) {
         if (!tryAcquireRateLimit(request)) {
-            return Result.error("请求过于频繁，请稍后再试");
+            return Result.rateLimited("请求过于频繁，请稍后再试");
         }
 
         String username = body.get("username");
         String password = body.get("password");
 
         if (isBlank(username) || isBlank(password)) {
-            return Result.error("用户名或密码不能为空");
+            return Result.badRequest("用户名或密码不能为空");
         }
 
         if (!adminUsername.equals(username) || !passwordEncoder.matches(password, adminPasswordHash)) {
-            return Result.error("用户名或密码错误");
+            return Result.unauthorized("用户名或密码错误");
         }
 
         User adminUser = ensureAdminUser();
@@ -250,7 +250,7 @@ public class AuthController {
     @GetMapping("/github")
     public Result<?> githubLogin() {
         if (isBlank(githubClientId)) {
-            return Result.error("GitHub OAuth 未配置");
+            return Result.serverError("GitHub OAuth 未配置");
         }
         String state = UUID.randomUUID().toString();
         oauthStates.put(state, "");
@@ -337,11 +337,11 @@ public class AuthController {
     public Result<?> getCurrentUser(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
-            return Result.error("未登录");
+            return Result.unauthorized("未登录");
         }
         User user = userService.getById(userId);
         if (user == null) {
-            return Result.error("用户不存在");
+            return Result.notFound("用户不存在");
         }
         UserInfo info = toUserInfo(user);
         return Result.success(info);

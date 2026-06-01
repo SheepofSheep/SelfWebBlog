@@ -1,6 +1,7 @@
 package org.example.selfwebblog.controller;
 
 import org.example.selfwebblog.entity.Post;
+import org.example.selfwebblog.config.ResultHttpStatusAdvice;
 import org.example.selfwebblog.service.PostService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,10 @@ class PostControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new PostController(postService)).build();
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(new PostController(postService))
+                .setControllerAdvice(new ResultHttpStatusAdvice())
+                .build();
     }
 
     @Test
@@ -45,8 +49,8 @@ class PostControllerTest {
         when(postService.getById(1L)).thenReturn(draft);
 
         mockMvc.perform(get("/posts/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
 
@@ -114,8 +118,8 @@ class PostControllerTest {
                                   "status": "HIDDEN"
                                 }
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
 
         verify(postService, never()).save(any(Post.class));
         verify(postService, never()).updateById(any(Post.class));

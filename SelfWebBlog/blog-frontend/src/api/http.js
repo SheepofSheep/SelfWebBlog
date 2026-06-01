@@ -44,9 +44,21 @@ api.interceptors.response.use(
     if (isAuthFailure(error.response?.data, error.response?.status)) {
       clearAuthState()
     }
-    return Promise.reject(error)
+    return Promise.reject(toApiError(error))
   }
 )
+
+function toApiError(error) {
+  const payload = error.response?.data
+  if (payload && typeof payload === 'object') {
+    const apiError = new Error(payload.msg || error.message || '请求失败')
+    apiError.code = payload.code
+    apiError.status = error.response?.status
+    apiError.authRequired = isAuthFailure(payload, error.response?.status)
+    return apiError
+  }
+  return error
+}
 
 export function unwrap(result) {
   if (!result || typeof result !== 'object') {

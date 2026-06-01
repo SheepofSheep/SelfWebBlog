@@ -34,14 +34,14 @@ public class UserController {
     @PutMapping("/profile")
     public Result<?> updateProfile(@RequestBody Map<String, String> body, HttpServletRequest request) {
         Long userId = AuthHelper.getUserId(request);
-        if (userId == null) return Result.error("请先登录");
+        if (userId == null) return Result.unauthorized("请先登录");
 
         User user = userService.getById(userId);
-        if (user == null) return Result.error("用户不存在");
+        if (user == null) return Result.notFound("用户不存在");
 
         if (body.containsKey("nickname")) {
             String nickname = body.get("nickname").trim();
-            if (nickname.length() > 30) return Result.error("昵称不能超过30个字符");
+            if (nickname.length() > 30) return Result.badRequest("昵称不能超过30个字符");
             user.setNickname(nickname);
         }
         if (body.containsKey("avatarUrl")) {
@@ -63,7 +63,7 @@ public class UserController {
     @PostMapping("/avatar")
     public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         Long userId = AuthHelper.getUserId(request);
-        if (userId == null) return Result.error("请先登录");
+        if (userId == null) return Result.unauthorized("请先登录");
 
         try {
             StoredUpload upload = uploadStorageService.storeImage(file, UploadTarget.AVATAR);
@@ -80,10 +80,10 @@ public class UserController {
 
             return Result.success(fileUrl);
         } catch (IllegalArgumentException e) {
-            return Result.error(e.getMessage());
+            return Result.badRequest(e.getMessage());
         } catch (IOException e) {
             log.error("用户头像上传失败", e);
-            return Result.error("上传失败，请稍后重试");
+            return Result.serverError("上传失败，请稍后重试");
         }
     }
 }

@@ -27,8 +27,8 @@ public class TagController {
 
     @PostMapping
     public Result<Tag> create(@RequestBody Tag tag, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
-        if (tag.getName() == null || tag.getName().trim().isEmpty()) return Result.error("标签名不能为空");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
+        if (tag.getName() == null || tag.getName().trim().isEmpty()) return Result.badRequest("标签名不能为空");
         String name = tag.getName().trim();
         Tag existing = tagMapper.selectOne(new LambdaQueryWrapper<Tag>().eq(Tag::getName, name));
         if (existing != null) return Result.success(existing);
@@ -40,7 +40,7 @@ public class TagController {
 
     @DeleteMapping("/{id}")
     public Result<String> delete(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限操作");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         tagMapper.deleteById(id);
         return Result.success("删除成功");
     }

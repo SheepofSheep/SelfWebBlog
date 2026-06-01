@@ -1,5 +1,6 @@
 package org.example.selfwebblog.controller;
 
+import org.example.selfwebblog.config.ResultHttpStatusAdvice;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.BlogInfoService;
@@ -48,6 +49,7 @@ class CommentControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CommentController(commentService, userService, blogInfoService, postService, commentRateLimiter))
+                .setControllerAdvice(new ResultHttpStatusAdvice())
                 .build();
     }
 
@@ -68,9 +70,9 @@ class CommentControllerTest {
                                   "postId": 99,
                                   "content": "hello"
                                 }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
+                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
 
         verify(commentService, never()).save(any());
     }
@@ -98,9 +100,9 @@ class CommentControllerTest {
                                   "postId": 99,
                                   "content": "hello"
                                 }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
+                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
 
         verify(commentService, never()).save(any());
     }
@@ -133,9 +135,9 @@ class CommentControllerTest {
                                   "postId": 99,
                                   "content": "hello"
                                 }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
+                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value(429));
 
         verify(commentService, never()).save(any());
     }

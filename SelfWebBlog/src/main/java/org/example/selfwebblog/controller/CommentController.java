@@ -80,23 +80,23 @@ public class CommentController {
     public Result<String> addComment(@Valid @RequestBody Comment comment, HttpServletRequest request) {
         Long userId = AuthHelper.getUserId(request);
         if (userId == null) {
-            return Result.error("请先登录");
+            return Result.unauthorized("请先登录");
         }
 
         User user = userService.getById(userId);
         if (user == null) {
-            return Result.error("用户不存在");
+            return Result.notFound("用户不存在");
         }
 
         Post post = postService.getById(comment.getPostId());
         if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
-            return Result.error("文章不存在或未发布");
+            return Result.notFound("文章不存在或未发布");
         }
         if (comment.getContent() != null && comment.getContent().trim().length() > MAX_COMMENT_LENGTH) {
-            return Result.error("评论不能超过1000个字符");
+            return Result.badRequest("评论不能超过1000个字符");
         }
         if (!commentRateLimiter.tryAcquire(userId, request.getRemoteAddr())) {
-            return Result.error("评论太频繁了，请稍后再试");
+            return Result.rateLimited("评论太频繁了，请稍后再试");
         }
 
         String displayName = (user.getNickname() != null && !user.getNickname().isBlank())
@@ -117,15 +117,15 @@ public class CommentController {
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
             HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         return Result.success(commentService.listAll(pageNum, pageSize));
     }
 
     @PutMapping("/{id}/pin")
     public Result<String> togglePin(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.error("无权限");
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         Comment comment = commentService.getById(id);
-        if (comment == null) return Result.error("评论不存在");
+        if (comment == null) return Result.notFound("评论不存在");
         comment.setPinned(comment.getPinned() != null && comment.getPinned() == 1 ? 0 : 1);
         commentService.updateById(comment);
         return Result.success(comment.getPinned() == 1 ? "已置顶" : "已取消置顶");
@@ -134,13 +134,13 @@ public class CommentController {
     @DeleteMapping("/{id}")
     public Result<String> deleteComment(@PathVariable Long id, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) {
-            return Result.error("无权限删除评论");
+            return Result.forbidden("无权限删除评论");
         }
         boolean removed = commentService.removeById(id);
         if (removed) {
             log.info("删除评论成功：ID={}", id);
             return Result.success("删除成功");
         }
-        return Result.error("评论不存在");
+        return Result.notFound("评论不存在");
     }
 }
