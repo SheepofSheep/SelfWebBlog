@@ -1,12 +1,12 @@
 <script setup>
-import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
 import { useRoute, navigate } from '../router'
 // navigate used in template
 import { getPost, addComment, deleteComment, getComments, togglePinComment } from '../utils/api'
 import { showToast } from '../composables/toast'
 import { renderArticleMarkdown, renderCommentMarkdown } from '../utils/marked'
-import { toAbsoluteUrl } from '../utils/url'
 import loadingStore from '../stores/loadingStore'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import {
   ArrowLeft,
   Send,
@@ -56,8 +56,18 @@ const commentContent = ref('')
 const user = inject('user', null)
 const refreshUser = inject('refreshUser', null)
 const commentSubmitting = ref(false)
-const commentRefs = ref({})
 const showEmoji = ref(false)
+const articleRef = ref(null)
+const readingProgress = ref(0)
+const activeHeading = ref('')
+const previewImage = ref('')
+const confirmDialog = ref({
+  open: false,
+  title: '',
+  message: '',
+  confirmText: '确认',
+  onConfirm: null
+})
 
 const emojis = [
   'love',
@@ -115,8 +125,26 @@ const tagList = computed(() => {
   return post.value.tags.split(/[,，\s]+/).filter(Boolean)
 })
 
+const tocItems = computed(() => {
+  if (!post.value?.content) return []
+  const headings = []
+  const pattern = /^(#{2,3})\s+(.+)$/gm
+  let match
+  while ((match = pattern.exec(post.value.content))) {
+    const text = match[2].replace(/[#*_`]/g, '').trim()
+    if (!text) continue
+    headings.push({
+      id: `section-${headings.length + 1}`,
+      text,
+      level: match[1].length
+    })
+  }
+  return headings.slice(0, 12)
+})
+
 watch(renderedContent, async () => {
   await nextTick()
+  prepareArticleEnhancements()
   if (document.querySelector('.post-content > *')) {
     gsap.from('.post-content > *', {
       opacity: 0,
@@ -156,6 +184,11 @@ async function loadComments() {
 
 async function handleAddComment() {
   if (!commentContent.value.trim()) return
+  if (!user?.value) {
+    showToast('登录后就可以发表评论。')
+    navigate('/login')
+    return
+  }
   commentSubmitting.value = true
   try {
     await addComment({ postId: postId.value, content: commentContent.value })
@@ -163,7 +196,13 @@ async function handleAddComment() {
     await loadComments()
     showToast('评论发表成功')
   } catch (error) {
-    showToast('评论发表失败：' + error.message)
+    const message =
+      error?.status === 429 || error?.code === 429
+        ? '评论太快啦，稍等一下再发。'
+        : error?.status === 401 || error?.code === 401
+          ? '登录状态过期了，重新登录一下就好。'
+          : error?.message || '评论没有发出去，稍后再试一次。'
+    showToast(message, 'error')
   } finally {
     commentSubmitting.value = false
   }
@@ -176,7 +215,17 @@ function toggleMenu(id) {
 }
 
 async function handleDeleteComment(commentId) {
-  if (!confirm('确定要删除这条评论吗？')) return
+  askConfirm({
+    title: '删除评论',
+    message: '确定要删除这条评论吗？删除后访客将看不到这条内容。',
+    confirmText: '删除评论',
+    onConfirm: async () => {
+      await deleteCommentById(commentId)
+    }
+  })
+}
+
+async function deleteCommentById(commentId) {
   try {
     await deleteComment(commentId)
     openMenuId.value = null
@@ -187,18 +236,25 @@ async function handleDeleteComment(commentId) {
   }
 }
 
+function askConfirm({ title, message, confirmText = '确认', onConfirm }) {
+  confirmDialog.value = { open: true, title, message, confirmText, onConfirm }
+}
+
+async function handleConfirmAction() {
+  const action = confirmDialog.value.onConfirm
+  confirmDialog.value.open = false
+  confirmDialog.value.onConfirm = null
+  if (action) await action()
+}
+
 async function handleTogglePin(comment) {
   try {
     await togglePinComment(comment.id)
     openMenuId.value = null
     await loadComments()
   } catch (e) {
-    showToast(e?.message || '操作失败', 'error')
+    showToast(e?.message || '这次没有处理成功，稍后再试一次。', 'error')
   }
-}
-
-function formatDate(dateString) {
-  return new Date(dateString).toLocaleString()
 }
 
 function formatRelativeTime(dateString) {
@@ -212,15 +268,69 @@ function formatRelativeTime(dateString) {
   return '刚刚'
 }
 
+function prepareArticleEnhancements() {
+  const root = articleRef.value
+  if (!root) return
+  const headings = [...root.querySelectorAll('h2, h3')]
+  headings.forEach((heading, index) => {
+    if (tocItems.value[index]) heading.id = tocItems.value[index].id
+  })
+  root.querySelectorAll('img').forEach((img) => {
+    img.setAttribute('loading', 'lazy')
+    img.classList.add('clickable-image')
+  })
+}
+
+function scrollToHeading(id) {
+  const target = document.getElementById(id)
+  if (!target) return
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function updateReadingProgress() {
+  const root = articleRef.value
+  if (!root) return
+  const rect = root.getBoundingClientRect()
+  const total = Math.max(1, root.scrollHeight - window.innerHeight * 0.55)
+  const read = Math.min(total, Math.max(0, -rect.top + 120))
+  readingProgress.value = Math.round((read / total) * 100)
+
+  let current = ''
+  for (const item of tocItems.value) {
+    const el = document.getElementById(item.id)
+    if (el && el.getBoundingClientRect().top <= 160) current = item.id
+  }
+  activeHeading.value = current || tocItems.value[0]?.id || ''
+}
+
+function handleArticleClick(event) {
+  const target = event.target
+  if (target?.tagName === 'IMG') {
+    previewImage.value = target.getAttribute('src') || ''
+  }
+}
+
 onMounted(async () => {
   if (refreshUser) await refreshUser()
-  loadPost()
-  loadComments()
+  await loadPost()
+  await loadComments()
+  await nextTick()
+  prepareArticleEnhancements()
+  updateReadingProgress()
+  window.addEventListener('scroll', updateReadingProgress, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', updateReadingProgress)
 })
 </script>
 
 <template>
   <div class="post-page">
+    <div class="reading-progress" aria-hidden="true">
+      <span :style="{ width: readingProgress + '%' }"></span>
+    </div>
+
     <div v-if="post" class="post-container glass-card">
       <div class="post-top-actions">
         <button class="back-btn" @click="goBack"><ArrowLeft :size="16" /> 返回</button>
@@ -264,7 +374,25 @@ onMounted(async () => {
         <span v-for="t in tagList" :key="t" class="tag">{{ t }}</span>
       </div>
 
-      <div class="post-content" v-html="renderedContent"></div>
+      <div class="article-layout" :class="{ 'has-toc': tocItems.length }">
+        <aside v-if="tocItems.length" class="post-toc" aria-label="文章目录">
+          <p class="toc-title">目录</p>
+          <button
+            v-for="item in tocItems"
+            :key="item.id"
+            :class="['toc-link', 'level-' + item.level, { active: activeHeading === item.id }]"
+            @click="scrollToHeading(item.id)"
+          >
+            {{ item.text }}
+          </button>
+        </aside>
+        <div
+          ref="articleRef"
+          class="post-content"
+          v-html="renderedContent"
+          @click="handleArticleClick"
+        ></div>
+      </div>
 
       <!-- 评论区 -->
       <div class="comments-section">
@@ -313,10 +441,9 @@ onMounted(async () => {
           </button>
         </div>
         <div v-else class="comment-login-hint glass-card">
-          <p>
-            <a @click="navigate('/login')" style="cursor: pointer; color: var(--primary)">登录</a>
-            后即可发表评论
-          </p>
+          <p class="login-hint-title">想留下一点想法？</p>
+          <p class="login-hint-desc">登录后就可以发表评论，头像和昵称会一起显示在评论区。</p>
+          <button class="pill-btn pill-btn-primary" @click="navigate('/login')">去登录</button>
         </div>
 
         <div v-if="comments.length > 0" class="comments-list">
@@ -371,7 +498,7 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-        <div v-else class="comments-empty">还没有评论，来发表第一条吧</div>
+        <div v-else class="comments-empty">还没有评论，留下一点想法吧。</div>
       </div>
     </div>
 
@@ -379,25 +506,62 @@ onMounted(async () => {
       <div class="loading-spin loading-shimmer"></div>
       <p>加载中...</p>
     </div>
+
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="previewImage" class="image-preview" @click="previewImage = ''">
+          <button class="image-preview-close" aria-label="关闭图片预览">关闭</button>
+          <img :src="previewImage" alt="文章图片预览" />
+        </div>
+      </Transition>
+    </Teleport>
+
+    <ConfirmDialog
+      v-model="confirmDialog.open"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-text="confirmDialog.confirmText"
+      @confirm="handleConfirmAction"
+    />
   </div>
 </template>
 
 <style scoped>
 .post-page {
-  max-width: 800px;
+  max-width: var(--magazine-max, 1180px);
   margin: 0 auto;
   width: 100%;
+  padding: 0 var(--space-md) var(--space-xl);
+}
+
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 300;
+  background: transparent;
+}
+
+.reading-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand-primary-soft), var(--primary));
+  box-shadow: 0 0 18px rgba(217, 154, 29, 0.28);
+  transition: width 0.15s var(--ease-soft);
 }
 
 .post-container {
-  padding: var(--space-lg);
+  padding: clamp(20px, 4vw, 44px);
+  border-radius: 30px;
 }
 .back-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 250, 238, 0.7);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   padding: 8px 18px;
   font-size: var(--font-size-sm);
@@ -417,9 +581,9 @@ onMounted(async () => {
 }
 
 .back-btn:hover {
-  border-color: var(--theme-pink);
-  color: var(--theme-pink-hover);
-  background: rgba(244, 164, 184, 0.12);
+  border-color: var(--border-warm);
+  color: var(--primary-hover);
+  background: var(--primary-soft);
   transform: translateY(-2px);
 }
 
@@ -428,7 +592,7 @@ onMounted(async () => {
   align-items: center;
   gap: 5px;
   background: var(--primary-soft);
-  border: 1px solid rgba(244, 164, 184, 0.3);
+  border: 1px solid var(--border-warm);
   border-radius: var(--radius-pill);
   padding: 8px 18px;
   font-size: var(--font-size-sm);
@@ -448,28 +612,30 @@ onMounted(async () => {
 }
 
 .post-cover-photo .cover-frame img {
-  max-height: 360px;
+  max-height: 460px;
 }
 
 .post-title {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-xl);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  font-weight: 700;
+  letter-spacing: 0;
   color: var(--text-main);
-  line-height: 1.35;
-  margin: 0 0 var(--space-sm);
+  line-height: 1.12;
+  margin: 8px 0 var(--space-sm);
 }
 
 .post-summary {
   margin: 0 0 16px;
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: var(--text-muted);
-  padding: 12px 16px;
-  background: var(--primary-soft);
-  border-left: 3px solid var(--primary);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  max-width: 760px;
+  font-size: 1rem;
+  line-height: 1.78;
+  color: var(--text-secondary);
+  padding: 14px 18px;
+  background: rgba(217, 154, 29, 0.1);
+  border: 1px solid var(--border-warm);
+  border-left: 4px solid var(--primary);
+  border-radius: 18px;
 }
 
 .post-meta {
@@ -500,17 +666,93 @@ onMounted(async () => {
   font-size: 0.72rem;
 }
 
+.article-layout.has-toc {
+  display: grid;
+  grid-template-columns: minmax(0, 760px) 220px;
+  justify-content: center;
+  gap: 34px;
+  align-items: start;
+}
+
+.article-layout:not(.has-toc) {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.post-toc {
+  position: sticky;
+  top: 104px;
+  order: 2;
+  padding: 16px;
+  border: 1px solid var(--border-warm);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 238, 0.7), rgba(255, 240, 207, 0.48)),
+    var(--surface-muted);
+}
+[data-theme='dark'] .post-toc {
+  background:
+    linear-gradient(180deg, rgba(39, 31, 21, 0.72), rgba(17, 16, 13, 0.45)), var(--surface-muted);
+}
+
+.toc-title {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.toc-link {
+  display: block;
+  width: 100%;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 6px 0 6px 8px;
+  text-align: left;
+  transition:
+    color var(--duration-fast),
+    border-color var(--duration-fast),
+    background var(--duration-fast);
+}
+
+.toc-link.level-3 {
+  padding-left: 18px;
+}
+
+.toc-link:hover,
+.toc-link.active {
+  color: var(--primary-hover);
+  border-left-color: var(--primary);
+  background: rgba(217, 154, 29, 0.08);
+}
+
 .post-content {
-  font-size: var(--font-size-md);
-  line-height: var(--line-height);
+  min-width: 0;
+  font-size: 1.03rem;
+  line-height: 1.9;
   color: var(--text-main);
 }
 .post-content h2 {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-lg);
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 3vw, 2rem);
   font-weight: 600;
-  margin: 2rem 0 1rem;
-  letter-spacing: 0.02em;
+  margin: 2.4rem 0 1rem;
+  letter-spacing: 0;
+  scroll-margin-top: 110px;
+}
+
+.post-content h3 {
+  scroll-margin-top: 110px;
+}
+
+.post-content :deep(img.clickable-image) {
+  cursor: zoom-in;
 }
 .post-content p {
   margin-bottom: 1rem;
@@ -518,7 +760,8 @@ onMounted(async () => {
 
 /* ====== 评论区 ====== */
 .comments-section {
-  margin-top: 3rem;
+  max-width: 820px;
+  margin: 3.2rem auto 0;
   padding-top: 2rem;
   border-top: 1px solid var(--border);
 }
@@ -618,6 +861,20 @@ onMounted(async () => {
   color: var(--text-muted);
 }
 
+.comment-login-hint:hover {
+  transform: none;
+}
+
+.login-hint-title {
+  margin: 0 0 4px;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.login-hint-desc {
+  margin: 0 0 14px;
+}
+
 .comments-list {
   display: flex;
   flex-direction: column;
@@ -630,20 +887,22 @@ onMounted(async () => {
   align-items: flex-start;
   padding: var(--space-md);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 250, 238, 0.62);
+  border: 1px solid var(--border);
   transition:
     transform var(--duration-normal) var(--ease-bounce),
     box-shadow var(--duration-normal) var(--ease-bounce);
+}
+[data-theme='dark'] .comment-item {
+  background: rgba(17, 16, 13, 0.34);
 }
 .comment-item:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-soft);
 }
 .admin-comment {
-  border-color: rgba(244, 164, 184, 0.35);
-  background: rgba(244, 164, 184, 0.08);
+  border-color: var(--border-warm);
+  background: rgba(217, 154, 29, 0.08);
 }
 .comment-body {
   flex: 1;
@@ -706,7 +965,7 @@ onMounted(async () => {
 }
 
 [data-theme='dark'] .action-menu {
-  background: rgba(30, 26, 28, 0.95);
+  background: rgba(39, 31, 21, 0.96);
 }
 .action-menu button {
   display: flex;
@@ -722,11 +981,11 @@ onMounted(async () => {
     color var(--duration-fast);
 }
 .action-menu button:hover {
-  background: var(--red-soft);
+  background: var(--primary-soft);
 }
 .action-menu button.danger:hover {
-  background: rgba(186, 0, 52, 0.1);
-  color: var(--red);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .pinned-badge {
@@ -735,15 +994,15 @@ onMounted(async () => {
   gap: 3px;
   font-size: 0.6rem;
   font-weight: 600;
-  color: var(--theme-pink-hover);
-  background: rgba(244, 164, 184, 0.15);
+  color: var(--primary-hover);
+  background: var(--primary-soft);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   margin-right: 6px;
   vertical-align: middle;
 }
 .pinned {
-  border-color: rgba(244, 164, 184, 0.35);
+  border-color: var(--border-warm);
 }
 
 .fade-enter-active,
@@ -773,6 +1032,37 @@ onMounted(async () => {
   margin: 0 auto var(--space-md);
   border-radius: 50%;
 }
+
+.image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(32, 24, 16, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.image-preview img {
+  max-width: min(94vw, 1200px);
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+}
+
+.image-preview-close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  border: 1px solid rgba(255, 250, 238, 0.3);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 250, 238, 0.16);
+  color: #fff9ec;
+  cursor: pointer;
+  padding: 8px 14px;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -780,11 +1070,30 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .post-page {
+    padding-inline: var(--space-sm);
+  }
   .post-container {
     padding: var(--space-md);
+    border-radius: 24px;
   }
   .post-title {
-    font-size: var(--font-size-lg);
+    font-size: clamp(1.8rem, 10vw, 2.5rem);
+  }
+  .article-layout,
+  .article-layout.has-toc {
+    display: block;
+  }
+  .post-toc {
+    position: static;
+    margin-bottom: var(--space-md);
+  }
+  .post-meta {
+    gap: 8px;
+  }
+  .emoji-popover {
+    right: -8px;
+    width: min(320px, calc(100vw - 48px));
   }
 }
 </style>

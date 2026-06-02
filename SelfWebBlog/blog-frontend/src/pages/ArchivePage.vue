@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { searchPosts, listCategories } from '../utils/api'
-import { navigate } from '../router'
+import { searchPosts, listCategories, listTags } from '../utils/api'
+import { navigate, useRoute } from '../router'
 import { formatTime } from '../utils/format'
 import { Search, Clock, Eye, Folder, Tag, ArrowUpDown, X } from 'lucide-vue-next'
 
 const posts = ref([])
 const categories = ref([])
+const tags = ref([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = 20
@@ -16,8 +17,17 @@ const keyword = ref('')
 const category = ref('')
 const tag = ref('')
 const sort = ref('date')
+const { query } = useRoute()
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const quickTags = computed(() => tags.value.slice(0, 12))
+const activeFilters = computed(() =>
+  [
+    keyword.value ? { key: 'keyword', label: `搜索：${keyword.value}` } : null,
+    category.value ? { key: 'category', label: `分类：${category.value}` } : null,
+    tag.value ? { key: 'tag', label: `标签：${tag.value}` } : null
+  ].filter(Boolean)
+)
 
 function postTags(p) {
   if (!p?.tags) return []
@@ -41,8 +51,34 @@ function doSearch(resetPage = true) {
   debounceTimer = setTimeout(() => loadPosts(), 200)
 }
 
+function buildArchiveQuery() {
+  const params = new URLSearchParams()
+  if (keyword.value.trim()) params.set('keyword', keyword.value.trim())
+  if (category.value) params.set('category', category.value)
+  if (tag.value.trim()) params.set('tag', tag.value.trim())
+  if (sort.value !== 'date') params.set('sort', sort.value)
+  if (currentPage.value > 1) params.set('page', String(currentPage.value))
+  return params.toString()
+}
+
+function syncArchiveUrl() {
+  const next = buildArchiveQuery()
+  const target = next ? `/archive?${next}` : '/archive'
+  const current = window.location.hash.replace(/^#/, '') || '/'
+  if (current !== target) navigate(target)
+}
+
+function initializeFromQuery() {
+  keyword.value = query.value.get('keyword') || ''
+  category.value = query.value.get('category') || ''
+  tag.value = query.value.get('tag') || ''
+  sort.value = query.value.get('sort') || 'date'
+  currentPage.value = Number(query.value.get('page') || 1)
+}
+
 async function loadPosts() {
   loading.value = true
+  syncArchiveUrl()
   try {
     const data = await searchPosts({
       keyword: keyword.value || undefined,
@@ -69,12 +105,27 @@ async function loadCategories() {
   }
 }
 
+async function loadTags() {
+  try {
+    tags.value = await listTags()
+  } catch {
+    tags.value = []
+  }
+}
+
 function clearFilters() {
   keyword.value = ''
   category.value = ''
   tag.value = ''
   sort.value = 'date'
   loadPosts()
+}
+
+function removeFilter(key) {
+  if (key === 'keyword') keyword.value = ''
+  if (key === 'category') category.value = ''
+  if (key === 'tag') tag.value = ''
+  doSearch()
 }
 
 function clearKeyword() {
@@ -84,6 +135,11 @@ function clearKeyword() {
 
 function clearTag() {
   tag.value = ''
+  doSearch()
+}
+
+function chooseTag(name) {
+  tag.value = name
   doSearch()
 }
 
@@ -103,15 +159,20 @@ function nextPage() {
 watch([category, sort], () => doSearch())
 
 onMounted(() => {
+  initializeFromQuery()
   loadPosts()
   loadCategories()
+  loadTags()
 })
 </script>
 
 <template>
   <main class="archive-page">
-    <h1 class="archive-title">全部文章</h1>
-    <p class="archive-sub">共 {{ total }} 篇文章</p>
+    <header class="archive-hero">
+      <span class="archive-kicker">EDITORIAL ARCHIVE</span>
+      <h1 class="archive-title">编辑部索引</h1>
+      <p class="archive-sub">共 {{ total }} 篇文章 · 搜索、分类和标签会保留在地址里</p>
+    </header>
 
     <!-- 搜索与筛选栏 -->
     <div class="archive-toolbar glass-card">
@@ -160,12 +221,43 @@ onMounted(() => {
           <X :size="14" /> 清除筛选
         </button>
       </div>
+
+      <div v-if="quickTags.length" class="quick-tags" aria-label="常用标签">
+        <span class="quick-label">常用标签</span>
+        <button
+          v-for="t in quickTags"
+          :key="t.id || t.name"
+          :class="['quick-tag', { active: tag === t.name }]"
+          @click="chooseTag(t.name)"
+        >
+          {{ t.name }}
+        </button>
+      </div>
+
+      <div v-if="activeFilters.length" class="filter-chips">
+        <button
+          v-for="item in activeFilters"
+          :key="item.key"
+          class="filter-chip"
+          @click="removeFilter(item.key)"
+        >
+          {{ item.label }}
+          <X :size="12" />
+        </button>
+      </div>
     </div>
 
     <!-- 文章卡片网格 -->
-    <div v-if="loading" class="loading-state">加载中...</div>
+    <div v-if="loading" class="archive-grid">
+      <div v-for="i in 6" :key="i" class="archive-card archive-skeleton loading-shimmer"></div>
+    </div>
     <div v-else-if="posts.length === 0" class="empty-state">
-      <p>没有找到匹配的文章</p>
+      <p class="empty-title">没有找到相关内容</p>
+      <p class="empty-desc">换个关键词看看，或者先清除筛选。</p>
+      <button class="pill-btn pill-btn-primary" @click="clearFilters">
+        <X :size="14" />
+        清除筛选
+      </button>
     </div>
     <div v-else class="archive-grid">
       <article
@@ -177,6 +269,11 @@ onMounted(() => {
         <div v-if="p.coverUrl" class="post-cover-photo">
           <div class="cover-frame">
             <img :src="p.coverUrl" :alt="p.title" />
+          </div>
+        </div>
+        <div v-else class="post-cover-photo fallback-cover">
+          <div class="cover-frame">
+            <span>{{ p.title?.charAt(0) || '文' }}</span>
           </div>
         </div>
 
@@ -217,41 +314,69 @@ onMounted(() => {
 
 <style scoped>
 .archive-page {
-  max-width: 1060px;
+  max-width: var(--magazine-max, 1180px);
   margin: 0 auto;
   width: 100%;
-  padding: 20px 0;
+  padding: 14px var(--space-md) var(--space-xl);
+}
+
+.archive-hero {
+  position: relative;
+  margin-bottom: 18px;
+  padding: 22px 4px 6px;
+}
+
+.archive-kicker {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--primary-hover);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .archive-title {
-  font-family: var(--font-sans);
-  font-size: 1.5rem;
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 5vw, 4.2rem);
   font-weight: 700;
   color: var(--text);
-  margin: 0 0 4px;
+  margin: 0 0 10px;
+  letter-spacing: 0;
+  line-height: 1.05;
 }
 .archive-sub {
-  margin: 0 0 24px;
+  margin: 0;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 /* ═══ 工具栏 ═══ */
 .archive-toolbar {
-  padding: 16px 20px;
+  padding: 16px;
   margin-bottom: 24px;
+  border-radius: 24px;
+}
+
+.archive-toolbar:hover {
+  transform: none;
 }
 
 .search-box {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
+  min-height: 50px;
   padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 253, 247, 0.72);
+  border: 1px solid var(--border-medium);
   margin-bottom: 12px;
   color: var(--text-muted);
+}
+[data-theme='dark'] .search-box {
+  background: rgba(17, 16, 13, 0.38);
 }
 .search-input {
   flex: 1;
@@ -287,10 +412,11 @@ onMounted(() => {
 }
 
 .filter-select {
+  min-height: 36px;
   padding: 6px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-pill);
-  background: var(--surface-muted);
+  background: rgba(255, 253, 247, 0.72);
   color: var(--text);
   font-size: 0.78rem;
   font-family: var(--font-body);
@@ -298,14 +424,21 @@ onMounted(() => {
   outline: none;
 }
 
+[data-theme='dark'] .filter-select,
+[data-theme='dark'] .tag-input-wrap {
+  background: rgba(17, 16, 13, 0.42);
+  border-color: var(--border-medium);
+}
+
 .tag-input-wrap {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid var(--border);
+  min-height: 36px;
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-pill);
-  background: var(--surface-muted);
+  background: rgba(255, 253, 247, 0.72);
   color: var(--text-muted);
 }
 .tag-input {
@@ -322,25 +455,41 @@ onMounted(() => {
 }
 
 .sort-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 14px;
-  border: 1px solid var(--border);
+  gap: 6px;
+  min-width: 96px;
+  padding: 8px 16px;
+  border: 1px solid var(--border-warm);
   border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.78rem;
+  background: rgba(255, 247, 227, 0.9);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
   font-family: var(--font-body);
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
   transition:
-    border-color var(--duration-fast),
-    color var(--duration-fast),
-    background var(--duration-fast);
+    border-color var(--duration-fast) var(--ease-soft),
+    color var(--duration-fast) var(--ease-soft),
+    background var(--duration-fast) var(--ease-soft),
+    transform var(--duration-fast) var(--ease-soft);
 }
-.sort-btn:hover {
+[data-theme='dark'] .sort-btn {
+  background: rgba(39, 31, 21, 0.7);
+  border-color: var(--border-medium);
+  color: var(--text-secondary);
+}
+.sort-btn:hover,
+.sort-btn:focus-visible {
   border-color: var(--primary);
   color: var(--primary-hover);
+  background: rgba(255, 245, 215, 0.96);
+  transform: translateY(-1px);
+}
+[data-theme='dark'] .sort-btn:hover,
+[data-theme='dark'] .sort-btn:focus-visible {
+  background: rgba(227, 170, 52, 0.14);
 }
 .sort-btn.active {
   background: var(--primary-soft);
@@ -355,7 +504,7 @@ onMounted(() => {
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: transparent;
+  background: rgba(255, 250, 238, 0.58);
   color: var(--text-muted);
   font-size: 0.76rem;
   font-family: var(--font-body);
@@ -363,6 +512,51 @@ onMounted(() => {
   transition:
     color var(--duration-fast),
     border-color var(--duration-fast);
+}
+
+.quick-tags,
+.filter-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.quick-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.quick-tag,
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 250, 238, 0.62);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  padding: 5px 11px;
+  transition:
+    color var(--duration-fast),
+    border-color var(--duration-fast),
+    background var(--duration-fast),
+    transform var(--duration-fast);
+}
+
+.quick-tag:hover,
+.quick-tag.active,
+.filter-chip:hover {
+  color: var(--primary-hover);
+  border-color: var(--border-warm);
+  background: var(--primary-soft);
+  transform: translateY(-1px);
 }
 .clear-filter-btn:hover {
   color: var(--danger);
@@ -372,7 +566,7 @@ onMounted(() => {
 /* ═══ 卡片网格 ═══ */
 .archive-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 18px;
 }
 
@@ -382,6 +576,7 @@ onMounted(() => {
   flex-direction: column;
   overflow: hidden;
   padding: 0;
+  min-height: 280px;
 }
 
 .archive-card .post-cover-photo {
@@ -392,6 +587,20 @@ onMounted(() => {
 .archive-card .cover-frame {
   height: 170px;
   overflow: hidden;
+}
+.fallback-cover .cover-frame {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(135deg, rgba(246, 196, 91, 0.14) 0 1px, transparent 1px 18px),
+    radial-gradient(circle at 25% 12%, rgba(246, 196, 91, 0.3), transparent 34%),
+    linear-gradient(135deg, #2b2114, #15110c);
+}
+.fallback-cover span {
+  color: rgba(246, 196, 91, 0.72);
+  font-family: var(--font-serif);
+  font-size: 3.4rem;
+  font-weight: 900;
 }
 .archive-card .cover-frame img {
   width: 100%;
@@ -427,8 +636,8 @@ onMounted(() => {
 
 .card-title {
   margin: 0 0 6px;
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text);
   line-height: 1.35;
@@ -480,17 +689,52 @@ onMounted(() => {
 .loading-state,
 .empty-state {
   text-align: center;
-  padding: 48px 0;
+  padding: 48px 20px;
   color: var(--text-muted);
 }
 
+.archive-skeleton {
+  min-height: 280px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.empty-state {
+  border: 1px dashed var(--border-warm);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 250, 238, 0.56);
+}
+[data-theme='dark'] .empty-state {
+  background: rgba(17, 16, 13, 0.36);
+}
+
+.empty-title {
+  margin: 0 0 6px;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.empty-desc {
+  margin: 0 0 18px;
+}
+
 @media (max-width: 640px) {
+  .archive-page {
+    padding-inline: var(--space-sm);
+  }
   .archive-grid {
     grid-template-columns: 1fr;
     gap: 14px;
   }
+  .search-box {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
   .filter-row {
     gap: 6px;
+  }
+  .sort-btn {
+    flex: 1 1 120px;
+    justify-content: center;
   }
   .tag-input {
     width: 70px;

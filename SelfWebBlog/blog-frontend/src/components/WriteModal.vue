@@ -161,7 +161,7 @@ async function submit() {
     emit('success')
     close()
   } catch (err) {
-    push(err?.message || '操作失败', 'error')
+    push(err?.message || '这次没有保存成功，稍后再试一次。', 'error')
   } finally {
     loading.value = false
   }

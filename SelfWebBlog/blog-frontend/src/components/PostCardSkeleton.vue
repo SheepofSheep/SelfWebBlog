@@ -12,9 +12,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-
-const props = defineProps({
+defineProps({
   isLoading: {
     type: Boolean,
     default: true
@@ -24,11 +22,11 @@ const props = defineProps({
 
 <style scoped>
 .post-card-skeleton {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 20px;
+  background: rgba(255, 250, 238, 0.86);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
-  box-shadow: 0 8px 24px rgba(244, 164, 184, 0.12);
+  box-shadow: var(--shadow-paper);
   transition: opacity 0.3s ease;
   overflow: hidden;
 }
@@ -36,7 +34,7 @@ const props = defineProps({
 .skeleton-image {
   width: 100%;
   height: 200px;
-  background: #eeeeee;
+  background: rgba(217, 154, 29, 0.1);
   border-radius: 12px;
   margin-bottom: 1rem;
   animation: pulse 1.5s ease-in-out infinite;
@@ -51,7 +49,7 @@ const props = defineProps({
 .skeleton-title {
   width: 60%;
   height: 24px;
-  background: #eeeeee;
+  background: rgba(217, 154, 29, 0.12);
   border-radius: 8px;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.2s;
@@ -60,7 +58,7 @@ const props = defineProps({
 .skeleton-description {
   width: 100%;
   height: 16px;
-  background: #eeeeee;
+  background: rgba(217, 154, 29, 0.1);
   border-radius: 6px;
   animation: pulse 1.5s ease-in-out infinite;
 }

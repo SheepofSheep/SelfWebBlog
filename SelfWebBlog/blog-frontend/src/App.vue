@@ -63,13 +63,18 @@ const { path, query } = useRoute()
 const { user, restoreUser, saveUser, clearUserState, loadUserInfo, logoutUser } = useAuthStore()
 const mobileOpen = ref(false)
 const sidebarCollapsed = ref(localStorage.getItem('sidebarCollapsed') === 'true')
+const siteInfo = ref(null)
+const brandAvatar = computed(() =>
+  toAbsoluteUrl(siteInfo.value?.avatarUrl || user.value?.avatarUrl || '')
+)
+const brandName = computed(() => siteInfo.value?.nickname || 'Gabriel')
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
   localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed.value))
 }
 
-const theme = ref(localStorage.getItem('theme') || 'light')
+const theme = ref(localStorage.getItem('theme') || 'dark')
 function toggleTheme() {
   theme.value = theme.value === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', theme.value)
@@ -79,8 +84,9 @@ const refreshKey = ref(0)
 provide('user', user)
 provide('refreshUser', loadUserInfo)
 provide('loadingStore', loadingStore)
-provide('refreshHome', () => {
+provide('refreshHome', async () => {
   refreshKey.value++
+  await loadBackground()
 })
 
 function handleOAuthRedirect() {
@@ -131,13 +137,14 @@ async function ensureAuthForRoute() {
   }
 
   if (meta.requiresAuth && !user.value) {
-    showToast('请先登录', 'warning')
-    navigate('/login')
+    showToast('登录后就可以继续访问这里。', 'warning')
+    const redirect = window.location.hash.replace(/^#/, '') || '/'
+    navigate(`/login?redirect=${encodeURIComponent(redirect)}`)
     return false
   }
 
   if (meta.requiresRole && user.value?.role !== meta.requiresRole) {
-    showToast('无权访问', 'warning')
+    showToast('这里是博主工作台，当前账号不能进入。', 'warning')
     navigate('/')
     return false
   }
@@ -156,7 +163,7 @@ function handleAuthExpired() {
   if (!user.value && !localStorage.getItem('token')) return
   clearUserState()
   if (!getRouteMeta(path.value).public) {
-    showToast('登录状态已失效，请重新登录', 'warning')
+    showToast('登录状态过期了，重新登录一下就好。', 'warning')
     navigate('/login')
   }
 }
@@ -169,8 +176,11 @@ function navTo(route) {
 async function loadBackground() {
   try {
     const data = await getProfile()
+    siteInfo.value = data?.blogInfo || null
     if (data?.blogInfo?.bgUrl) {
       document.body.style.backgroundImage = `url(${data.blogInfo.bgUrl})`
+    } else {
+      document.body.style.backgroundImage = ''
     }
   } catch {}
 }
@@ -224,10 +234,21 @@ onUnmounted(() => {
       :class="{ collapsed: sidebarCollapsed }"
       aria-label="站点导航"
     >
+      <button class="sb-brand" @click="navTo('/')">
+        <span class="brand-mark">
+          <img v-if="brandAvatar" :src="brandAvatar" :alt="brandName" class="brand-avatar" />
+          <span v-else>G</span>
+        </span>
+        <span class="brand-copy">
+          <strong>{{ brandName }}</strong>
+          <small>ガヴリールドロップアウト</small>
+        </span>
+      </button>
+
       <nav class="sb-nav">
         <a class="sb-link" :class="{ active: path === '/' }" title="首页" @click="navTo('/')">
           <Home :size="18" />
-          <span v-show="!sidebarCollapsed">首页</span>
+          <span>首页</span>
         </a>
         <a
           class="sb-link"
@@ -236,7 +257,7 @@ onUnmounted(() => {
           @click="navTo('/archive')"
         >
           <Search :size="18" />
-          <span v-show="!sidebarCollapsed">归档</span>
+          <span>归档</span>
         </a>
         <a
           v-if="user?.role === 'ADMIN'"
@@ -246,7 +267,7 @@ onUnmounted(() => {
           @click="navTo('/write')"
         >
           <PenLine :size="18" />
-          <span v-show="!sidebarCollapsed">写作</span>
+          <span>写作</span>
         </a>
         <a
           v-if="user?.role === 'ADMIN'"
@@ -256,7 +277,7 @@ onUnmounted(() => {
           @click="navTo('/profile')"
         >
           <Settings :size="18" />
-          <span v-show="!sidebarCollapsed">管理</span>
+          <span>管理</span>
         </a>
         <a
           v-if="user && user.role !== 'ADMIN'"
@@ -266,7 +287,7 @@ onUnmounted(() => {
           @click="navTo('/me')"
         >
           <User :size="18" />
-          <span v-show="!sidebarCollapsed">我的</span>
+          <span>我的</span>
         </a>
         <a
           v-if="!user"
@@ -276,7 +297,7 @@ onUnmounted(() => {
           @click="navTo('/login')"
         >
           <UserPlus :size="18" />
-          <span v-show="!sidebarCollapsed">登录</span>
+          <span>登录</span>
         </a>
       </nav>
 
@@ -289,7 +310,7 @@ onUnmounted(() => {
         >
           <Moon v-if="theme === 'light'" :size="18" />
           <Sun v-else :size="18" />
-          <span v-show="!sidebarCollapsed">{{ theme === 'light' ? '深色模式' : '浅色模式' }}</span>
+          <span>{{ theme === 'light' ? '深色' : '浅色' }}</span>
         </button>
 
         <div
@@ -308,7 +329,7 @@ onUnmounted(() => {
             :class="{ loaded: user?.avatarUrl }"
             @load="(e) => e.target.classList.add('loaded')"
           />
-          <div v-show="!sidebarCollapsed" class="sb-user-info">
+          <div class="sb-user-info">
             <span class="sb-username">{{ user?.nickname || user?.username }}</span>
             <span v-if="user?.role === 'ADMIN'" class="sb-badge">博主</span>
           </div>
@@ -316,7 +337,7 @@ onUnmounted(() => {
 
         <a v-if="user" class="sb-link sb-logout" title="退出登录" @click="handleLogout">
           <LogOut :size="18" />
-          <span v-show="!sidebarCollapsed">退出登录</span>
+          <span>退出</span>
         </a>
       </div>
 
@@ -364,49 +385,122 @@ onUnmounted(() => {
 }
 
 .app:not(.is-login) {
-  padding-left: calc(var(--sidebar-width) + var(--space-xl));
-  transition: padding-left var(--duration-normal) var(--ease-bounce);
+  padding-top: 92px;
+  transition: padding-top var(--duration-normal) var(--ease-bounce);
 }
 
 .app.sidebar-collapsed:not(.is-login) {
-  padding-left: calc(76px + var(--space-xl));
+  padding-top: 92px;
 }
 
 /* ============================================================
-   悬浮胶囊侧边栏
+   暗金杂志顶部导航
    ============================================================ */
 .sidebar {
   position: fixed;
-  left: var(--space-md);
-  top: var(--space-md);
-  bottom: var(--space-md);
-  width: var(--sidebar-width);
+  left: 50%;
+  top: 14px;
+  bottom: auto;
+  width: min(var(--magazine-max, 1180px), calc(100vw - 28px));
+  min-height: 62px;
   display: flex;
-  flex-direction: column;
-  padding: var(--space-md) var(--space-sm);
-  border-radius: var(--radius-xl);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 24px;
   z-index: 200;
-  overflow: hidden;
+  overflow: visible;
+  background:
+    linear-gradient(180deg, rgba(251, 247, 239, 0.96), rgba(244, 236, 222, 0.94)),
+    var(--surface-strong);
+  transform: translateX(-50%);
   transition:
-    width var(--duration-normal) var(--ease-bounce),
-    padding var(--duration-normal) var(--ease-bounce);
+    transform var(--duration-normal) var(--ease-bounce),
+    border-color var(--duration-normal) var(--ease-bounce),
+    background var(--duration-normal) var(--ease-bounce);
 }
 
 .sidebar.collapsed {
-  width: 76px;
-  padding: var(--space-md) 10px;
+  width: min(var(--magazine-max, 1180px), calc(100vw - 28px));
+  padding: 10px 12px;
 }
 
 .sidebar:hover {
-  transform: none;
+  transform: translateX(-50%);
+}
+
+.sb-brand {
+  display: inline-grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.brand-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-paper);
+  color: var(--primary-hover);
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.brand-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.brand-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.brand-copy strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-copy small {
+  overflow: hidden;
+  color: var(--primary-hover);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .sb-nav {
-  flex: 1;
+  flex: 0 1 auto;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 0 4px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
 }
 
 .sb-link {
@@ -422,7 +516,7 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   border: none;
   background: none;
-  width: 100%;
+  width: auto;
   text-align: left;
   transition:
     color var(--duration-normal) var(--ease-bounce),
@@ -431,59 +525,46 @@ onUnmounted(() => {
 }
 
 .sb-link:hover {
-  color: var(--theme-pink-hover);
-  background: rgba(244, 164, 184, 0.1);
-  transform: translateX(2px);
-}
-
-.sidebar.collapsed .sb-link {
-  justify-content: center;
-  padding: 10px;
-  gap: 0;
-}
-
-.sidebar.collapsed .sb-link:hover {
-  transform: translateY(-2px);
-}
-
-.sidebar.collapsed .sb-user {
-  justify-content: center;
-  padding: 10px 8px;
+  color: var(--primary-hover);
+  background: rgba(201, 145, 45, 0.08);
+  transform: translateY(-1px);
 }
 
 .sb-link.active {
-  color: var(--theme-pink-hover);
-  background: rgba(244, 164, 184, 0.18);
+  color: var(--primary-hover);
+  background: rgba(201, 145, 45, 0.12);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(244, 164, 184, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(201, 145, 45, 0.2);
 }
 
 .sb-footer {
   margin-top: auto;
-  padding-top: var(--space-sm);
-  border-top: 1px solid rgba(244, 164, 184, 0.15);
+  padding-top: 0;
+  border-top: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 
 .sb-user {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  max-width: 180px;
+  padding: 6px 10px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: background var(--duration-normal) var(--ease-bounce);
 }
 
 .sb-user:hover {
-  background: rgba(244, 164, 184, 0.1);
+  background: rgba(201, 145, 45, 0.08);
 }
 
 .sb-avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -508,7 +589,7 @@ onUnmounted(() => {
 .sb-badge {
   font-size: 0.6rem;
   font-weight: 600;
-  color: var(--theme-pink-hover);
+  color: var(--primary-hover);
 }
 
 .sb-logout:hover {
@@ -517,48 +598,33 @@ onUnmounted(() => {
 }
 
 .sb-collapse-btn {
-  position: absolute;
-  right: -12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.45));
-  backdrop-filter: blur(8px);
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  box-shadow: var(--shadow-soft);
-  transition:
-    color var(--duration-normal) var(--ease-bounce),
-    border-color var(--duration-normal) var(--ease-bounce),
-    transform var(--duration-normal) var(--ease-bounce);
-  z-index: 10;
+  display: none;
 }
 
-.sb-collapse-btn:hover {
-  color: var(--theme-pink-hover);
-  border-color: rgba(244, 164, 184, 0.45);
-  transform: translateY(-50%) scale(1.08);
+[data-theme='dark'] .sidebar {
+  background:
+    linear-gradient(180deg, rgba(28, 24, 18, 0.96), rgba(19, 16, 12, 0.94)), var(--surface-strong);
+  border-color: var(--border);
 }
 
-[data-theme='dark'] .sb-collapse-btn {
-  background: linear-gradient(135deg, rgba(50, 44, 50, 0.85), rgba(38, 34, 38, 0.65));
-  border-color: rgba(255, 255, 255, 0.12);
+[data-theme='dark'] .sb-link:hover,
+[data-theme='dark'] .sb-user:hover {
+  background: rgba(212, 160, 68, 0.1);
+}
+
+[data-theme='dark'] .sb-link.active {
+  color: var(--primary-hover);
+  background: rgba(212, 160, 68, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(226, 180, 90, 0.2);
 }
 
 /* ============================================================
    主内容区
    ============================================================ */
 .main-content {
-  max-width: 920px;
+  max-width: none;
   margin: 0 auto;
-  padding: var(--space-md) var(--space-xl) var(--space-xl);
+  padding: 0 var(--space-md) var(--space-xl);
   width: 100%;
 }
 
@@ -572,7 +638,7 @@ onUnmounted(() => {
 }
 
 .is-login {
-  padding-left: 0 !important;
+  padding-top: 0 !important;
 }
 
 .not-found {
@@ -608,10 +674,10 @@ onUnmounted(() => {
   z-index: 210;
   width: 44px;
   height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border-warm);
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.35));
-  backdrop-filter: blur(12px);
+  background: var(--surface-strong);
+  backdrop-filter: none;
   color: var(--text-main);
   cursor: pointer;
   align-items: center;
@@ -619,18 +685,28 @@ onUnmounted(() => {
   box-shadow: var(--shadow-soft);
 }
 
+[data-theme='dark'] .mobile-menu-btn {
+  background: var(--surface-strong);
+  border-color: var(--border-warm);
+  color: var(--text-main);
+}
+
 .mobile-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(92, 77, 77, 0.12);
+  background: rgba(63, 52, 41, 0.16);
   backdrop-filter: blur(4px);
   z-index: 190;
+}
+
+[data-theme='dark'] .mobile-overlay {
+  background: rgba(17, 16, 13, 0.58);
 }
 
 @media (max-width: 900px) {
   .app:not(.is-login),
   .app.sidebar-collapsed:not(.is-login) {
-    padding-left: 0;
+    padding-top: 0;
   }
 
   .sidebar,
@@ -639,10 +715,16 @@ onUnmounted(() => {
     top: 12px;
     bottom: 12px;
     width: min(280px, calc(100vw - 24px));
+    min-height: auto;
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-direction: column;
+    gap: 12px;
     padding: var(--space-md) var(--space-sm);
     transform: translateX(calc(-100% - 24px));
     transition: transform 0.4s var(--ease-bounce);
     box-shadow: var(--shadow-hover);
+    overflow: hidden;
   }
 
   .mobile-open .sidebar,
@@ -652,6 +734,24 @@ onUnmounted(() => {
 
   .sb-collapse-btn {
     display: none;
+  }
+
+  .sb-brand {
+    width: 100%;
+  }
+
+  .sb-nav,
+  .sb-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sb-link {
+    width: 100%;
+  }
+
+  .sb-user {
+    max-width: none;
   }
 
   .mobile-menu-btn {

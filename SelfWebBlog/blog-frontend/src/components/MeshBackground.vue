@@ -1,5 +1,5 @@
 <script setup>
-// 柔和暖色渐变 — Lovable 风格 hero glow
+// Honey Paper Studio 背景柔光，不使用厚重玻璃感。
 </script>
 
 <template>
@@ -21,13 +21,13 @@
 .glow-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(180px);
+  filter: blur(150px);
 }
 
 .glow-a {
   width: 700px;
   height: 500px;
-  background: radial-gradient(ellipse, rgba(244, 164, 184, 0.06) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(214, 185, 119, 0.1) 0%, transparent 70%);
   top: -20%;
   left: -15%;
 }
@@ -35,15 +35,15 @@
 .glow-b {
   width: 600px;
   height: 400px;
-  background: radial-gradient(ellipse, rgba(224, 242, 241, 0.05) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(210, 216, 194, 0.1) 0%, transparent 70%);
   bottom: -15%;
   right: -10%;
 }
 
 [data-theme='dark'] .glow-a {
-  background: radial-gradient(ellipse, rgba(224, 135, 154, 0.07) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(212, 160, 68, 0.06) 0%, transparent 70%);
 }
 [data-theme='dark'] .glow-b {
-  background: radial-gradient(ellipse, rgba(180, 210, 200, 0.04) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(111, 127, 69, 0.045) 0%, transparent 70%);
 }
 </style>

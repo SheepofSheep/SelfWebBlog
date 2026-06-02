@@ -39,6 +39,7 @@ import {
 
 const { push } = useToast()
 const user = inject('user', ref(null))
+const refreshHome = inject('refreshHome', null)
 const loading = ref(false)
 const blogInfo = ref(null)
 const posts = ref([])
@@ -162,6 +163,7 @@ async function saveNickname() {
     push('资料修改成功')
     closeNicknameModal()
     await refresh()
+    if (refreshHome) await refreshHome()
   } catch (e) {
     push(e?.message || '修改失败', 'error')
   }
@@ -179,6 +181,7 @@ async function onPickAvatar(e) {
     await uploadAvatar(file)
     push('头像更新成功')
     await refresh()
+    if (refreshHome) await refreshHome()
   } catch (err) {
     push(err?.message || '上传失败', 'error')
   } finally {
@@ -194,6 +197,7 @@ async function onPickBg(e) {
     await updateBackground(url)
     push('背景图更新成功')
     await refresh()
+    if (refreshHome) await refreshHome()
   } catch (err) {
     push(err?.message || '上传失败', 'error')
   } finally {
@@ -206,8 +210,9 @@ async function clearBg() {
     await updateBackground('')
     push('背景图已清除')
     await refresh()
+    if (refreshHome) await refreshHome()
   } catch (e) {
-    push(e?.message || '操作失败', 'error')
+    push(e?.message || '背景暂时没有清除成功，稍后再试一次。', 'error')
   }
 }
 
@@ -234,11 +239,11 @@ async function remove(id) {
     onConfirm: async () => {
       try {
         await deletePost(id)
-        push('删除成功')
+        push('已删除')
         await refresh()
         if (tab.value === 'drafts') await loadDrafts()
       } catch (e) {
-        push(e?.message || '删除失败', 'error')
+        push(e?.message || '暂时没有删除成功，稍后再试一次。', 'error')
       }
     }
   })
@@ -282,7 +287,7 @@ async function handleSavePoster() {
     closePosterModal()
     await loadPosters()
   } catch (e) {
-    push(e?.message || '操作失败', 'error')
+    push(e?.message || '海报暂时没有添加成功，稍后再试一次。', 'error')
   }
 }
 
@@ -294,9 +299,9 @@ async function handleDeletePoster(id) {
       try {
         await delPoster(id)
         posters.value = posters.value.filter((p) => p.id !== id)
-        push('删除成功')
+        push('海报已删除')
       } catch (e) {
-        push(e?.message || '删除失败', 'error')
+        push(e?.message || '海报暂时没有删除成功，稍后再试一次。', 'error')
       }
     }
   })
@@ -385,7 +390,7 @@ async function handleGrantTitle() {
     closeTitleModal()
     await loadUsers()
   } catch (e) {
-    push(e?.message || '操作失败', 'error')
+    push(e?.message || '称号暂时没有设置成功，稍后再试一次。', 'error')
   }
 }
 
@@ -396,7 +401,7 @@ async function handleClearTitle() {
     closeTitleModal()
     await loadUsers()
   } catch (e) {
-    push(e?.message || '操作失败', 'error')
+    push(e?.message || '称号暂时没有移除成功，稍后再试一次。', 'error')
   }
 }
 
@@ -414,10 +419,6 @@ async function handleDeleteUser(u) {
       }
     }
   })
-}
-
-function tabClass(t) {
-  return ['tab-btn', { active: tab.value === t }]
 }
 
 onMounted(async () => {
@@ -497,20 +498,14 @@ onMounted(async () => {
         <button
           v-for="item in workbenchItems"
           :key="item.key"
-          class="glass-card workbench-card"
+          :class="['glass-card', 'workbench-card', { active: tab === item.key }]"
+          :aria-pressed="tab === item.key"
           @click="openTab(item.key)"
         >
           <component :is="item.icon" :size="18" class="workbench-icon" />
           <span class="workbench-value">{{ item.value }}</span>
           <span class="workbench-label">{{ item.label }}</span>
         </button>
-      </div>
-
-      <div class="tab-bar">
-        <button :class="tabClass('posts')" @click="openTab('posts')">文章</button>
-        <button :class="tabClass('posters')" @click="openTab('posters')">海报</button>
-        <button :class="tabClass('users')" @click="openTab('users')">用户</button>
-        <button :class="tabClass('drafts')" @click="openTab('drafts')">草稿</button>
       </div>
 
       <!-- 文章列表 -->
@@ -619,7 +614,7 @@ onMounted(async () => {
         </div>
         <div v-if="usersLoading" class="loading-state">加载中...</div>
         <div v-else-if="users.length === 0" class="empty-state">
-          <div class="empty-title">暂无用户</div>
+          <div class="empty-title">现在还没有访客用户</div>
         </div>
         <div v-else class="user-list">
           <div v-for="u in users" :key="u.id" class="glass-card user-item">
@@ -837,9 +832,10 @@ onMounted(async () => {
 .profile-main {
   display: flex;
   gap: 28px;
-  max-width: 1140px;
+  max-width: var(--magazine-max, 1180px);
   margin: 0 auto;
   width: 100%;
+  padding: 0 var(--space-md) var(--space-xl);
 }
 
 .profile-aside {
@@ -849,7 +845,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 16px;
   position: sticky;
-  top: 88px;
+  top: 104px;
   align-self: flex-start;
 }
 
@@ -1016,6 +1012,23 @@ onMounted(async () => {
 .workbench-card:hover {
   transform: translateY(-2px);
 }
+.workbench-card.active {
+  border-color: var(--border-warm);
+  background-image:
+    linear-gradient(180deg, rgba(255, 248, 230, 0.98), rgba(255, 239, 199, 0.9)),
+    radial-gradient(circle at 18% 0%, rgba(217, 154, 29, 0.2), transparent 34%);
+  box-shadow:
+    0 16px 42px rgba(135, 88, 18, 0.16),
+    inset 0 0 0 1px rgba(217, 154, 29, 0.16);
+}
+[data-theme='dark'] .workbench-card.active {
+  background-image:
+    linear-gradient(180deg, rgba(56, 43, 24, 0.94), rgba(38, 30, 20, 0.9)),
+    radial-gradient(circle at 18% 0%, rgba(216, 162, 58, 0.18), transparent 34%);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.38),
+    inset 0 0 0 1px rgba(240, 189, 84, 0.12);
+}
 .workbench-icon {
   grid-area: icon;
   color: var(--primary-hover);
@@ -1031,48 +1044,6 @@ onMounted(async () => {
   grid-area: label;
   color: var(--text-muted);
   font-size: 0.78rem;
-}
-.tab-bar {
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-soft);
-  margin-bottom: 20px;
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
-}
-[data-theme='dark'] .tab-bar {
-  background: rgba(30, 28, 30, 0.8);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.tab-btn {
-  padding: 8px 20px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  font-family: var(--font-body);
-  cursor: pointer;
-  font-weight: 500;
-  transition:
-    background var(--duration-fast),
-    color var(--duration-fast);
-}
-.tab-btn:hover {
-  color: var(--primary-hover);
-  background: var(--primary-soft);
-}
-.tab-btn.active {
-  background: var(--primary);
-  color: var(--on-primary);
-  font-weight: 600;
 }
 
 .feed-head {
@@ -1660,6 +1631,7 @@ onMounted(async () => {
 @media (max-width: 900px) {
   .profile-main {
     flex-direction: column;
+    padding-inline: var(--space-sm);
   }
   .profile-aside {
     width: 100%;
@@ -1692,13 +1664,6 @@ onMounted(async () => {
   .workbench-card {
     min-height: 84px;
     padding: 14px;
-  }
-  .tab-bar {
-    width: 100%;
-  }
-  .tab-btn {
-    flex: 1 0 auto;
-    padding: 8px 14px;
   }
   .feed-head {
     align-items: flex-start;

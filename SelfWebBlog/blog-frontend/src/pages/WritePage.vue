@@ -4,6 +4,7 @@ import { navigate } from '../router'
 import { savePost, uploadImage, listTags, listCategories } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import {
   ArrowLeft,
   Eye,
@@ -46,9 +47,20 @@ const fileInput = ref(null)
 const coverInput = ref(null)
 const editingId = ref(null)
 const postStatus = ref('PUBLISHED') // DRAFT | PUBLISHED
+const confirmDialog = ref({
+  open: false,
+  title: '',
+  message: '',
+  confirmText: '确认',
+  cancelText: '取消',
+  tone: 'primary',
+  onConfirm: null,
+  onCancel: null
+})
 
 // ── Draft state ──
 const draftStatus = ref('') // '' | 'saving' | 'saved'
+const pendingDraft = ref(null)
 let draftTimer = null
 const LEGACY_DRAFT_KEY = 'postDraft'
 const NEW_DRAFT_KEY = 'postDraft:new'
@@ -144,10 +156,10 @@ onMounted(() => {
       const e = JSON.parse(editing)
       applyDraftData(e)
       sessionStorage.removeItem('editingPost')
-      loadDraft()
+      loadDraft({ ask: true })
     } catch {}
   } else {
-    loadDraft()
+    loadDraft({ ask: true })
   }
   loadAllTags()
   loadAllCategories()
@@ -196,13 +208,37 @@ function saveDraft() {
   }, 300)
 }
 
-function loadDraft() {
+function loadDraft({ ask = false } = {}) {
   const draft = localStorage.getItem(draftKey.value)
   if (!draft) return
   try {
     const d = JSON.parse(draft)
+    if (ask && hasUsefulDraft(d)) {
+      pendingDraft.value = d
+      askConfirm({
+        title: '发现本地草稿',
+        message: '这里有一份之前自动保存的内容，要恢复继续写吗？',
+        confirmText: '恢复草稿',
+        cancelText: '先不用',
+        tone: 'primary',
+        onConfirm: restorePendingDraft,
+        onCancel: discardPendingDraft
+      })
+      return
+    }
     applyDraftData(d)
   } catch {}
+}
+
+function hasUsefulDraft(d) {
+  return Boolean(
+    d?.title ||
+    d?.content ||
+    d?.summary ||
+    d?.coverUrl ||
+    d?.category ||
+    (Array.isArray(d?.tags) ? d.tags.length : d?.tags)
+  )
 }
 
 function applyDraftData(d) {
@@ -219,6 +255,54 @@ function applyDraftData(d) {
 function clearCurrentDraft() {
   localStorage.removeItem(draftKey.value)
   localStorage.removeItem(LEGACY_DRAFT_KEY)
+}
+
+function askConfirm({
+  title,
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  tone = 'primary',
+  onConfirm,
+  onCancel
+}) {
+  confirmDialog.value = {
+    open: true,
+    title,
+    message,
+    confirmText,
+    cancelText,
+    tone,
+    onConfirm,
+    onCancel
+  }
+}
+
+async function handleConfirmAction() {
+  const action = confirmDialog.value.onConfirm
+  confirmDialog.value.open = false
+  confirmDialog.value.onConfirm = null
+  confirmDialog.value.onCancel = null
+  if (action) await action()
+}
+
+async function handleCancelAction() {
+  const action = confirmDialog.value.onCancel
+  confirmDialog.value.onCancel = null
+  confirmDialog.value.onConfirm = null
+  if (action) await action()
+}
+
+function restorePendingDraft() {
+  if (!pendingDraft.value) return
+  applyDraftData(pendingDraft.value)
+  pendingDraft.value = null
+  draftStatus.value = 'saved'
+  push('草稿已恢复，继续写吧')
+}
+
+function discardPendingDraft() {
+  pendingDraft.value = null
 }
 
 // ── Image upload ──
@@ -397,6 +481,23 @@ function validateBeforePublish() {
 async function submit() {
   if (!canSubmit.value || loading.value) return
   if (!validateBeforePublish()) return
+  if (postStatus.value === 'PUBLISHED') {
+    askConfirm({
+      title: isEditing.value ? '确认更新文章' : '确认发布文章',
+      message: recommendedChecks.value.length
+        ? `还有 ${recommendedChecks.value.length} 项建议内容未补充，仍然继续发布吗？`
+        : '内容会对访客可见，确认现在发布吗？',
+      confirmText: isEditing.value ? '确认更新' : '确认发布',
+      cancelText: '再检查一下',
+      tone: 'primary',
+      onConfirm: persistPost
+    })
+    return
+  }
+  await persistPost()
+}
+
+async function persistPost() {
   const t = title.value.trim(),
     c = content.value.trim()
   loading.value = true
@@ -412,20 +513,36 @@ async function submit() {
     }
     if (editingId.value) body.id = editingId.value
     await savePost(body)
-    push(postStatus.value === 'DRAFT' ? '草稿已保存' : isEditing.value ? '更新成功' : '发布成功')
+    push(
+      postStatus.value === 'DRAFT'
+        ? '草稿已保存，安心继续写。'
+        : isEditing.value
+          ? '文章已更新。'
+          : '发布好了，访客已经可以看到了。'
+    )
     clearCurrentDraft()
     refreshHome()
     navigate('/')
   } catch (err) {
-    push(err?.message || '操作失败', 'error')
+    push(err?.message || '这次没有保存成功，稍后再试一次。', 'error')
   } finally {
     loading.value = false
   }
 }
 
 function goBack() {
-  saveDraft()
-  if (hasDraftContent() && !confirm('本地草稿已保存，确定离开写作页吗？')) return
+  if (hasDraftContent()) {
+    saveDraft()
+    askConfirm({
+      title: '离开写作页',
+      message: '本地草稿已经自动保存。现在离开也不会丢稿。',
+      confirmText: '离开',
+      cancelText: '继续写',
+      tone: 'primary',
+      onConfirm: () => navigate('/')
+    })
+    return
+  }
   navigate('/')
 }
 
@@ -792,6 +909,17 @@ watch(
         </aside>
       </Transition>
     </div>
+
+    <ConfirmDialog
+      v-model="confirmDialog.open"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-text="confirmDialog.confirmText"
+      :cancel-text="confirmDialog.cancelText"
+      :tone="confirmDialog.tone"
+      @confirm="handleConfirmAction"
+      @cancel="handleCancelAction"
+    />
   </div>
 </template>
 
@@ -813,16 +941,15 @@ watch(
   padding: 12px 20px;
   margin-bottom: 16px;
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: var(--shadow-soft);
+  background: linear-gradient(180deg, rgba(255, 253, 247, 0.92), rgba(255, 246, 225, 0.86));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-paper);
   gap: 12px;
   flex-wrap: wrap;
 }
 [data-theme='dark'] .write-topbar {
-  background: rgba(30, 28, 30, 0.8);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(42, 34, 24, 0.86);
+  border-color: var(--border);
 }
 
 .back-link {
@@ -1354,11 +1481,11 @@ watch(
   cursor: pointer;
   background: var(--primary-soft);
   color: var(--primary-hover);
-  border: 1px solid rgba(244, 164, 184, 0.3);
+  border: 1px solid var(--border-warm);
   transition: background var(--duration-fast);
 }
 .tag-chip:hover {
-  background: rgba(244, 164, 184, 0.25);
+  background: rgba(217, 154, 29, 0.2);
 }
 .tag-chip.suggest {
   background: var(--surface-muted);

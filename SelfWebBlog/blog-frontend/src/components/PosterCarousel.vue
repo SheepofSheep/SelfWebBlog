@@ -89,7 +89,7 @@ onUnmounted(() => {
         :class="{ active: i === current }"
         @click.prevent.stop="openPreview(i)"
       >
-        <img :src="p.imageUrl" />
+        <img :src="p.imageUrl" alt="博客海报" />
       </div>
     </div>
 
@@ -149,11 +149,24 @@ onUnmounted(() => {
 .carousel {
   position: relative;
   width: 100%;
-  max-width: 1140px;
+  max-width: 100%;
   margin: 0 auto var(--space-lg);
-  padding: var(--space-md) var(--space-lg);
-  border-radius: var(--radius-lg);
+  padding: 12px;
+  border-radius: 24px;
   overflow: hidden;
+}
+
+.carousel::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+[data-theme='dark'] .carousel::after {
+  border-color: rgba(255, 232, 186, 0.08);
 }
 
 .carousel:hover {
@@ -163,11 +176,16 @@ onUnmounted(() => {
 .carousel-track {
   position: relative;
   width: 100%;
-  padding-bottom: 45%;
-  border-radius: var(--radius-md);
+  aspect-ratio: 16 / 7;
+  min-height: 260px;
+  max-height: 380px;
+  border-radius: 18px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.25);
-  box-shadow: var(--shadow-inner);
+  background: var(--surface-parchment);
+}
+
+[data-theme='dark'] .carousel-track {
+  background: #14110c;
 }
 
 .carousel-slide {
@@ -186,20 +204,32 @@ onUnmounted(() => {
 .carousel-slide img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center 42%;
+  display: block;
+  filter: saturate(0.96) contrast(1.02);
   background: var(--surface-muted);
+}
+
+.carousel-slide::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 58%, rgba(17, 16, 13, 0.28));
+  pointer-events: none;
 }
 
 .carousel-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-warm);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(8px);
+  background: var(--surface-strong);
+  backdrop-filter: none;
   color: var(--text-main);
   cursor: pointer;
   display: flex;
@@ -216,28 +246,34 @@ onUnmounted(() => {
   opacity: 1;
 }
 .carousel-prev {
-  left: 20px;
+  left: 24px;
 }
 .carousel-next {
-  right: 20px;
+  right: 24px;
 }
 .carousel-btn:hover {
-  background: rgba(255, 248, 250, 0.95);
-  color: var(--theme-pink-hover);
+  background: var(--surface-page);
+  color: var(--primary-hover);
   transform: translateY(-50%) scale(1.05);
 }
 
 .carousel-dots {
   position: absolute;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 28px;
+  bottom: 24px;
+  z-index: 2;
+  left: auto;
+  transform: none;
   display: flex;
-  gap: 8px;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 226, 177, 0.2);
+  border-radius: var(--radius-pill);
+  background: rgba(17, 16, 13, 0.38);
 }
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.45);
@@ -248,17 +284,45 @@ onUnmounted(() => {
     transform var(--duration-normal) var(--ease-bounce);
 }
 .dot.active {
-  background: rgba(255, 248, 250, 0.95);
-  transform: scale(1.3);
-  box-shadow: 0 0 8px rgba(244, 164, 184, 0.5);
+  background: var(--primary);
+  transform: scale(1.45);
+  box-shadow: none;
 }
 
 @media (max-width: 768px) {
-  .carousel-track {
-    padding-bottom: 50%;
+  .carousel {
+    padding: 8px;
+    border-radius: 20px;
   }
-  .carousel-caption {
-    font-size: 0.75rem;
+
+  .carousel::after {
+    inset: 8px;
+    border-radius: 15px;
+  }
+
+  .carousel-track {
+    min-height: 210px;
+    aspect-ratio: 4 / 3;
+    border-radius: 15px;
+  }
+
+  .carousel-btn {
+    opacity: 1;
+    width: 34px;
+    height: 34px;
+  }
+
+  .carousel-prev {
+    left: 16px;
+  }
+
+  .carousel-next {
+    right: 16px;
+  }
+
+  .carousel-dots {
+    right: 18px;
+    bottom: 16px;
   }
 }
 

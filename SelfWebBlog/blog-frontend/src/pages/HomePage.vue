@@ -2,16 +2,15 @@
 import { computed, onMounted, ref, inject, nextTick } from 'vue'
 import { getProfile, deletePost } from '../utils/api'
 import { useToast } from '../composables/toast'
-import { toAbsoluteUrl } from '../utils/url'
 import { navigate } from '../router'
-import { Trash2, PenLine, Clock, Tag, Folder, Eye, Sparkles } from 'lucide-vue-next'
+import { ArrowRight, PenLine } from 'lucide-vue-next'
 import { gsap } from 'gsap'
-import WriteModal from '../components/WriteModal.vue'
 import PosterCarousel from '../components/PosterCarousel.vue'
-import PersonalLinks from '../components/PersonalLinks.vue'
-import SkeletonCard from '../components/SkeletonCard.vue'
-import MiniCalendar from '../components/MiniCalendar.vue'
-import { formatTime, toPlainText } from '../utils/format'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import MagazineHero from '../components/home/MagazineHero.vue'
+import MagazineArticleCard from '../components/home/MagazineArticleCard.vue'
+import EditorialIndex from '../components/home/EditorialIndex.vue'
+import AuthorRail from '../components/home/AuthorRail.vue'
 
 const { push } = useToast()
 const user = inject('user', null)
@@ -19,11 +18,20 @@ const user = inject('user', null)
 const blogInfo = ref(null)
 const posts = ref([])
 const totalPosts = ref(0)
-const showWrite = ref(false)
-const editingInitial = ref(null)
 const loading = ref(true)
+const confirmDialog = ref({
+  open: false,
+  title: '',
+  message: '',
+  confirmText: '确认',
+  onConfirm: null
+})
 
 const displayPosts = computed(() => posts.value)
+const gridPosts = computed(() =>
+  displayPosts.value.length > 4 ? displayPosts.value.slice(4) : displayPosts.value.slice(1)
+)
+const isAdmin = computed(() => user?.value?.role === 'ADMIN' || user?.role === 'ADMIN')
 
 const calendarPosts = ref([])
 
@@ -40,36 +48,17 @@ async function loadCalendarPosts() {
   } catch {}
 }
 
-function postTags(p) {
-  if (!p?.tags) return []
-  return p.tags
-    .split(/[,，\s]+/)
-    .filter(Boolean)
-    .slice(0, 3)
-}
-
-function postSummary(p) {
-  const text = p?.summary || toPlainText(p?.content || '')
-  return text.slice(0, 100) + (text.length > 100 ? '…' : '')
-}
-
-function readMinutes(p) {
-  if (!p?.content) return 1
-  const text = p.content.replace(/[#*_`\[\]!\(\)>\-\s]/g, '')
-  return Math.max(1, Math.ceil(text.length / 400))
-}
-
 async function refresh() {
   loading.value = true
   try {
-    const data = await getProfile({ page: 1, size: 4 })
+    const data = await getProfile({ page: 1, size: 10 })
     if (data.blogInfo) blogInfo.value = data.blogInfo
     if (Array.isArray(data.posts)) posts.value = data.posts
     if (data.total) totalPosts.value = data.total
     else totalPosts.value = posts.value.length
     await nextTick()
-    if (document.querySelector('.post-row')) {
-      gsap.from('.post-row', {
+    if (document.querySelector('.mag-card')) {
+      gsap.from('.mag-card', {
         y: 16,
         opacity: 0,
         duration: 0.5,
@@ -91,9 +80,40 @@ function openWriteModal() {
   navigate('/write')
 }
 
+function openArchiveWithSearch(keyword) {
+  navigate(`/archive?keyword=${encodeURIComponent(keyword)}`)
+}
+
+function openArchiveWithTag(tag) {
+  navigate(`/archive?tag=${encodeURIComponent(tag)}`)
+}
+
+function openArchiveWithCategory(category) {
+  navigate(`/archive?category=${encodeURIComponent(category)}`)
+}
+
 async function handleDeletePost(postId, event) {
-  if (!confirm('确定要删除这篇文章吗？')) return
-  const card = event.currentTarget.closest('.post-row')
+  const card = event?.currentTarget?.closest('.mag-card')
+  askConfirm({
+    title: '删除文章',
+    message: '确定要删除这篇文章吗？删除后访客将无法继续阅读。',
+    confirmText: '删除文章',
+    onConfirm: async () => deletePostWithAnimation(postId, card)
+  })
+}
+
+function askConfirm({ title, message, confirmText = '确认', onConfirm }) {
+  confirmDialog.value = { open: true, title, message, confirmText, onConfirm }
+}
+
+async function handleConfirmAction() {
+  const action = confirmDialog.value.onConfirm
+  confirmDialog.value.open = false
+  confirmDialog.value.onConfirm = null
+  if (action) await action()
+}
+
+async function deletePostWithAnimation(postId, card) {
   if (card) {
     gsap.to(card, {
       scale: 0.98,
@@ -104,9 +124,9 @@ async function handleDeletePost(postId, event) {
         try {
           await deletePost(postId)
           await refresh()
-          push('删除成功')
+          push('文章已删除')
         } catch (e) {
-          push(e?.message || '删除失败', 'error')
+          push(e?.message || '这篇文章暂时没有删掉，稍后再试一次。', 'error')
         }
       }
     })
@@ -114,9 +134,9 @@ async function handleDeletePost(postId, event) {
     try {
       await deletePost(postId)
       await refresh()
-      push('删除成功')
+      push('文章已删除')
     } catch (e) {
-      push(e?.message || '删除失败', 'error')
+      push(e?.message || '这篇文章暂时没有删掉，稍后再试一次。', 'error')
     }
   }
 }
@@ -128,495 +148,259 @@ onMounted(async () => {
 
 <template>
   <main class="home-main">
-    <!-- 海报轮播 — 全宽 -->
-    <PosterCarousel />
-
-    <div class="home-layout">
-      <!-- 左侧：文章 -->
-      <div class="home-content">
-        <section class="posts-section glass-panel">
-          <header class="section-head">
-            <div>
-              <h2 class="section-title">最新文章</h2>
-              <p class="section-sub">共 {{ totalPosts }} 篇 · 随手记录的想法</p>
-            </div>
-          </header>
-
-          <div class="posts-list">
-            <SkeletonCard v-if="loading" :count="3" />
-
-            <div v-else-if="displayPosts.length === 0" class="empty-state">
-              <PenLine :size="36" class="empty-icon" />
-              <p class="empty-title">还没有文章</p>
-              <p class="empty-desc">写下你的第一篇博客吧</p>
-            </div>
-
-            <article
-              v-else
-              v-for="(p, index) in displayPosts"
-              :key="p.id"
-              class="post-row glass-card"
-              :style="{ animationDelay: `${index * 0.06}s` }"
-              @click="openPost(p.id)"
-            >
-              <div class="post-thumb" :class="{ 'no-cover': !p.coverUrl }">
-                <img v-if="p.coverUrl" :src="p.coverUrl" :alt="p.title" loading="lazy" />
-                <span v-else class="thumb-placeholder">{{ p.title?.charAt(0) || '文' }}</span>
-              </div>
-
-              <div class="post-body">
-                <div class="post-meta">
-                  <span class="meta-item"><Clock :size="12" /> {{ formatTime(p.createTime) }}</span>
-                  <span v-if="p.category" class="meta-item"
-                    ><Folder :size="12" /> {{ p.category }}</span
-                  >
-                  <span class="meta-item"><Eye :size="12" /> {{ readMinutes(p) }} 分钟</span>
-                </div>
-                <h3 class="post-title">{{ p.title }}</h3>
-                <p class="post-excerpt">{{ postSummary(p) }}</p>
-                <div v-if="postTags(p).length" class="post-tags" @click.stop>
-                  <span v-for="t in postTags(p)" :key="t" class="tag">{{ t }}</span>
-                </div>
-              </div>
-
-              <div v-if="user?.role === 'ADMIN'" class="post-actions" @click.stop>
-                <button
-                  class="delete-btn"
-                  @click="handleDeletePost(p.id, $event)"
-                  aria-label="删除文章"
-                >
-                  <Trash2 :size="14" />
-                </button>
-              </div>
-            </article>
-          </div>
-        </section>
+    <section class="home-cover">
+      <div class="cover-copy">
+        <p class="cover-kicker">GABRIEL MAGAZINE</p>
+        <h1>Gabriel</h1>
+        <p>欢 迎 OvO。</p>
       </div>
+      <button v-if="isAdmin" class="cover-write" @click="openWriteModal">
+        <PenLine :size="16" />
+        写新文章
+      </button>
+    </section>
 
-      <!-- 右侧：博主信息卡片 -->
-      <aside class="home-aside">
-        <section
-          class="hero-card glass-panel"
-          :class="{ 'has-bg': blogInfo?.bgUrl }"
-          :style="
-            blogInfo?.bgUrl ? { backgroundImage: 'url(' + toAbsoluteUrl(blogInfo.bgUrl) + ')' } : {}
-          "
-        >
-          <div class="hero-inner">
-            <div class="hero-avatar-wrap">
-              <img
-                class="hero-avatar avatar-img"
-                :class="{ loaded: blogInfo?.avatarUrl }"
-                :src="
-                  toAbsoluteUrl(
-                    blogInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'
-                  )
-                "
-                :alt="blogInfo?.nickname || '博主头像'"
-                @load="(e) => e.target.classList.add('loaded')"
-              />
-            </div>
-            <div class="hero-text">
-              <p class="hero-greeting"><Sparkles :size="14" /> 你好呀，欢迎来逛</p>
-              <h1 class="hero-name">{{ blogInfo?.nickname || '加载中...' }}</h1>
-              <p class="hero-bio">{{ blogInfo?.bio || '记录生活与代码的小角落' }}</p>
-              <div class="hero-meta">
-                <span class="hero-stat"
-                  ><strong>{{ totalPosts }}</strong> 篇文章</span
-                >
-                <PersonalLinks />
-              </div>
-            </div>
-            <button
-              v-if="user?.role === 'ADMIN'"
-              class="pill-btn pill-btn-primary hero-write"
-              @click="openWriteModal"
-            >
-              <PenLine :size="16" />
-              <span>写文章</span>
-            </button>
-          </div>
-        </section>
-
-        <MiniCalendar :posts="calendarPosts" />
-      </aside>
+    <div v-if="loading" class="home-loading">
+      <div v-for="i in 4" :key="i" class="loading-shimmer loading-card"></div>
     </div>
 
-    <WriteModal v-model="showWrite" :initial="editingInitial" @success="refresh" />
+    <template v-else>
+      <MagazineHero
+        :posts="displayPosts"
+        :blog-info="blogInfo"
+        :total-posts="totalPosts"
+        :is-admin="isAdmin"
+        @open="openPost"
+        @delete="handleDeletePost"
+        @tag="openArchiveWithTag"
+        @category="openArchiveWithCategory"
+        @write="openWriteModal"
+        @archive="navigate('/archive')"
+      />
+
+      <EditorialIndex
+        :posts="displayPosts"
+        @search="openArchiveWithSearch"
+        @tag="openArchiveWithTag"
+        @category="openArchiveWithCategory"
+        @archive="navigate('/archive')"
+      />
+
+      <section class="magazine-body">
+        <div class="article-flow">
+          <header class="flow-head">
+            <div>
+              <p class="flow-kicker">LATEST ROLL</p>
+              <h2>继续阅读</h2>
+            </div>
+            <button class="flow-more" @click="navigate('/archive')">
+              全部文章
+              <ArrowRight :size="15" />
+            </button>
+          </header>
+
+          <div v-if="gridPosts.length" class="article-grid">
+            <MagazineArticleCard
+              v-for="p in gridPosts"
+              :key="p.id"
+              :post="p"
+              variant="grid"
+              :is-admin="isAdmin"
+              @open="openPost"
+              @delete="handleDeletePost"
+              @tag="openArchiveWithTag"
+              @category="openArchiveWithCategory"
+            />
+          </div>
+
+          <div v-else class="empty-state glass-card">
+            <PenLine :size="34" />
+            <h2>还没有文章</h2>
+            <p>发布第一篇后，首页会自动生成杂志封面和文章流。</p>
+            <button v-if="isAdmin" class="cover-write" @click="openWriteModal">开始写作</button>
+          </div>
+        </div>
+
+        <AuthorRail
+          :blog-info="blogInfo"
+          :posts="displayPosts"
+          :calendar-posts="calendarPosts"
+          :total-posts="totalPosts"
+          :is-admin="isAdmin"
+          @write="openWriteModal"
+          @archive="navigate('/archive')"
+          @tag="openArchiveWithTag"
+        />
+
+        <div class="poster-strip">
+          <PosterCarousel />
+        </div>
+      </section>
+    </template>
+
+    <ConfirmDialog
+      v-model="confirmDialog.open"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-text="confirmDialog.confirmText"
+      @confirm="handleConfirmAction"
+    />
   </main>
 </template>
 
 <style scoped>
 .home-main {
   width: 100%;
-  padding: var(--space-md) 0;
+  padding: 0 0 var(--space-xl);
 }
 
-/* ═══ 左右布局 ═══ */
-.home-layout {
-  max-width: 1060px;
+.home-cover {
+  max-width: var(--magazine-max, 1180px);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px var(--space-md) 14px;
+}
+
+.cover-kicker,
+.flow-kicker {
+  margin: 0 0 6px;
+  color: var(--primary-hover);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.cover-copy h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 5vw, 4.6rem);
+  line-height: 1;
+  color: var(--text-main);
+}
+
+.cover-copy p:last-child {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.cover-write,
+.flow-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 18px var(--primary-glow);
+}
+
+.home-loading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
+  gap: 16px;
+  max-width: var(--magazine-max, 1180px);
   margin: 0 auto;
   padding: 0 var(--space-md);
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
 }
 
-.home-content {
-  flex: 1;
+.loading-card {
+  min-height: 180px;
+  border-radius: 26px;
+  background: var(--surface-muted);
+}
+
+.magazine-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 18px;
+  max-width: var(--magazine-max, 1180px);
+  margin: 18px auto 0;
+  padding: 0 var(--space-md);
+  align-items: start;
+}
+
+.article-flow {
   min-width: 0;
 }
 
-.home-aside {
-  width: 260px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 20px;
-}
-
-/* ====== Hero ====== */
-.hero-card {
-  padding: var(--space-md);
-  background-size: cover;
-  background-position: center;
-  position: relative;
-  overflow: hidden;
-  text-align: center;
-}
-
-.hero-card:hover {
-  transform: none;
-}
-
-.hero-card.has-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.85);
-  z-index: 0;
-  transition: background 0.4s var(--ease-bounce);
-}
-.hero-card.has-bg:hover::before {
-  background: rgba(255, 255, 255, 0.55);
-}
-[data-theme='dark'] .hero-card.has-bg::before {
-  background: rgba(26, 24, 24, 0.8);
-}
-[data-theme='dark'] .hero-card.has-bg:hover::before {
-  background: rgba(26, 24, 24, 0.5);
-}
-.hero-card.has-bg > * {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-inner {
+.flow-head {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
 }
 
-.hero-avatar-wrap {
-  width: 80px;
-  height: 80px;
-  padding: 3px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--theme-pink), var(--theme-peach));
-  margin-bottom: 4px;
-}
-
-.hero-avatar {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-  background: rgba(255, 248, 250, 0.95);
-}
-
-.hero-text {
-  width: 100%;
-  text-align: center;
-}
-
-.hero-greeting {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: var(--font-size-xs);
-  color: var(--theme-pink-hover);
-  letter-spacing: 0.04em;
-}
-
-.hero-name {
-  margin: 0 0 4px;
-  font-size: var(--font-size-xl);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-main);
-}
-
-.hero-bio {
-  margin: 0 0 10px;
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  line-height: var(--line-height);
-}
-
-.hero-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-md);
-}
-
-.hero-stat {
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-}
-.hero-stat strong {
-  font-size: var(--font-size-md);
-  color: var(--theme-pink-hover);
-  margin-right: 4px;
-}
-
-.hero-write {
-  width: 100%;
-  margin-top: var(--space-xs);
-}
-
-/* ====== 文章区 ====== */
-.posts-section {
-  padding: var(--space-lg);
-}
-
-.posts-section:hover {
-  transform: none;
-}
-
-.section-head {
-  margin-bottom: var(--space-md);
-  padding-bottom: var(--space-md);
-  border-bottom: 1px solid rgba(244, 164, 184, 0.15);
-}
-
-.section-title {
-  margin: 0 0 4px;
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-main);
-}
-
-.section-sub {
+.flow-head h2 {
   margin: 0;
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-}
-
-.posts-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  min-height: 120px;
-}
-
-/* ====== 横向文章卡片 ====== */
-.post-row {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-md);
-  padding: var(--space-md);
-  cursor: pointer;
-  position: relative;
-}
-
-.post-row:hover {
-  transform: translateY(-3px);
-}
-
-.post-thumb {
-  width: 128px;
-  height: 96px;
-  flex-shrink: 0;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: rgba(244, 164, 184, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: var(--shadow-inner);
-}
-
-.post-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 30%;
-  display: block;
-  transition: transform var(--duration-slow) var(--ease-soft);
-}
-
-.post-row:hover .post-thumb img {
-  transform: scale(1.08);
-}
-
-.post-thumb.no-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.thumb-placeholder {
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: var(--theme-pink-hover);
-  opacity: 0.6;
-}
-
-.post-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.post-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 6px;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-}
-
-.meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.post-title {
-  margin: 0 0 6px;
-  font-size: var(--font-size-md);
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
   color: var(--text-main);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
-.post-excerpt {
-  margin: 0;
-  font-size: var(--font-size-xs);
+.flow-more {
+  min-height: 38px;
+  padding-inline: 13px;
+  background: var(--surface-muted);
   color: var(--text-secondary);
-  line-height: 1.65;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  box-shadow: none;
 }
 
-.post-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.post-tags .tag {
-  padding: 2px 8px;
-  font-size: 0.62rem;
-}
-
-.post-actions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-}
-
-.delete-btn {
-  background: rgba(255, 255, 255, 0.5);
-  color: var(--theme-pink-hover);
-  border: 1px solid rgba(244, 164, 184, 0.3);
-  padding: 5px;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  display: flex;
-  visibility: hidden;
-  opacity: 0;
-  transition:
-    opacity var(--duration-normal) var(--ease-bounce),
-    visibility var(--duration-normal) var(--ease-bounce),
-    background var(--duration-normal) var(--ease-bounce);
-}
-
-.post-row:hover .delete-btn {
-  visibility: visible;
-  opacity: 1;
-}
-
-.delete-btn:hover {
-  background: var(--danger);
-  color: var(--on-primary);
-  border-color: var(--danger);
+.poster-strip {
+  grid-column: 1 / -1;
+  margin-top: 2px;
 }
 
 .empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 54px 20px;
   text-align: center;
-  padding: var(--space-xl) 0;
-  color: var(--text-muted);
 }
 
-.empty-icon {
-  opacity: 0.4;
-  margin-bottom: var(--space-sm);
-}
-
-.empty-title {
-  margin: 0 0 4px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.empty-desc {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
-@media (max-width: 860px) {
-  .home-layout {
-    flex-direction: column;
-  }
-  .home-aside {
-    width: 100%;
-    position: static;
+@media (max-width: 980px) {
+  .magazine-body {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .hero-write {
-    width: 100%;
-  }
-
-  .posts-section,
-  .hero-card {
-    padding: var(--space-md);
-  }
-
-  .post-row {
+  .home-cover {
+    align-items: flex-start;
     flex-direction: column;
-    gap: var(--space-sm);
+    padding-inline: var(--space-sm);
   }
 
-  .post-thumb {
+  .cover-write {
     width: 100%;
-    height: 140px;
+  }
+
+  .home-loading,
+  .magazine-body {
+    padding-inline: var(--space-sm);
+  }
+
+  .home-loading,
+  .article-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

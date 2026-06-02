@@ -6,7 +6,8 @@ const props = defineProps({
   title: { type: String, default: '确认操作' },
   message: { type: String, default: '确定要执行此操作吗？' },
   confirmText: { type: String, default: '确定' },
-  cancelText: { type: String, default: '取消' }
+  cancelText: { type: String, default: '取消' },
+  tone: { type: String, default: 'danger' }
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
@@ -40,7 +41,7 @@ function handleCancel() {
         <button class="pill-btn pill-btn-ghost" @click="handleCancel">
           {{ cancelText }}
         </button>
-        <button class="pill-btn confirm-ok" @click="handleConfirm">
+        <button class="pill-btn confirm-ok" :class="'tone-' + tone" @click="handleConfirm">
           {{ confirmText }}
         </button>
       </div>
@@ -52,8 +53,8 @@ function handleCancel() {
 .confirm-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(60, 45, 45, 0.18);
-  backdrop-filter: blur(12px);
+  background: rgba(63, 52, 41, 0.2);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -88,14 +89,25 @@ function handleCancel() {
   justify-content: flex-end;
 }
 
-.confirm-ok {
+.confirm-ok.tone-danger {
   background: var(--danger);
   color: var(--on-primary);
   border-color: var(--danger);
 }
 
-.confirm-ok:hover {
+.confirm-ok.tone-danger:hover {
   background: #c95f68;
+  transform: translateY(-1px);
+}
+
+.confirm-ok.tone-primary {
+  background: linear-gradient(180deg, #e8ad37, var(--primary));
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+.confirm-ok.tone-primary:hover {
+  background: linear-gradient(180deg, #e4a52c, var(--primary-hover));
   transform: translateY(-1px);
 }
 

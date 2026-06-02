@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { navigate } from '../router'
+import { navigate, useRoute } from '../router'
 import { login, register, getGithubAuthUrl } from '../utils/api'
 import { showToast } from '../composables/toast'
 import { gsap } from 'gsap'
@@ -9,6 +9,7 @@ import { Github } from 'lucide-vue-next'
 const tab = ref('login')
 const loading = ref(false)
 const imageKey = ref(0)
+const { query } = useRoute()
 
 const loginUsername = ref('')
 const loginPassword = ref('')
@@ -61,19 +62,23 @@ function saveAuth(data) {
   localStorage.setItem('user', JSON.stringify(data.user))
 }
 
+function goAfterLogin() {
+  navigate(query.value.get('redirect') || '/')
+}
+
 async function handleLogin() {
   if (!loginUsername.value.trim() || !loginPassword.value.trim()) {
-    showToast('请填写用户名和密码')
+    showToast('先填一下用户名和密码。')
     return
   }
   loading.value = true
   try {
     const data = await login(loginUsername.value.trim(), loginPassword.value)
     saveAuth(data)
-    showToast('登录成功')
-    navigate('/')
+    showToast('登录好了，欢迎回来。')
+    goAfterLogin()
   } catch (e) {
-    showToast(e?.message || '登录失败')
+    showToast(e?.message || '登录没有成功，检查一下账号或密码。', 'error')
   } finally {
     loading.value = false
   }
@@ -81,15 +86,15 @@ async function handleLogin() {
 
 async function handleRegister() {
   if (!regUsername.value.trim() || !regPassword.value.trim()) {
-    showToast('请填写用户名和密码')
+    showToast('先填一下用户名和密码。')
     return
   }
   if (regUsername.value.trim().length < 2 || regUsername.value.trim().length > 20) {
-    showToast('用户名需要2-20个字符')
+    showToast('用户名需要 2 到 20 个字符。')
     return
   }
   if (regPassword.value.length < 6) {
-    showToast('密码至少6个字符')
+    showToast('密码至少 6 个字符。')
     return
   }
   loading.value = true
@@ -101,10 +106,10 @@ async function handleRegister() {
       avatarUrl: regAvatar.value.trim() || undefined
     })
     saveAuth(data)
-    showToast('注册成功，已自动登录')
-    navigate('/')
+    showToast('注册好了，已经帮你登录。')
+    goAfterLogin()
   } catch (e) {
-    showToast(e?.message || '注册失败')
+    showToast(e?.message || '注册没有成功，稍后再试一次。', 'error')
   } finally {
     loading.value = false
   }
@@ -115,7 +120,7 @@ async function handleGithubLogin() {
     const url = await getGithubAuthUrl()
     if (url) window.location.href = url
   } catch (e) {
-    showToast('GitHub 登录暂不可用')
+    showToast('GitHub 登录暂不可用，先用账号密码登录吧。', 'warning')
   }
 }
 </script>
@@ -141,8 +146,8 @@ async function handleGithubLogin() {
           <!-- 图片未放置时的占位 -->
           <div class="illust-placeholder">
             <div class="placeholder-inner">
-              <p class="placeholder-icon">{{ tab === 'login' ? '🌸' : '✨' }}</p>
-              <p class="placeholder-text">将图片放在</p>
+              <p class="placeholder-icon">{{ tab === 'login' ? 'Honey' : 'Hello' }}</p>
+              <p class="placeholder-text">可放置插画</p>
               <code class="placeholder-path"
                 >public/images/{{ tab === 'login' ? 'login-illust' : 'register-illust' }}.png</code
               >
@@ -261,6 +266,9 @@ async function handleGithubLogin() {
   align-items: center;
   justify-content: center;
   padding: var(--space-xl);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(246, 215, 131, 0.28), transparent 24rem),
+    radial-gradient(circle at 90% 90%, rgba(229, 234, 212, 0.28), transparent 24rem);
 }
 
 /* ═══ 左右分栏 ═══ */
@@ -271,6 +279,9 @@ async function handleGithubLogin() {
   min-height: 620px;
   overflow: hidden;
   opacity: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-paper);
 }
 .login-layout.register-mode {
   flex-direction: row-reverse;
@@ -281,7 +292,9 @@ async function handleGithubLogin() {
   flex: 1.25;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--theme-pink-light), var(--theme-mint));
+  background:
+    linear-gradient(135deg, var(--brand-primary-wash), var(--accent-olive-soft)),
+    radial-gradient(circle at 30% 10%, rgba(255, 253, 247, 0.7), transparent 18rem);
   display: none; /* 移动端隐藏 */
   will-change: transform, opacity;
 }
@@ -304,15 +317,20 @@ async function handleGithubLogin() {
   height: 100%;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--theme-pink-light), var(--theme-mint));
+  background:
+    linear-gradient(135deg, var(--brand-primary-wash), var(--accent-olive-soft)),
+    radial-gradient(circle at 30% 10%, rgba(255, 253, 247, 0.7), transparent 18rem);
 }
 .placeholder-inner {
   text-align: center;
   color: var(--text-muted);
 }
 .placeholder-icon {
-  font-size: 2rem;
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 700;
   margin: 0 0 8px;
+  color: var(--primary-hover);
 }
 .placeholder-text {
   font-size: 0.8rem;
@@ -320,7 +338,7 @@ async function handleGithubLogin() {
 }
 .placeholder-path {
   font-size: 0.65rem;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 253, 247, 0.56);
   padding: 2px 8px;
   border-radius: 4px;
   color: var(--primary-hover);
@@ -332,7 +350,7 @@ async function handleGithubLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: var(--surface-page);
   padding: var(--space-xl);
   will-change: transform, opacity;
 }
@@ -350,7 +368,7 @@ async function handleGithubLogin() {
   display: flex;
   gap: 0;
   margin-bottom: var(--space-md);
-  border-bottom: 2px solid rgba(244, 164, 184, 0.15);
+  border-bottom: 2px solid var(--border-light);
 }
 .tab {
   flex: 1;
@@ -405,7 +423,7 @@ async function handleGithubLogin() {
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface-muted);
+  background: rgba(255, 253, 247, 0.86);
   color: var(--text);
   font-size: var(--font-size-sm);
   font-family: var(--font-body);
@@ -417,6 +435,7 @@ async function handleGithubLogin() {
 }
 .field-control:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(217, 154, 29, 0.14);
 }
 
 .btn-full {

@@ -21,11 +21,21 @@ Thumbs.db
 
 # Logs and temporary files
 *.log
+*.out.log
+*.err.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 logs/
 *.tmp
+*.temp
+*.pid
 *.swp
 *.swo
 *~
+.cache/
+.vite/
 
 # Environment and local secrets
 .env
@@ -46,9 +56,20 @@ uploads/
 
 # Backups
 *.md.backup
+*.bak
+*.backup
 
 # Template files
 **/blog-frontend/README.md
+
+# Deployment bundles / local release staging
+release/
+releases/
+deploy/
+deployment/
+*.zip
+*.tar
+*.tar.gz
 
 # Claude Code
 .claude/

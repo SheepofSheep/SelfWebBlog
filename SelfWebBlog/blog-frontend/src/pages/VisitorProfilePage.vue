@@ -1,10 +1,9 @@
 <script setup>
 import { ref, inject, onMounted, computed } from 'vue'
 import { updateUserProfile, uploadUserAvatar } from '../utils/api'
-import { navigate } from '../router'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
-import { Camera, User } from 'lucide-vue-next'
+import { Camera } from 'lucide-vue-next'
 
 const { push } = useToast()
 const user = inject('user', ref(null))
@@ -27,20 +26,20 @@ const avatarSrc = computed(
 async function saveNickname() {
   const n = nickname.value.trim()
   if (!n) {
-    push('请输入昵称', 'warning')
+    push('先给自己取个昵称吧。', 'warning')
     return
   }
   if (n.length > 30) {
-    push('昵称不能超过30个字符', 'warning')
+    push('昵称控制在 30 个字符以内会更好看。', 'warning')
     return
   }
   saving.value = true
   try {
     await updateUserProfile({ nickname: n })
-    push('昵称已更新')
+    push('昵称已更新，会显示在评论区。')
     await refreshUser()
   } catch (e) {
-    push(e?.message || '保存失败', 'error')
+    push(e?.message || '这次没有保存成功，稍后再试一次。', 'error')
   } finally {
     saving.value = false
   }
@@ -50,17 +49,17 @@ async function onPickAvatar(e) {
   const file = e?.target?.files?.[0]
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    push('请选择图片文件', 'error')
+    push('请选择一张图片作为头像。', 'error')
     e.target.value = ''
     return
   }
   try {
     const url = await uploadUserAvatar(file)
     await updateUserProfile({ avatarUrl: url })
-    push('头像已更新')
+    push('头像已更新，评论区也会同步显示。')
     await refreshUser()
   } catch (err) {
-    push(err?.message || '上传失败', 'error')
+    push(err?.message || '头像没有传上去，换张图片再试试。', 'error')
   } finally {
     e.target.value = ''
   }
@@ -70,7 +69,7 @@ async function onPickAvatar(e) {
 <template>
   <main class="vp-main">
     <div class="vp-card glass-card">
-      <h2 class="vp-title">个人主页</h2>
+      <h2 class="vp-title">我的小名片</h2>
 
       <!-- 头像区 -->
       <label class="vp-avatar-wrap">
@@ -85,7 +84,7 @@ async function onPickAvatar(e) {
         <input type="file" accept="image/*" @change="onPickAvatar" class="hidden-input" />
       </label>
 
-      <p class="vp-hint">点击头像上传新图片</p>
+      <p class="vp-hint">点击头像上传新图片，会同步到评论区</p>
 
       <!-- 昵称区 -->
       <div class="vp-field">
@@ -140,8 +139,8 @@ async function onPickAvatar(e) {
 
 .vp-title {
   margin: 0 0 24px;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--ink);
 }
@@ -173,7 +172,7 @@ async function onPickAvatar(e) {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(80, 55, 55, 0.35);
+  background: rgba(63, 52, 41, 0.42);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,6 +218,7 @@ async function onPickAvatar(e) {
 }
 .vp-input:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(217, 154, 29, 0.14);
 }
 
 .vp-field-hint {
