@@ -7,9 +7,6 @@ import {
   updateBackground,
   uploadAvatar,
   uploadImage,
-  listPosters,
-  savePoster,
-  deletePoster as delPoster,
   listUsers,
   grantTitle,
   deleteUser,
@@ -26,15 +23,10 @@ import {
   Edit3,
   Trash2,
   Camera,
-  Plus,
-  ChevronUp,
-  ChevronDown,
   FileText,
   Images,
   Users,
-  FileClock,
-  Eye,
-  EyeOff
+  FileClock
 } from 'lucide-vue-next'
 
 const { push } = useToast()
@@ -46,7 +38,7 @@ const posts = ref([])
 const nicknameModal = ref(false)
 const newNickname = ref('')
 const newBio = ref('')
-const tab = ref('posts') // posts | posters | users | drafts
+const tab = ref('posts') // posts | users | drafts
 
 // 草稿管理
 const drafts = ref([])
@@ -71,12 +63,6 @@ const titleThemes = [
   { value: 'candy', label: '糖果', color: '#f9a8c2' }
 ]
 
-// 海报相关
-const posters = ref([])
-const posterModal = ref(false)
-const posterImageUrl = ref('')
-const posterUploading = ref(false)
-const posterInput = ref(null)
 const showIpDiagnostics = ref(false)
 const confirmDialog = ref({
   open: false,
@@ -93,7 +79,6 @@ const draftCount = computed(() => drafts.value.length)
 const workbenchItems = computed(() => [
   { key: 'posts', label: '文章', value: posts.value.length, icon: FileText },
   { key: 'drafts', label: '草稿', value: draftCount.value || '查看', icon: FileClock },
-  { key: 'posters', label: '海报', value: posters.value.length, icon: Images },
   { key: 'users', label: '用户', value: users.value.length || '查看', icon: Users }
 ])
 
@@ -124,16 +109,6 @@ async function refresh() {
     push(e?.message || '加载失败', 'error')
   } finally {
     loading.value = false
-  }
-}
-
-async function loadPosters() {
-  try {
-    const data = await listPosters()
-    posters.value = Array.isArray(data) ? data : []
-  } catch (e) {
-    console.warn('加载海报失败', e)
-    posters.value = []
   }
 }
 
@@ -249,82 +224,6 @@ async function remove(id) {
   })
 }
 
-// ====== 海报管理 ======
-
-function openPosterModal() {
-  posterImageUrl.value = ''
-  posterModal.value = true
-}
-
-function closePosterModal() {
-  posterModal.value = false
-}
-
-async function onPickPosterImg(e) {
-  const file = e?.target?.files?.[0]
-  if (!file) return
-  posterUploading.value = true
-  try {
-    const url = await uploadImage(file)
-    posterImageUrl.value = url
-    push('图片上传成功')
-  } catch (err) {
-    push(err?.message || '上传失败', 'error')
-  } finally {
-    posterUploading.value = false
-    e.target.value = ''
-  }
-}
-
-async function handleSavePoster() {
-  if (!posterImageUrl.value) {
-    push('请上传海报图片', 'warning')
-    return
-  }
-  try {
-    await savePoster({ imageUrl: posterImageUrl.value })
-    push('海报添加成功')
-    closePosterModal()
-    await loadPosters()
-  } catch (e) {
-    push(e?.message || '海报暂时没有添加成功，稍后再试一次。', 'error')
-  }
-}
-
-async function handleDeletePoster(id) {
-  askConfirm({
-    title: '删除海报',
-    message: '这张海报会从首页轮播中移除，删除后无法恢复。',
-    onConfirm: async () => {
-      try {
-        await delPoster(id)
-        posters.value = posters.value.filter((p) => p.id !== id)
-        push('海报已删除')
-      } catch (e) {
-        push(e?.message || '海报暂时没有删除成功，稍后再试一次。', 'error')
-      }
-    }
-  })
-}
-
-async function movePoster(id, direction) {
-  const idx = posters.value.findIndex((p) => p.id === id)
-  if (idx === -1) return
-  const target = idx + direction
-  if (target < 0 || target >= posters.value.length) return
-  // swap
-  const a = posters.value[idx],
-    b = posters.value[target]
-  const { updatePosterSort } = await import('../utils/api')
-  try {
-    await updatePosterSort({ id: a.id, sortOrder: b.sortOrder })
-    await updatePosterSort({ id: b.id, sortOrder: a.sortOrder })
-    await loadPosters()
-  } catch (e) {
-    push(e?.message || '排序失败', 'error')
-  }
-}
-
 // ====== 用户管理 ======
 
 async function loadUsers() {
@@ -423,7 +322,6 @@ async function handleDeleteUser(u) {
 
 onMounted(async () => {
   await refresh()
-  await loadPosters()
 })
 </script>
 
@@ -487,7 +385,7 @@ onMounted(async () => {
         <div>
           <p class="workbench-kicker">Gabriel Workbench</p>
           <h1 class="workbench-title">博客轻工作台</h1>
-          <p class="workbench-sub">写作、资料、海报和用户管理都从这里进入。</p>
+          <p class="workbench-sub">写作、资料和用户管理都从这里进入。</p>
         </div>
         <button class="pill-btn pill-btn-primary" @click="navigate('/write')">
           <Edit3 :size="16" /> 写文章
@@ -555,47 +453,6 @@ onMounted(async () => {
               </button>
             </div>
           </article>
-        </div>
-      </div>
-
-      <!-- 海报管理 -->
-      <div v-if="tab === 'posters'">
-        <div class="feed-head">
-          <h2 class="feed-title">海报管理</h2>
-          <button class="pill-btn pill-btn-primary" @click="openPosterModal">
-            <Plus :size="16" /> 添加海报
-          </button>
-        </div>
-        <div v-if="posters.length === 0" class="empty-state">
-          <div class="empty-icon"><Image :size="32" /></div>
-          <div class="empty-title">还没有海报</div>
-          <div class="empty-desc">添加海报将在首页轮播展示</div>
-        </div>
-        <div v-else class="poster-list">
-          <div v-for="(p, i) in posters" :key="p.id" class="glass-card poster-item">
-            <img :src="p.imageUrl" class="poster-thumb" />
-            <div class="poster-info">
-              <span class="poster-title">{{ p.title || '无标题' }}</span>
-              <span class="poster-link" v-if="p.linkUrl">{{ p.linkUrl }}</span>
-            </div>
-            <div class="poster-sort">
-              <button :disabled="i === 0" @click="movePoster(p.id, -1)" aria-label="上移海报">
-                <ChevronUp :size="16" />
-              </button>
-              <button
-                :disabled="i === posters.length - 1"
-                @click="movePoster(p.id, 1)"
-                aria-label="下移海报"
-              >
-                <ChevronDown :size="16" />
-              </button>
-            </div>
-            <div class="poster-actions">
-              <button class="act-btn del" @click="handleDeletePoster(p.id)" aria-label="删除海报">
-                <Trash2 :size="14" />
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -779,39 +636,6 @@ onMounted(async () => {
           <div class="modal-btns">
             <button class="pill-btn pill-btn-ghost" @click="closeNicknameModal">取消</button>
             <button class="pill-btn pill-btn-primary" @click="saveNickname">保存</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- 海报编辑弹窗 -->
-    <Transition name="modal">
-      <div v-if="posterModal" class="modal-mask" @click.self="closePosterModal">
-        <div class="glass-card modal-card">
-          <h3 class="modal-title">添加海报</h3>
-          <div class="poster-upload-area" @click="posterInput?.click()">
-            <img v-if="posterImageUrl" :src="posterImageUrl" class="poster-preview" />
-            <div v-else class="poster-placeholder">
-              <Plus :size="28" /><span>点击上传图片</span>
-            </div>
-            <div v-if="posterUploading" class="poster-uploading">上传中...</div>
-          </div>
-          <input
-            ref="posterInput"
-            type="file"
-            accept="image/*"
-            class="hidden-input"
-            @change="onPickPosterImg"
-          />
-          <div class="modal-btns">
-            <button class="pill-btn pill-btn-ghost" @click="closePosterModal">取消</button>
-            <button
-              class="pill-btn pill-btn-primary"
-              :disabled="!posterImageUrl"
-              @click="handleSavePoster"
-            >
-              保存
-            </button>
           </div>
         </div>
       </div>
@@ -1224,108 +1048,6 @@ onMounted(async () => {
   color: #fff;
 }
 
-/* ====== 海报管理 ====== */
-.poster-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.poster-item {
-  padding: 8px 12px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.poster-item:hover {
-  transform: none;
-}
-.poster-thumb {
-  width: 56px;
-  height: 36px;
-  object-fit: cover;
-  flex-shrink: 0;
-  border: 1px solid var(--border-light);
-}
-.poster-info {
-  flex: 1;
-  min-width: 0;
-}
-.poster-title {
-  font-weight: var(--fw-medium);
-  font-size: 0.8rem;
-  color: var(--text-main);
-  display: block;
-}
-.poster-link {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.poster-sort {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.poster-sort button {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    color var(--duration-fast),
-    border-color var(--duration-fast);
-}
-.poster-sort button:hover:not(:disabled) {
-  color: var(--primary);
-  border-color: var(--primary);
-}
-.poster-sort button:disabled {
-  opacity: 0.2;
-  cursor: default;
-}
-.poster-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.poster-actions .act-btn.del {
-  color: var(--text-muted);
-}
-.poster-actions .act-btn.del:hover {
-  background: var(--primary);
-  color: #fff;
-}
-
-.poster-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.poster-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-.poster-uploading {
-  font-size: 0.78rem;
-  color: var(--primary);
-  font-weight: 500;
-}
-
 /* ====== 弹窗 ====== */
 .modal-mask {
   position: fixed;
@@ -1674,8 +1396,7 @@ onMounted(async () => {
     justify-content: flex-start;
   }
   .post-item,
-  .user-item,
-  .poster-item {
+  .user-item {
     align-items: flex-start;
   }
   .post-item {
@@ -1696,10 +1417,6 @@ onMounted(async () => {
   }
   .user-title-btn {
     flex: 1 1 auto;
-  }
-  .poster-sort,
-  .poster-actions {
-    margin-left: auto;
   }
 }
 </style>

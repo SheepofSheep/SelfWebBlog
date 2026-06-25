@@ -40,7 +40,7 @@ function submit() {
 <template>
   <section class="editorial-index glass-card">
     <div class="index-head">
-      <p>EDITORIAL INDEX</p>
+      <p>TOPIC COMMAND</p>
       <button @click="emit('archive')">
         <Archive :size="15" />
         全部归档
@@ -49,7 +49,7 @@ function submit() {
 
     <form class="index-search" @submit.prevent="submit">
       <Search :size="16" />
-      <input v-model="keyword" type="search" placeholder="搜索文章、标题或片段..." />
+      <input v-model="keyword" type="search" placeholder="搜索技术记录、项目实验、复习笔记..." />
       <button type="submit">搜索</button>
     </form>
 
@@ -70,8 +70,9 @@ function submit() {
 <style scoped>
 .editorial-index {
   max-width: var(--magazine-max, 1180px);
-  margin: 18px auto 0;
+  margin: 16px auto 0;
   padding: 16px;
+  border-radius: var(--radius-xl);
 }
 
 .editorial-index:hover {
@@ -89,16 +90,17 @@ function submit() {
 .index-head p {
   margin: 0;
   color: var(--primary-hover);
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
 }
 
 .index-head button,
 .index-row button,
 .index-search button {
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--surface-muted);
   color: var(--text-secondary);
   font: inherit;
@@ -123,7 +125,7 @@ function submit() {
   min-height: 48px;
   padding: 0 8px 0 14px;
   border: 1px solid var(--border-medium);
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   background: var(--surface-strong);
   color: var(--text-muted);
 }
@@ -170,6 +172,7 @@ function submit() {
   max-width: 150px;
   min-height: 32px;
   padding: 0 11px;
+  font-family: var(--font-mono);
 }
 
 .index-row button:hover,

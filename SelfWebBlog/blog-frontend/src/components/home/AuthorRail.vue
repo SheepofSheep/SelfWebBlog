@@ -40,11 +40,11 @@ const latestTags = computed(() => {
       <div class="author-top">
         <img :src="avatar" :alt="blogInfo?.nickname || '博主头像'" />
         <div>
-          <p><Sparkles :size="13" /> AUTHOR</p>
+          <p><Sparkles :size="13" /> SYSTEM PROFILE</p>
           <h2>{{ blogInfo?.nickname || 'Gabriel' }}</h2>
         </div>
       </div>
-      <p class="author-bio">{{ blogInfo?.bio || '记录生活与代码的小角落' }}</p>
+      <p class="author-bio">{{ blogInfo?.bio || '技术记录 / 项目实验 / 复习笔记 / 杂乱思考' }}</p>
       <div class="author-stats">
         <span
           ><strong>{{ totalPosts }}</strong> 篇文章</span
@@ -61,14 +61,14 @@ const latestTags = computed(() => {
     </section>
 
     <section v-if="latestTags.length" class="rail-card tag-card glass-card">
-      <p class="rail-title">RECENT TAGS</p>
+      <p class="rail-title">TOPIC TOKENS</p>
       <div class="rail-tags">
         <button v-for="t in latestTags" :key="t" @click="emit('tag', t)"># {{ t }}</button>
       </div>
     </section>
 
     <section class="rail-card date-card glass-card">
-      <p class="rail-title"><CalendarDays :size="14" /> ISSUE CALENDAR</p>
+      <p class="rail-title"><CalendarDays :size="14" /> ARCHIVE CALENDAR</p>
       <MiniCalendar :posts="calendarPosts" />
     </section>
   </aside>
@@ -77,11 +77,12 @@ const latestTags = computed(() => {
 <style scoped>
 .author-rail {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .rail-card {
-  padding: 16px;
+  padding: 14px;
+  border-radius: var(--radius-xl);
 }
 
 .rail-card:hover {
@@ -99,7 +100,7 @@ const latestTags = computed(() => {
   width: 58px;
   height: 58px;
   border: 1px solid var(--border-warm);
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   object-fit: cover;
 }
 
@@ -110,9 +111,10 @@ const latestTags = computed(() => {
   gap: 6px;
   margin: 0;
   color: var(--primary-hover);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
 }
 
 .author-top h2 {
@@ -139,7 +141,7 @@ const latestTags = computed(() => {
 .author-stats span {
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--surface-muted);
   color: var(--text-muted);
   font-size: 0.72rem;
@@ -161,7 +163,7 @@ const latestTags = computed(() => {
   min-height: 42px;
   margin-top: 14px;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: var(--primary);
   color: var(--on-primary);
   font: inherit;
@@ -178,7 +180,7 @@ const latestTags = computed(() => {
 
 .rail-tags button {
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--surface-muted);
   color: var(--text-muted);
   font: inherit;
@@ -194,7 +196,7 @@ const latestTags = computed(() => {
 }
 
 .date-card .rail-title {
-  padding: 16px 16px 0;
+  padding: 14px 14px 0;
 }
 
 .date-card :deep(.mini-calendar) {

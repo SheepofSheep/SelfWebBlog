@@ -169,8 +169,8 @@ onMounted(() => {
 <template>
   <main class="archive-page">
     <header class="archive-hero">
-      <span class="archive-kicker">EDITORIAL ARCHIVE</span>
-      <h1 class="archive-title">编辑部索引</h1>
+      <span class="archive-kicker">GABRIEL.ARCHIVE / SEARCH</span>
+      <h1 class="archive-title">档案检索台</h1>
       <p class="archive-sub">共 {{ total }} 篇文章 · 搜索、分类和标签会保留在地址里</p>
     </header>
 
@@ -355,7 +355,7 @@ onMounted(() => {
 .archive-toolbar {
   padding: 16px;
   margin-bottom: 24px;
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
 }
 
 .archive-toolbar:hover {
@@ -369,7 +369,7 @@ onMounted(() => {
   gap: 8px;
   min-height: 50px;
   padding: 8px 14px;
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   background: rgba(255, 253, 247, 0.72);
   border: 1px solid var(--border-medium);
   margin-bottom: 12px;
@@ -415,7 +415,7 @@ onMounted(() => {
   min-height: 36px;
   padding: 6px 12px;
   border: 1px solid var(--border-medium);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: rgba(255, 253, 247, 0.72);
   color: var(--text);
   font-size: 0.78rem;
@@ -437,7 +437,7 @@ onMounted(() => {
   padding: 6px 12px;
   min-height: 36px;
   border: 1px solid var(--border-medium);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: rgba(255, 253, 247, 0.72);
   color: var(--text-muted);
 }
@@ -461,7 +461,7 @@ onMounted(() => {
   min-width: 96px;
   padding: 8px 16px;
   border: 1px solid var(--border-warm);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: rgba(255, 247, 227, 0.9);
   color: var(--text-secondary);
   font-size: 0.82rem;
@@ -503,7 +503,7 @@ onMounted(() => {
   gap: 4px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: rgba(255, 250, 238, 0.58);
   color: var(--text-muted);
   font-size: 0.76rem;
@@ -536,7 +536,7 @@ onMounted(() => {
   gap: 5px;
   min-height: 28px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: rgba(255, 250, 238, 0.62);
   color: var(--text-secondary);
   cursor: pointer;

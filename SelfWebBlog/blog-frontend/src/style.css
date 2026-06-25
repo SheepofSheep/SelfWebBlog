@@ -1,31 +1,31 @@
 /* ============================================================
-   Honey Paper Studio — Design System
-   蜂蜜纸页 · 温暖黄色系 · 个人写作桌
+   GABRIEL.ARCHIVE — Warm Archive Design System
+   暖黄技术档案 · 旧纸编号 · 杂志索引
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ============================================================
-   Design Tokens — Honey Paper Studio
+   Design Tokens — Warm Archive
    ============================================================ */
 :root {
   /* ── Brand Colors ── */
-  --brand-primary: #c9912d;
-  --brand-primary-hover: #a8741d;
-  --brand-primary-soft: #e7c675;
-  --brand-primary-wash: #f4e5bc;
-  --accent-olive: #6f7f45;
-  --accent-olive-soft: #e5ead4;
-  --accent-clay: #c87b4a;
-  --accent-clay-soft: #f5ded0;
-  --accent-sky: #8fb7bd;
-  --accent-sky-soft: #dceff1;
-  --anime-gold: #c9912d;
-  --anime-amber: #ddb258;
-  --anime-ink: #11100d;
-  --anime-panel: rgba(255, 250, 238, 0.82);
-  --anime-panel-strong: rgba(255, 253, 247, 0.94);
-  --anime-line: rgba(133, 91, 38, 0.14);
+  --brand-primary: #c88900;
+  --brand-primary-hover: #9c6a00;
+  --brand-primary-soft: #f0c45a;
+  --brand-primary-wash: #f8e7b0;
+  --accent-olive: #6d7652;
+  --accent-olive-soft: #e3e4c5;
+  --accent-clay: #a86238;
+  --accent-clay-soft: #edd2bc;
+  --accent-sky: #6f9ca4;
+  --accent-sky-soft: #d4e8ea;
+  --anime-gold: #c88900;
+  --anime-amber: #f0c45a;
+  --anime-ink: #1f1a12;
+  --anime-panel: rgba(255, 249, 232, 0.78);
+  --anime-panel-strong: rgba(255, 249, 232, 0.94);
+  --anime-line: rgba(42, 33, 21, 0.18);
 
   /* Deprecated compatibility aliases */
   --theme-pink: var(--brand-primary);
@@ -81,40 +81,49 @@
   --space-2xl: 72px;
 
   /* ── Radius ── */
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --radius-xl: 30px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-pill: 999px;
 
-  /* ── Shadows (warm paper, never gray) ── */
-  --shadow-paper: 0 10px 28px rgba(68, 49, 24, 0.07);
-  --shadow-lift: 0 14px 36px rgba(68, 49, 24, 0.1);
-  --shadow-soft: 0 6px 18px rgba(68, 49, 24, 0.06);
+  /* ── Shadows (thin archive paper, no oily glow) ── */
+  --shadow-paper: 0 8px 20px rgba(42, 33, 21, 0.06);
+  --shadow-lift: 0 12px 28px rgba(42, 33, 21, 0.09);
+  --shadow-soft: 0 4px 12px rgba(42, 33, 21, 0.05);
   --shadow-hover: var(--shadow-lift);
   --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.42);
   --shadow-raised: var(--shadow-lift);
 
   /* ── Palette ── */
-  --bg: #f7f0e2;
-  --surface-base: #f7f0e2;
-  --surface-page: #fbf7ef;
-  --surface-paper: #f8f1e4;
-  --surface-parchment: #eee2ce;
-  --surface-wash: #f3e7d2;
-  --surface: #f8f1e4;
-  --surface-muted: rgba(238, 226, 206, 0.7);
-  --surface-strong: #fbf7ef;
-  --border: rgba(94, 70, 38, 0.14);
-  --border-light: rgba(94, 70, 38, 0.08);
-  --border-medium: rgba(94, 70, 38, 0.2);
-  --border-warm: rgba(169, 116, 29, 0.24);
+  --bg: #f6edcf;
+  --bg-soft: #fbf4dc;
+  --panel: #fff9e8;
+  --line: #2a2115;
+  --line-soft: rgba(42, 33, 21, 0.18);
+  --accent: #c88900;
+  --accent-soft: #f0c45a;
+  --code-bg: #211b13;
+  --code-text: #f8e7b0;
+  --surface-base: var(--bg);
+  --surface-page: var(--bg-soft);
+  --surface-paper: var(--panel);
+  --surface-parchment: #efe0b9;
+  --surface-wash: #f4df9d;
+  --surface: var(--panel);
+  --surface-muted: rgba(244, 223, 157, 0.42);
+  --surface-strong: #fffdf4;
+  --border: var(--line-soft);
+  --border-soft: rgba(42, 33, 21, 0.14);
+  --border-light: rgba(42, 33, 21, 0.08);
+  --border-medium: rgba(42, 33, 21, 0.24);
+  --border-warm: rgba(200, 137, 0, 0.34);
 
   /* ── Text (ink brown, no pure black) ── */
-  --text-main: #3f3429;
-  --text-secondary: #6d5b47;
-  --text-muted: #9a8569;
-  --text-soft: #b7a98f;
+  --text-main: #1f1a12;
+  --text-secondary: #3a3022;
+  --text-muted: #7a6a4d;
+  --text-soft: #a28d65;
   --text: var(--text-main);
   --text-faint: var(--text-soft);
 
@@ -166,41 +175,50 @@
    Dark Theme
    ============================================================ */
 [data-theme='dark'] {
-  --brand-primary: #d4a044;
-  --brand-primary-hover: #e2b45a;
-  --brand-primary-soft: #5a431e;
-  --brand-primary-wash: #211b12;
-  --accent-olive: #aeb979;
-  --accent-olive-soft: #303626;
-  --accent-clay: #d08b5d;
-  --accent-clay-soft: #3d2b22;
-  --accent-sky: #94bdc0;
-  --accent-sky-soft: #213639;
-  --anime-gold: #d4a044;
-  --anime-amber: #e2b45a;
-  --anime-ink: #11100d;
-  --anime-panel: rgba(33, 26, 18, 0.82);
-  --anime-panel-strong: rgba(39, 31, 21, 0.94);
-  --anime-line: rgba(255, 224, 171, 0.18);
+  --brand-primary: #e0a72f;
+  --brand-primary-hover: #f3d17a;
+  --brand-primary-soft: #f3d17a;
+  --brand-primary-wash: #2a2114;
+  --accent-olive: #b4bd83;
+  --accent-olive-soft: #2d3320;
+  --accent-clay: #d28c5e;
+  --accent-clay-soft: #3d2a1c;
+  --accent-sky: #8ab8bf;
+  --accent-sky-soft: #20343a;
+  --anime-gold: #e0a72f;
+  --anime-amber: #f3d17a;
+  --anime-ink: #f4e7c2;
+  --anime-panel: rgba(33, 27, 18, 0.82);
+  --anime-panel-strong: rgba(33, 27, 18, 0.94);
+  --anime-line: rgba(230, 207, 145, 0.2);
 
-  --bg: #12100d;
-  --surface-base: #12100d;
-  --surface-page: #17140f;
-  --surface-paper: #1d1913;
-  --surface-parchment: #252016;
-  --surface-wash: #2a2318;
-  --surface: #1d1913;
-  --surface-muted: rgba(42, 35, 24, 0.72);
-  --surface-strong: #211d16;
-  --border: rgba(232, 199, 145, 0.13);
-  --border-light: rgba(232, 199, 145, 0.08);
-  --border-medium: rgba(232, 199, 145, 0.2);
-  --border-warm: rgba(226, 180, 90, 0.28);
+  --bg: #14110b;
+  --bg-soft: #1c1810;
+  --panel: #211b12;
+  --line: #e6cf91;
+  --line-soft: rgba(230, 207, 145, 0.2);
+  --accent: #e0a72f;
+  --accent-soft: #f3d17a;
+  --code-bg: #0d0b08;
+  --code-text: #ffe4a3;
+  --surface-base: var(--bg);
+  --surface-page: var(--bg-soft);
+  --surface-paper: var(--panel);
+  --surface-parchment: #292115;
+  --surface-wash: #312614;
+  --surface: var(--panel);
+  --surface-muted: rgba(49, 38, 20, 0.72);
+  --surface-strong: #261f14;
+  --border: var(--line-soft);
+  --border-soft: rgba(230, 207, 145, 0.14);
+  --border-light: rgba(230, 207, 145, 0.08);
+  --border-medium: rgba(230, 207, 145, 0.24);
+  --border-warm: rgba(224, 167, 47, 0.34);
 
-  --text-main: #f8edd9;
-  --text-secondary: #e0caab;
-  --text-muted: #b7a07d;
-  --text-soft: #88775d;
+  --text-main: #f4e7c2;
+  --text-secondary: #d6c49b;
+  --text-muted: #9c8b66;
+  --text-soft: #776846;
   --text: var(--text-main);
   --text-faint: var(--text-soft);
 
@@ -216,9 +234,9 @@
   --amber: var(--brand-primary);
   --sage: var(--accent-olive);
 
-  --shadow-paper: 0 12px 30px rgba(0, 0, 0, 0.24);
-  --shadow-lift: 0 16px 42px rgba(0, 0, 0, 0.3);
-  --shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.2);
+  --shadow-paper: 0 8px 20px rgba(0, 0, 0, 0.22);
+  --shadow-lift: 0 12px 28px rgba(0, 0, 0, 0.28);
+  --shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.18);
   --shadow-hover: var(--shadow-lift);
   --shadow-inner: inset 0 1px 0 rgba(255, 238, 205, 0.1);
   --shadow-raised: var(--shadow-hover);
@@ -256,6 +274,7 @@
 
 html {
   font-size: 16px;
+  background: var(--surface-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
@@ -270,12 +289,18 @@ body {
   line-height: var(--lh-body);
   color: var(--text);
   background:
-    radial-gradient(circle at 14% -10%, rgba(214, 185, 119, 0.16), transparent 34rem),
-    radial-gradient(circle at 95% 5%, rgba(210, 216, 194, 0.16), transparent 30rem),
+    linear-gradient(rgba(42, 33, 21, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 33, 21, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 50% -20%, rgba(240, 196, 90, 0.14), transparent 34rem),
     linear-gradient(180deg, var(--surface-base), var(--surface-page) 42%, var(--surface-base));
+  background-size:
+    48px 48px,
+    48px 48px,
+    auto,
+    auto;
   background-size: auto;
   background-position: center;
-  background-attachment: fixed;
+  background-attachment: scroll;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -286,17 +311,48 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(247, 240, 226, 0.94), rgba(251, 247, 239, 0.985)),
-    radial-gradient(circle at 50% 0%, rgba(224, 199, 143, 0.08), transparent 42rem);
+    linear-gradient(180deg, rgba(246, 237, 207, 0.9), rgba(251, 244, 220, 0.975)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(42, 33, 21, 0.018),
+      rgba(42, 33, 21, 0.018) 1px,
+      transparent 1px,
+      transparent 7px
+    );
   z-index: -1;
   pointer-events: none;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background-image: var(--user-bg-image, none);
+  background-position: center top;
+  background-repeat: repeat;
+  background-size: 280px auto;
+  opacity: 0.045;
+  filter: saturate(0.8) contrast(0.92);
 }
 
 /* Dark mode background dimming */
 [data-theme='dark'] body::before {
   background:
-    linear-gradient(180deg, rgba(18, 16, 13, 0.965), rgba(18, 16, 13, 0.995)),
-    radial-gradient(circle at 50% 0%, rgba(212, 160, 68, 0.04), transparent 42rem);
+    linear-gradient(180deg, rgba(20, 17, 11, 0.96), rgba(20, 17, 11, 0.99)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(230, 207, 145, 0.018),
+      rgba(230, 207, 145, 0.018) 1px,
+      transparent 1px,
+      transparent 7px
+    );
+}
+
+[data-theme='dark'] body::after {
+  opacity: 0.055;
+  filter: saturate(0.7) contrast(0.88);
 }
 
 a {
@@ -353,8 +409,14 @@ h4 {
 .glass-card {
   position: relative;
   overflow: hidden;
-  background-color: var(--surface-paper);
-  background-image: linear-gradient(180deg, #faf4e8, #f2e7d5);
+  background-color: color-mix(in srgb, var(--surface-paper) 92%, transparent);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 34%),
+    linear-gradient(
+      180deg,
+      var(--surface-paper),
+      color-mix(in srgb, var(--surface-paper) 82%, var(--surface-parchment))
+    );
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border-radius: var(--radius-lg);
@@ -374,7 +436,7 @@ h4 {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
     repeating-linear-gradient(
       0deg,
       rgba(94, 70, 38, 0.018),
@@ -402,7 +464,9 @@ h4 {
 [data-theme='dark'] .glass-panel,
 [data-theme='dark'] .glass-card {
   background-color: var(--surface-paper);
-  background-image: linear-gradient(180deg, #211c15, #18150f);
+  background-image:
+    linear-gradient(180deg, rgba(255, 238, 205, 0.04), transparent 30%),
+    linear-gradient(180deg, var(--surface-paper), #18140d);
   border-color: var(--border);
 }
 [data-theme='dark'] .glass-panel::before,

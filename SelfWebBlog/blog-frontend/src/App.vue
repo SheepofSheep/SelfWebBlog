@@ -48,6 +48,7 @@ const currentPage = computed(() => {
 
 const pageKey = computed(() => {
   if (path.value.startsWith('/post')) return 'post-' + (query.value.get('id') || '')
+  if (path.value === '/archive') return 'archive-' + query.value.toString()
   return path.value
 })
 import NProgress from 'nprogress'
@@ -178,9 +179,11 @@ async function loadBackground() {
     const data = await getProfile()
     siteInfo.value = data?.blogInfo || null
     if (data?.blogInfo?.bgUrl) {
-      document.body.style.backgroundImage = `url(${data.blogInfo.bgUrl})`
+      document.body.style.backgroundImage = ''
+      document.documentElement.style.setProperty('--user-bg-image', `url("${data.blogInfo.bgUrl}")`)
     } else {
       document.body.style.backgroundImage = ''
+      document.documentElement.style.removeProperty('--user-bg-image')
     }
   } catch {}
 }
@@ -240,8 +243,8 @@ onUnmounted(() => {
           <span v-else>G</span>
         </span>
         <span class="brand-copy">
-          <strong>{{ brandName }}</strong>
-          <small>ガヴリールドロップアウト</small>
+          <strong>GABRIEL.ARCHIVE</strong>
+          <small>{{ brandName }} / PUBLIC LOG</small>
         </span>
       </button>
 
@@ -310,7 +313,7 @@ onUnmounted(() => {
         >
           <Moon v-if="theme === 'light'" :size="18" />
           <Sun v-else :size="18" />
-          <span>{{ theme === 'light' ? '深色' : '浅色' }}</span>
+          <span>{{ theme === 'light' ? 'DARK' : 'LIGHT' }}</span>
         </button>
 
         <div
@@ -385,34 +388,35 @@ onUnmounted(() => {
 }
 
 .app:not(.is-login) {
-  padding-top: 92px;
+  padding-top: 86px;
   transition: padding-top var(--duration-normal) var(--ease-bounce);
 }
 
 .app.sidebar-collapsed:not(.is-login) {
-  padding-top: 92px;
+  padding-top: 86px;
 }
 
 /* ============================================================
-   暗金杂志顶部导航
+   Warm Archive 顶部导航
    ============================================================ */
 .sidebar {
   position: fixed;
   left: 50%;
-  top: 14px;
+  top: 12px;
   bottom: auto;
   width: min(var(--magazine-max, 1180px), calc(100vw - 28px));
-  min-height: 62px;
+  min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 12px;
-  border-radius: 24px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xl);
   z-index: 200;
   overflow: visible;
+  border-color: var(--border-medium);
   background:
-    linear-gradient(180deg, rgba(251, 247, 239, 0.96), rgba(244, 236, 222, 0.94)),
+    linear-gradient(180deg, rgba(255, 249, 232, 0.92), rgba(246, 237, 207, 0.88)),
     var(--surface-strong);
   transform: translateX(-50%);
   transition:
@@ -423,7 +427,7 @@ onUnmounted(() => {
 
 .sidebar.collapsed {
   width: min(var(--magazine-max, 1180px), calc(100vw - 28px));
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .sidebar:hover {
@@ -432,10 +436,10 @@ onUnmounted(() => {
 
 .sb-brand {
   display: inline-grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 38px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-width: 190px;
+  min-width: 230px;
   border: 0;
   background: transparent;
   color: var(--text-main);
@@ -451,9 +455,9 @@ onUnmounted(() => {
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 13px;
-  background: var(--surface-paper);
-  color: var(--primary-hover);
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover)), var(--surface-paper);
+  color: var(--on-primary);
   font-family: var(--font-serif);
   font-size: 1.2rem;
   font-weight: 900;
@@ -474,8 +478,9 @@ onUnmounted(() => {
 .brand-copy strong {
   overflow: hidden;
   color: var(--text-main);
-  font-family: var(--font-serif);
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 900;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -483,10 +488,10 @@ onUnmounted(() => {
 
 .brand-copy small {
   overflow: hidden;
-  color: var(--primary-hover);
+  color: var(--text-muted);
   font-size: 0.62rem;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -498,7 +503,7 @@ onUnmounted(() => {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
   padding: 0;
 }
@@ -506,14 +511,14 @@ onUnmounted(() => {
 .sb-link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 9px 12px;
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 800;
   text-decoration: none;
   cursor: pointer;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   border: none;
   background: none;
   width: auto;
@@ -526,15 +531,15 @@ onUnmounted(() => {
 
 .sb-link:hover {
   color: var(--primary-hover);
-  background: rgba(201, 145, 45, 0.08);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
   transform: translateY(-1px);
 }
 
 .sb-link.active {
   color: var(--primary-hover);
-  background: rgba(201, 145, 45, 0.12);
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(201, 145, 45, 0.2);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  font-weight: 900;
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
 .sb-footer {
@@ -553,13 +558,13 @@ onUnmounted(() => {
   gap: 10px;
   max-width: 180px;
   padding: 6px 10px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--duration-normal) var(--ease-bounce);
 }
 
 .sb-user:hover {
-  background: rgba(201, 145, 45, 0.08);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .sb-avatar {
@@ -603,19 +608,19 @@ onUnmounted(() => {
 
 [data-theme='dark'] .sidebar {
   background:
-    linear-gradient(180deg, rgba(28, 24, 18, 0.96), rgba(19, 16, 12, 0.94)), var(--surface-strong);
+    linear-gradient(180deg, rgba(33, 27, 18, 0.94), rgba(20, 17, 11, 0.92)), var(--surface-strong);
   border-color: var(--border);
 }
 
 [data-theme='dark'] .sb-link:hover,
 [data-theme='dark'] .sb-user:hover {
-  background: rgba(212, 160, 68, 0.1);
+  background: color-mix(in srgb, var(--primary) 13%, transparent);
 }
 
 [data-theme='dark'] .sb-link.active {
   color: var(--primary-hover);
-  background: rgba(212, 160, 68, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(226, 180, 90, 0.2);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
 /* ============================================================
@@ -675,7 +680,7 @@ onUnmounted(() => {
   width: 44px;
   height: 44px;
   border: 1px solid var(--border-warm);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: var(--surface-strong);
   backdrop-filter: none;
   color: var(--text-main);
@@ -724,7 +729,8 @@ onUnmounted(() => {
     transform: translateX(calc(-100% - 24px));
     transition: transform 0.4s var(--ease-bounce);
     box-shadow: var(--shadow-hover);
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .mobile-open .sidebar,

@@ -5,7 +5,8 @@ import { useToast } from '../composables/toast'
 import { navigate } from '../router'
 import { ArrowRight, PenLine } from 'lucide-vue-next'
 import { gsap } from 'gsap'
-import PosterCarousel from '../components/PosterCarousel.vue'
+import { toAbsoluteUrl } from '../utils/url'
+import { getFirstImageUrl } from '../utils/format'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import MagazineHero from '../components/home/MagazineHero.vue'
 import MagazineArticleCard from '../components/home/MagazineArticleCard.vue'
@@ -30,6 +31,15 @@ const confirmDialog = ref({
 const displayPosts = computed(() => posts.value)
 const gridPosts = computed(() =>
   displayPosts.value.length > 4 ? displayPosts.value.slice(4) : displayPosts.value.slice(1)
+)
+const visualPosts = computed(() =>
+  displayPosts.value
+    .map((post) => ({
+      ...post,
+      visualUrl: post.coverUrl || toAbsoluteUrl(getFirstImageUrl(post.content || '') || '')
+    }))
+    .filter((post) => post.visualUrl)
+    .slice(0, 4)
 )
 const isAdmin = computed(() => user?.value?.role === 'ADMIN' || user?.role === 'ADMIN')
 
@@ -148,16 +158,29 @@ onMounted(async () => {
 
 <template>
   <main class="home-main">
-    <section class="home-cover">
+    <section class="home-cover archive-cover">
       <div class="cover-copy">
-        <p class="cover-kicker">GABRIEL MAGAZINE</p>
-        <h1>Gabriel</h1>
-        <p>欢 迎 OvO。</p>
+        <p class="cover-kicker">GABRIEL.ARCHIVE / PUBLIC KNOWLEDGE LOG</p>
+        <h1>一个学生开发者的公开知识档案库</h1>
+        <p>技术记录 / 项目实验 / 复习笔记 / 杂乱思考</p>
+        <div class="cover-status">
+          <span><small>STATUS</small><strong>ONLINE</strong></span>
+          <span
+            ><small>POSTS</small><strong>{{ totalPosts }}</strong></span
+          >
+          <span><small>MODE</small><strong>WARM ARCHIVE</strong></span>
+        </div>
       </div>
-      <button v-if="isAdmin" class="cover-write" @click="openWriteModal">
-        <PenLine :size="16" />
-        写新文章
-      </button>
+      <div class="cover-actions">
+        <button class="cover-write secondary" @click="navigate('/archive')">
+          全部归档
+          <ArrowRight :size="16" />
+        </button>
+        <button v-if="isAdmin" class="cover-write" @click="openWriteModal">
+          <PenLine :size="16" />
+          写新文章
+        </button>
+      </div>
     </section>
 
     <div v-if="loading" class="home-loading">
@@ -190,8 +213,8 @@ onMounted(async () => {
         <div class="article-flow">
           <header class="flow-head">
             <div>
-              <p class="flow-kicker">LATEST ROLL</p>
-              <h2>继续阅读</h2>
+              <p class="flow-kicker">CONTINUE READING</p>
+              <h2>延伸阅读</h2>
             </div>
             <button class="flow-more" @click="navigate('/archive')">
               全部文章
@@ -231,9 +254,27 @@ onMounted(async () => {
           @archive="navigate('/archive')"
           @tag="openArchiveWithTag"
         />
+      </section>
 
-        <div class="poster-strip">
-          <PosterCarousel />
+      <section class="poster-strip">
+        <header class="poster-head">
+          <p class="flow-kicker">VISUAL NOTES</p>
+          <h2>海报与视觉笔记</h2>
+        </header>
+        <div v-if="visualPosts.length" class="visual-note-grid">
+          <button
+            v-for="(post, index) in visualPosts"
+            :key="post.id"
+            class="visual-note"
+            :class="{ wide: index === 0 }"
+            @click="openPost(post.id)"
+          >
+            <img :src="post.visualUrl" :alt="post.title" loading="lazy" />
+            <span>{{ post.title }}</span>
+          </button>
+        </div>
+        <div v-else class="visual-empty glass-card">
+          <span>还没有可展示的封面图，发布带封面的文章后这里会自动生成视觉笔记。</span>
         </div>
       </section>
     </template>
@@ -258,33 +299,83 @@ onMounted(async () => {
   max-width: var(--magazine-max, 1180px);
   margin: 0 auto;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 20px;
-  padding: 16px var(--space-md) 14px;
+  gap: 24px;
+  padding: 18px var(--space-md) 18px;
+}
+
+.archive-cover {
+  position: relative;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .cover-kicker,
 .flow-kicker {
   margin: 0 0 6px;
   color: var(--primary-hover);
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
 }
 
 .cover-copy h1 {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: clamp(2rem, 5vw, 4.6rem);
-  line-height: 1;
+  font-size: clamp(2.25rem, 6vw, 5.8rem);
+  line-height: 0.98;
   color: var(--text-main);
+  max-width: 760px;
 }
 
-.cover-copy p:last-child {
-  margin: 10px 0 0;
+.cover-copy > p:not(.cover-kicker) {
+  margin: 14px 0 0;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: clamp(0.95rem, 2vw, 1.12rem);
+}
+
+.cover-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: min(620px, 100%);
+  margin-top: 18px;
+}
+
+.cover-status span {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-paper) 72%, transparent);
+}
+
+.cover-status small,
+.cover-status strong {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cover-status small {
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 900;
+}
+
+.cover-status strong {
+  color: var(--text-main);
+  font-size: 0.78rem;
+}
+
+.cover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 .cover-write,
@@ -293,16 +384,23 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 42px;
-  padding: 0 16px;
+  min-height: 40px;
+  padding: 0 14px;
   border: 1px solid var(--border-warm);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: var(--primary);
   color: var(--on-primary);
   font: inherit;
+  font-size: 0.84rem;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 8px 18px var(--primary-glow);
+  box-shadow: none;
+}
+
+.cover-write.secondary {
+  border-color: var(--border-medium);
+  background: var(--surface-paper);
+  color: var(--text-secondary);
 }
 
 .home-loading {
@@ -316,7 +414,7 @@ onMounted(async () => {
 
 .loading-card {
   min-height: 180px;
-  border-radius: 26px;
+  border-radius: var(--radius-xl);
   background: var(--surface-muted);
 }
 
@@ -352,7 +450,7 @@ onMounted(async () => {
 .flow-more {
   min-height: 38px;
   padding-inline: 13px;
-  background: var(--surface-muted);
+  background: var(--surface-paper);
   color: var(--text-secondary);
   box-shadow: none;
 }
@@ -360,12 +458,89 @@ onMounted(async () => {
 .article-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .poster-strip {
-  grid-column: 1 / -1;
-  margin-top: 2px;
+  max-width: var(--magazine-max, 1180px);
+  margin: 20px auto 0;
+  padding: 0 var(--space-md);
+}
+
+.poster-head {
+  margin-bottom: 12px;
+}
+
+.poster-head h2 {
+  margin: 0;
+  color: var(--text-main);
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+}
+
+.visual-note-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.visual-note {
+  position: relative;
+  display: block;
+  min-height: 190px;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+  background: var(--surface-parchment);
+  cursor: pointer;
+}
+
+.visual-note.wide {
+  min-height: 250px;
+}
+
+.visual-note img {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  object-fit: cover;
+  filter: saturate(0.92) contrast(1.03);
+  transition: transform var(--duration-slow) var(--ease-soft);
+}
+
+.visual-note:hover img {
+  transform: scale(1.04);
+}
+
+.visual-note::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(17, 16, 13, 0.58));
+}
+
+.visual-note span {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  z-index: 1;
+  overflow: hidden;
+  color: #fff3cf;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-empty {
+  padding: 18px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
 }
 
 .empty-state {
@@ -389,18 +564,30 @@ onMounted(async () => {
     padding-inline: var(--space-sm);
   }
 
+  .cover-actions,
   .cover-write {
     width: 100%;
   }
 
+  .cover-status {
+    grid-template-columns: 1fr;
+  }
+
   .home-loading,
-  .magazine-body {
+  .magazine-body,
+  .poster-strip {
     padding-inline: var(--space-sm);
   }
 
   .home-loading,
-  .article-grid {
+  .article-grid,
+  .visual-note-grid {
     grid-template-columns: 1fr;
+  }
+
+  .visual-note,
+  .visual-note.wide {
+    min-height: 210px;
   }
 }
 </style>
