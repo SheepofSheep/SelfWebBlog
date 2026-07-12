@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { searchPosts, listCategories, listTags } from '../utils/api'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ArrowLeft, ArrowRight, SearchX } from 'lucide-vue-next'
+import { listCategories, listTags, searchPosts } from '../api'
 import { navigate, useRoute } from '../router'
-import { formatTime } from '../utils/format'
-import { Search, Clock, Eye, Folder, Tag, ArrowUpDown, X } from 'lucide-vue-next'
+import ArticleFilterBar from '../components/articles/ArticleFilterBar.vue'
+import ArchiveTimeline from '../components/articles/ArchiveTimeline.vue'
 
+const { query } = useRoute()
 const posts = ref([])
 const categories = ref([])
 const tags = ref([])
@@ -12,73 +14,34 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = 20
 const loading = ref(false)
-
 const keyword = ref('')
 const category = ref('')
 const tag = ref('')
 const sort = ref('date')
-const { query } = useRoute()
-
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
-const quickTags = computed(() => tags.value.slice(0, 12))
-const activeFilters = computed(() =>
-  [
-    keyword.value ? { key: 'keyword', label: `搜索：${keyword.value}` } : null,
-    category.value ? { key: 'category', label: `分类：${category.value}` } : null,
-    tag.value ? { key: 'tag', label: `标签：${tag.value}` } : null
-  ].filter(Boolean)
-)
-
-function postTags(p) {
-  if (!p?.tags) return []
-  return p.tags.split(/[,，\s]+/).filter(Boolean)
-}
-
-function postSummary(p) {
-  return p?.summary || ''
-}
-
-function readMinutes(p) {
-  if (!p?.content) return 1
-  const text = p.content.replace(/[#*_`\[\]!\(\)>\-\s]/g, '')
-  return Math.max(1, Math.ceil(text.length / 400))
-}
-
-let debounceTimer = null
-function doSearch(resetPage = true) {
-  if (resetPage) currentPage.value = 1
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => loadPosts(), 200)
-}
-
-function buildArchiveQuery() {
-  const params = new URLSearchParams()
-  if (keyword.value.trim()) params.set('keyword', keyword.value.trim())
-  if (category.value) params.set('category', category.value)
-  if (tag.value.trim()) params.set('tag', tag.value.trim())
-  if (sort.value !== 'date') params.set('sort', sort.value)
-  if (currentPage.value > 1) params.set('page', String(currentPage.value))
-  return params.toString()
-}
-
-function syncArchiveUrl() {
-  const next = buildArchiveQuery()
-  const target = next ? `/archive?${next}` : '/archive'
-  const current = window.location.hash.replace(/^#/, '') || '/'
-  if (current !== target) navigate(target)
-}
+let debounceTimer
 
 function initializeFromQuery() {
   keyword.value = query.value.get('keyword') || ''
   category.value = query.value.get('category') || ''
   tag.value = query.value.get('tag') || ''
   sort.value = query.value.get('sort') || 'date'
-  currentPage.value = Number(query.value.get('page') || 1)
+  currentPage.value = Math.max(1, Number(query.value.get('page') || 1))
 }
 
-async function loadPosts() {
+function archiveUrl() {
+  const params = new URLSearchParams()
+  if (keyword.value.trim()) params.set('keyword', keyword.value.trim())
+  if (category.value) params.set('category', category.value)
+  if (tag.value) params.set('tag', tag.value)
+  if (sort.value !== 'date') params.set('sort', sort.value)
+  if (currentPage.value > 1) params.set('page', String(currentPage.value))
+  return params.size ? `/archive?${params}` : '/archive'
+}
+
+async function loadPosts({ resetPage = false } = {}) {
+  if (resetPage) currentPage.value = 1
   loading.value = true
-  syncArchiveUrl()
   try {
     const data = await searchPosts({
       keyword: keyword.value || undefined,
@@ -90,27 +53,16 @@ async function loadPosts() {
     })
     posts.value = data.records || []
     total.value = data.total || 0
-  } catch {
-    posts.value = []
+    const nextUrl = archiveUrl()
+    if ((window.location.hash.replace(/^#/, '') || '/') !== nextUrl) navigate(nextUrl)
   } finally {
     loading.value = false
   }
 }
 
-async function loadCategories() {
-  try {
-    categories.value = await listCategories()
-  } catch {
-    categories.value = []
-  }
-}
-
-async function loadTags() {
-  try {
-    tags.value = await listTags()
-  } catch {
-    tags.value = []
-  }
+function scheduleSearch() {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => loadPosts({ resetPage: true }), 220)
 }
 
 function clearFilters() {
@@ -118,626 +70,210 @@ function clearFilters() {
   category.value = ''
   tag.value = ''
   sort.value = 'date'
+  loadPosts({ resetPage: true })
+}
+
+function changePage(nextPage) {
+  if (nextPage < 1 || nextPage > totalPages.value) return
+  currentPage.value = nextPage
   loadPosts()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function removeFilter(key) {
-  if (key === 'keyword') keyword.value = ''
-  if (key === 'category') category.value = ''
-  if (key === 'tag') tag.value = ''
-  doSearch()
-}
-
-function clearKeyword() {
-  keyword.value = ''
-  doSearch()
-}
-
-function clearTag() {
-  tag.value = ''
-  doSearch()
-}
-
-function chooseTag(name) {
-  tag.value = name
-  doSearch()
-}
-
-function prevPage() {
-  if (currentPage.value > 1) {
-    currentPage.value--
-    loadPosts()
-  }
-}
-function nextPage() {
-  if (currentPage.value < totalPages.value) {
-    currentPage.value++
-    loadPosts()
-  }
-}
-
-watch([category, sort], () => doSearch())
-
-onMounted(() => {
+watch([category, tag, sort], scheduleSearch)
+onBeforeUnmount(() => clearTimeout(debounceTimer))
+onMounted(async () => {
   initializeFromQuery()
-  loadPosts()
-  loadCategories()
-  loadTags()
+  await Promise.all([
+    loadPosts(),
+    listCategories()
+      .then((data) => (categories.value = data || []))
+      .catch(() => {}),
+    listTags()
+      .then((data) => (tags.value = data || []))
+      .catch(() => {})
+  ])
 })
 </script>
 
 <template>
   <main class="archive-page">
-    <header class="archive-hero">
-      <span class="archive-kicker">GABRIEL.ARCHIVE / SEARCH</span>
-      <h1 class="archive-title">档案检索台</h1>
-      <p class="archive-sub">共 {{ total }} 篇文章 · 搜索、分类和标签会保留在地址里</p>
+    <header class="archive-header">
+      <p>所有公开记录</p>
+      <div>
+        <h1>文章归档</h1>
+        <span>{{ total }} 篇文章，按时间整理。</span>
+      </div>
     </header>
 
-    <!-- 搜索与筛选栏 -->
-    <div class="archive-toolbar glass-card">
-      <div class="search-box">
-        <Search :size="16" />
-        <input
-          v-model="keyword"
-          type="text"
-          placeholder="搜索文章标题或摘要..."
-          @input="doSearch()"
-          class="search-input"
-        />
-        <button v-if="keyword" class="clear-btn" @click="clearKeyword" aria-label="清除搜索">
-          <X :size="14" />
-        </button>
-      </div>
+    <section class="archive-filter">
+      <ArticleFilterBar
+        v-model:keyword="keyword"
+        v-model:category="category"
+        v-model:tag="tag"
+        v-model:sort="sort"
+        :categories="categories"
+        :tags="tags"
+        show-sort
+        @submit="loadPosts({ resetPage: true })"
+        @clear="clearFilters"
+      />
+    </section>
 
-      <div class="filter-row">
-        <select v-model="category" class="filter-select">
-          <option value="">全部分类</option>
-          <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-        </select>
-
-        <div class="tag-input-wrap">
-          <Tag :size="14" />
-          <input
-            v-model="tag"
-            type="text"
-            placeholder="标签筛选..."
-            @input="doSearch()"
-            class="tag-input"
-          />
-          <button v-if="tag" class="clear-btn" @click="clearTag" aria-label="清除标签">
-            <X :size="14" />
-          </button>
-        </div>
-
-        <button :class="['sort-btn', { active: sort === 'date' }]" @click="sort = 'date'">
-          <Clock :size="14" /> 最新
-        </button>
-        <button :class="['sort-btn', { active: sort === 'title' }]" @click="sort = 'title'">
-          <ArrowUpDown :size="14" /> 标题
-        </button>
-
-        <button v-if="keyword || category || tag" class="clear-filter-btn" @click="clearFilters">
-          <X :size="14" /> 清除筛选
-        </button>
-      </div>
-
-      <div v-if="quickTags.length" class="quick-tags" aria-label="常用标签">
-        <span class="quick-label">常用标签</span>
-        <button
-          v-for="t in quickTags"
-          :key="t.id || t.name"
-          :class="['quick-tag', { active: tag === t.name }]"
-          @click="chooseTag(t.name)"
-        >
-          {{ t.name }}
-        </button>
-      </div>
-
-      <div v-if="activeFilters.length" class="filter-chips">
-        <button
-          v-for="item in activeFilters"
-          :key="item.key"
-          class="filter-chip"
-          @click="removeFilter(item.key)"
-        >
-          {{ item.label }}
-          <X :size="12" />
-        </button>
-      </div>
+    <div v-if="loading" class="archive-loading">
+      <div v-for="index in 5" :key="index" class="loading-shimmer"></div>
     </div>
+    <ArchiveTimeline
+      v-else-if="posts.length"
+      :posts="posts"
+      @open="navigate(`/post?id=${encodeURIComponent(String($event))}`)"
+    />
+    <section v-else class="archive-empty">
+      <SearchX :size="30" />
+      <h2>没有找到相关内容</h2>
+      <p>换一个关键词，或者清除当前筛选。</p>
+      <button type="button" @click="clearFilters">清除筛选</button>
+    </section>
 
-    <!-- 文章卡片网格 -->
-    <div v-if="loading" class="archive-grid">
-      <div v-for="i in 6" :key="i" class="archive-card archive-skeleton loading-shimmer"></div>
-    </div>
-    <div v-else-if="posts.length === 0" class="empty-state">
-      <p class="empty-title">没有找到相关内容</p>
-      <p class="empty-desc">换个关键词看看，或者先清除筛选。</p>
-      <button class="pill-btn pill-btn-primary" @click="clearFilters">
-        <X :size="14" />
-        清除筛选
+    <nav v-if="totalPages > 1" class="archive-pagination" aria-label="归档分页">
+      <button type="button" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
+        <ArrowLeft :size="16" /> 上一页
       </button>
-    </div>
-    <div v-else class="archive-grid">
-      <article
-        v-for="p in posts"
-        :key="p.id"
-        class="glass-card archive-card"
-        @click="navigate(`/post?id=${p.id}`)"
-      >
-        <div v-if="p.coverUrl" class="post-cover-photo">
-          <div class="cover-frame">
-            <img :src="p.coverUrl" :alt="p.title" />
-          </div>
-        </div>
-        <div v-else class="post-cover-photo fallback-cover">
-          <div class="cover-frame">
-            <span>{{ p.title?.charAt(0) || '文' }}</span>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div class="card-meta">
-            <span class="meta-item"><Clock :size="12" /> {{ formatTime(p.createTime) }}</span>
-            <span v-if="p.category" class="meta-item"><Folder :size="12" /> {{ p.category }}</span>
-            <span class="meta-item"><Eye :size="12" /> {{ readMinutes(p) }} min</span>
-          </div>
-
-          <h2 class="card-title">{{ p.title }}</h2>
-
-          <p v-if="postSummary(p)" class="card-summary">{{ postSummary(p) }}</p>
-
-          <div v-if="postTags(p).length" class="card-tags">
-            <span v-for="t in postTags(p)" :key="t" class="tag">{{ t }}</span>
-          </div>
-        </div>
-      </article>
-    </div>
-
-    <!-- 分页 -->
-    <div v-if="totalPages > 1" class="pagination">
-      <button class="pill-btn pill-btn-ghost" :disabled="currentPage === 1" @click="prevPage">
-        上一页
-      </button>
-      <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+      <span>{{ currentPage }} / {{ totalPages }}</span>
       <button
-        class="pill-btn pill-btn-ghost"
+        type="button"
         :disabled="currentPage >= totalPages"
-        @click="nextPage"
+        @click="changePage(currentPage + 1)"
       >
-        下一页
+        下一页 <ArrowRight :size="16" />
       </button>
-    </div>
+    </nav>
   </main>
 </template>
 
 <style scoped>
 .archive-page {
-  max-width: var(--magazine-max, 1180px);
+  width: min(1120px, calc(100% - 40px));
   margin: 0 auto;
-  width: 100%;
-  padding: 14px var(--space-md) var(--space-xl);
+  padding: 42px 0 70px;
 }
-
-.archive-hero {
-  position: relative;
-  margin-bottom: 18px;
-  padding: 22px 4px 6px;
-}
-
-.archive-kicker {
-  display: inline-flex;
-  margin-bottom: 8px;
-  color: var(--primary-hover);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.archive-title {
-  font-family: var(--font-serif);
-  font-size: clamp(2rem, 5vw, 4.2rem);
-  font-weight: 700;
-  color: var(--text);
-  margin: 0 0 10px;
-  letter-spacing: 0;
-  line-height: 1.05;
-}
-.archive-sub {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-}
-
-/* ═══ 工具栏 ═══ */
-.archive-toolbar {
-  padding: 16px;
-  margin-bottom: 24px;
-  border-radius: var(--radius-xl);
-}
-
-.archive-toolbar:hover {
-  transform: none;
-}
-
-.search-box {
+.archive-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 50px;
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 253, 247, 0.72);
-  border: 1px solid var(--border-medium);
-  margin-bottom: 12px;
-  color: var(--text-muted);
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 24px;
+  align-items: end;
+  padding: 24px 0 34px;
 }
-[data-theme='dark'] .search-box {
-  background: rgba(17, 16, 13, 0.38);
+.archive-header > p {
+  margin: 0 0 9px;
+  color: var(--primary-hover);
+  font-size: 0.76rem;
+  font-weight: 900;
 }
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 0.88rem;
-  font-family: var(--font-body);
-  color: var(--text);
-}
-.search-input::placeholder {
-  color: var(--text-faint);
-}
-.clear-btn {
+.archive-header > div {
   display: flex;
-  border: none;
-  background: none;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+.archive-header h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2.6rem, 6vw, 5.2rem);
+  font-weight: 500;
+  line-height: 1;
+}
+.archive-header span {
   color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 50%;
-}
-.clear-btn:hover {
-  color: var(--text);
-  background: var(--surface-muted);
-}
-
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.filter-select {
-  min-height: 36px;
-  padding: 6px 12px;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 253, 247, 0.72);
-  color: var(--text);
-  font-size: 0.78rem;
-  font-family: var(--font-body);
-  cursor: pointer;
-  outline: none;
-}
-
-[data-theme='dark'] .filter-select,
-[data-theme='dark'] .tag-input-wrap {
-  background: rgba(17, 16, 13, 0.42);
-  border-color: var(--border-medium);
-}
-
-.tag-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  min-height: 36px;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 253, 247, 0.72);
-  color: var(--text-muted);
-}
-.tag-input {
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 0.78rem;
-  font-family: var(--font-body);
-  color: var(--text);
-  width: 100px;
-}
-.tag-input::placeholder {
-  color: var(--text-faint);
-}
-
-.sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 96px;
-  padding: 8px 16px;
-  border: 1px solid var(--border-warm);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 247, 227, 0.9);
-  color: var(--text-secondary);
   font-size: 0.82rem;
-  font-family: var(--font-body);
-  font-weight: 600;
-  line-height: 1.2;
-  cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-soft),
-    color var(--duration-fast) var(--ease-soft),
-    background var(--duration-fast) var(--ease-soft),
-    transform var(--duration-fast) var(--ease-soft);
 }
-[data-theme='dark'] .sort-btn {
-  background: rgba(39, 31, 21, 0.7);
-  border-color: var(--border-medium);
-  color: var(--text-secondary);
+.archive-filter {
+  margin-bottom: 54px;
+  padding: 22px 0;
+  border-block: 1px solid var(--border-medium);
 }
-.sort-btn:hover,
-.sort-btn:focus-visible {
-  border-color: var(--primary);
-  color: var(--primary-hover);
-  background: rgba(255, 245, 215, 0.96);
-  transform: translateY(-1px);
-}
-[data-theme='dark'] .sort-btn:hover,
-[data-theme='dark'] .sort-btn:focus-visible {
-  background: rgba(227, 170, 52, 0.14);
-}
-.sort-btn.active {
-  background: var(--primary-soft);
-  border-color: var(--primary);
-  color: var(--primary-hover);
-}
-
-.clear-filter-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 250, 238, 0.58);
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  font-family: var(--font-body);
-  cursor: pointer;
-  transition:
-    color var(--duration-fast),
-    border-color var(--duration-fast);
-}
-
-.quick-tags,
-.filter-chips {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.quick-label {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.quick-tag,
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 28px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 250, 238, 0.62);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-family: var(--font-body);
-  font-size: 0.72rem;
-  padding: 5px 11px;
-  transition:
-    color var(--duration-fast),
-    border-color var(--duration-fast),
-    background var(--duration-fast),
-    transform var(--duration-fast);
-}
-
-.quick-tag:hover,
-.quick-tag.active,
-.filter-chip:hover {
-  color: var(--primary-hover);
-  border-color: var(--border-warm);
-  background: var(--primary-soft);
-  transform: translateY(-1px);
-}
-.clear-filter-btn:hover {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
-/* ═══ 卡片网格 ═══ */
-.archive-grid {
+.archive-loading {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 18px;
+  gap: 10px;
 }
-
-.archive-card {
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-  min-height: 280px;
+.archive-loading > div {
+  height: 110px;
+  border-radius: 8px;
 }
-
-.archive-card .post-cover-photo {
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  overflow: hidden;
+.archive-empty {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border-block: 1px solid var(--border-medium);
+  text-align: center;
+}
+.archive-empty h2,
+.archive-empty p {
   margin: 0;
 }
-.archive-card .cover-frame {
-  height: 170px;
-  overflow: hidden;
-}
-.fallback-cover .cover-frame {
-  display: grid;
-  place-items: center;
-  background:
-    repeating-linear-gradient(135deg, rgba(246, 196, 91, 0.14) 0 1px, transparent 1px 18px),
-    radial-gradient(circle at 25% 12%, rgba(246, 196, 91, 0.3), transparent 34%),
-    linear-gradient(135deg, #2b2114, #15110c);
-}
-.fallback-cover span {
-  color: rgba(246, 196, 91, 0.72);
-  font-family: var(--font-serif);
-  font-size: 3.4rem;
-  font-weight: 900;
-}
-.archive-card .cover-frame img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform var(--duration-slow) var(--ease-soft);
-}
-.archive-card:hover .cover-frame img {
-  transform: scale(1.04);
-}
-
-.card-body {
-  padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+.archive-empty p {
   color: var(--text-muted);
-  font-size: 0.66rem;
-  margin-bottom: 6px;
 }
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 3px;
+.archive-empty button {
+  margin-top: 10px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
 }
-
-.card-title {
-  margin: 0 0 6px;
-  font-family: var(--font-serif);
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card-summary {
-  margin: 0 0 8px;
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  line-height: 1.55;
-  flex: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-light);
-}
-.card-tags .tag {
-  padding: 2px 8px;
-  font-size: 0.62rem;
-}
-
-/* ═══ 分页 ═══ */
-.pagination {
+.archive-pagination {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
+  gap: 18px;
+  margin-top: 50px;
 }
-.page-info {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.loading-state,
-.empty-state {
-  text-align: center;
-  padding: 48px 20px;
-  color: var(--text-muted);
-}
-
-.archive-skeleton {
-  min-height: 280px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-}
-
-.empty-state {
-  border: 1px dashed var(--border-warm);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 250, 238, 0.56);
-}
-[data-theme='dark'] .empty-state {
-  background: rgba(17, 16, 13, 0.36);
-}
-
-.empty-title {
-  margin: 0 0 6px;
+.archive-pagination button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid var(--border-medium);
+  border-radius: 7px;
+  background: transparent;
   color: var(--text-main);
-  font-weight: 700;
+  cursor: pointer;
 }
-
-.empty-desc {
-  margin: 0 0 18px;
+.archive-pagination button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
-
-@media (max-width: 640px) {
+.archive-pagination span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+@media (max-width: 720px) {
   .archive-page {
-    padding-inline: var(--space-sm);
+    width: min(100% - 28px, 1120px);
+    padding-top: 16px;
   }
-  .archive-grid {
+  .archive-header {
     grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  .search-box {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .filter-row {
     gap: 6px;
   }
-  .sort-btn {
-    flex: 1 1 120px;
-    justify-content: center;
+  .archive-header > div {
+    display: grid;
+    gap: 8px;
   }
-  .tag-input {
-    width: 70px;
+  .archive-header h1 {
+    font-size: 3rem;
+  }
+  .archive-filter {
+    margin-bottom: 38px;
   }
 }
 </style>

@@ -36,6 +36,8 @@ logs/
 *~
 .cache/
 .vite/
+coverage/
+**/coverage/
 
 # Environment and local secrets
 .env
@@ -77,6 +79,9 @@ deployment/
 
 # Playwright（E2E 截图/快照）
 .playwright-mcp/
+.playwright-cli/
+output/playwright/
+.gstack/
 
 # Local dev scripts (machine-specific paths)
 start-dev.bat

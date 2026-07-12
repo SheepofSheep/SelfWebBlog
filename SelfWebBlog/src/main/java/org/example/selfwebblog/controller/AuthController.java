@@ -1,11 +1,13 @@
 package org.example.selfwebblog.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.security.JwtUtil;
+import org.example.selfwebblog.security.ClientIpResolver;
+import org.example.selfwebblog.security.LoginRateLimiter;
+import org.example.selfwebblog.security.OAuthLoginTicketService;
 import org.example.selfwebblog.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,8 +40,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/auth")
@@ -50,11 +52,10 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final UserService userService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ClientIpResolver clientIpResolver;
+    private final LoginRateLimiter loginRateLimiter;
+    private final OAuthLoginTicketService loginTicketService;
     private RestTemplate restTemplate;
-
-    // 每 IP 每分钟最多 5 次登录/注册（滑动窗口）
-    private final ConcurrentHashMap<String, long[]> loginAttempts = new ConcurrentHashMap<>();
 
     // OAuth state 防 CSRF，10 分钟过期自动淘汰
     private final Cache<String, String> oauthStates = CacheBuilder.newBuilder()
@@ -91,9 +92,17 @@ public class AuthController {
 
     private String adminPasswordHash;
 
-    public AuthController(JwtUtil jwtUtil, UserService userService) {
+    public AuthController(
+            JwtUtil jwtUtil,
+            UserService userService,
+            ClientIpResolver clientIpResolver,
+            LoginRateLimiter loginRateLimiter,
+            OAuthLoginTicketService loginTicketService) {
         this.jwtUtil = jwtUtil;
         this.userService = userService;
+        this.clientIpResolver = clientIpResolver;
+        this.loginRateLimiter = loginRateLimiter;
+        this.loginTicketService = loginTicketService;
     }
 
     @PostConstruct
@@ -163,7 +172,7 @@ public class AuthController {
 
         try {
             User user = userService.register(username.trim(), password, email, avatarUrl, getClientIp(request));
-            String token = jwtUtil.generateToken(user.getId(), user.getRole());
+            String token = issueToken(user);
             UserInfo info = toUserInfo(user);
             Map<String, Object> data = Map.of("token", token, "user", info);
             return Result.success(data);
@@ -190,7 +199,7 @@ public class AuthController {
         // 管理员可通过此接口登录
         if (adminUsername.equals(username) && passwordEncoder.matches(password, adminPasswordHash)) {
             User adminUser = ensureAdminUser();
-            String token = jwtUtil.generateToken(adminUser.getId(), "ADMIN");
+            String token = issueToken(adminUser);
             UserInfo info = toUserInfo(adminUser);
             log.info("管理员登录成功");
             return Result.success(Map.of("token", token, "user", info));
@@ -198,7 +207,7 @@ public class AuthController {
 
         try {
             User user = userService.login(username.trim(), password);
-            String token = jwtUtil.generateToken(user.getId(), user.getRole());
+            String token = issueToken(user);
             UserInfo info = toUserInfo(user);
             Map<String, Object> data = Map.of("token", token, "user", info);
             log.info("用户登录成功：{}", username);
@@ -209,11 +218,12 @@ public class AuthController {
     }
 
     private User ensureAdminUser() {
-        User adminUser = userService.getByUsername("admin");
+        User adminUser = userService.getByUsername(adminUsername);
         if (adminUser == null) {
             adminUser = new User();
-            adminUser.setUsername("admin");
+            adminUser.setUsername(adminUsername);
             adminUser.setRole("ADMIN");
+            adminUser.setTokenVersion(0);
             userService.save(adminUser);
         }
         return adminUser;
@@ -239,7 +249,7 @@ public class AuthController {
         }
 
         User adminUser = ensureAdminUser();
-        String token = jwtUtil.generateToken(adminUser.getId(), "ADMIN");
+        String token = issueToken(adminUser);
         UserInfo info = toUserInfo(adminUser);
         log.info("博主登录成功");
         return Result.success(Map.of("token", token, "user", info));
@@ -315,20 +325,29 @@ public class AuthController {
             User user = userService.findOrCreateGithubUser(githubId, login, avatarUrl, null, "");
             if (githubId.equals(adminGithubId) && !"ADMIN".equals(user.getRole())) {
                 user.setRole("ADMIN");
+                user.setTokenVersion(currentTokenVersion(user) + 1);
                 userService.updateById(user);
                 log.info("博主 GitHub 账号已自动提升为 ADMIN");
             }
-            String token = jwtUtil.generateToken(user.getId(), user.getRole());
             log.info("GitHub 用户登录成功：{} (role={})", login, user.getRole());
 
-            // 用 Jackson 安全序列化 JSON
-            UserInfo info = toUserInfo(user);
-            String userJson = URLEncoder.encode(objectMapper.writeValueAsString(info), StandardCharsets.UTF_8);
-            response.sendRedirect(frontendUrl + "/#/login?token=" + token + "&user=" + userJson);
+            String ticket = loginTicketService.issue(user);
+            response.sendRedirect(frontendUrl + "/#/login?ticket=" + ticket);
         } catch (Exception e) {
             log.error("GitHub OAuth 回调失败", e);
             response.sendRedirect(frontendUrl + "/#/login?error=oauth_error");
         }
+    }
+
+    @PostMapping("/exchange")
+    public Result<?> exchangeOAuthTicket(@RequestBody Map<String, String> body) {
+        return loginTicketService.consume(body.get("ticket"))
+                .map(userService::getById)
+                .filter(Objects::nonNull)
+                .<Result<?>>map(user -> Result.success(Map.of(
+                        "token", issueToken(user),
+                        "user", toUserInfo(user))))
+                .orElseGet(() -> Result.unauthorized("登录票据无效或已过期"));
     }
 
     // ==================== 获取当前用户 ====================
@@ -362,49 +381,34 @@ public class AuthController {
     // ==================== 退出登录 ====================
 
     @PostMapping("/logout")
-    public Result<?> logout() {
+    public Result<?> logout(HttpServletRequest request) {
+        Long userId = AuthHelper.getUserId(request);
+        if (userId != null) {
+            User user = userService.getById(userId);
+            if (user != null) {
+                user.setTokenVersion(currentTokenVersion(user) + 1);
+                userService.updateById(user);
+            }
+        }
         return Result.success("退出成功");
     }
 
     // ==================== 频率限制（滑动窗口） ====================
 
-    private static final int MAX_LOGIN_PER_MINUTE = 5;
-    private static final long WINDOW_MS = 60_000;
-
     private boolean tryAcquireRateLimit(HttpServletRequest request) {
-        String ip = getClientIp(request);
-        long now = System.currentTimeMillis();
-        long cutoff = now - WINDOW_MS;
-
-        long[] slots = loginAttempts.computeIfAbsent(ip, k -> new long[MAX_LOGIN_PER_MINUTE]);
-        synchronized (slots) {
-            int count = 0;
-            int freeIdx = -1;
-            for (int i = 0; i < slots.length; i++) {
-                if (slots[i] > cutoff) {
-                    count++;
-                } else if (freeIdx == -1) {
-                    freeIdx = i;
-                }
-            }
-            if (count >= MAX_LOGIN_PER_MINUTE) {
-                return false;
-            }
-            slots[freeIdx != -1 ? freeIdx : 0] = now;
-            return true;
-        }
+        return loginRateLimiter.tryAcquire(getClientIp(request));
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
-        }
-        return request.getRemoteAddr();
+        return clientIpResolver.resolve(request);
+    }
+
+    private String issueToken(User user) {
+        return jwtUtil.generateToken(user.getId(), user.getRole(), currentTokenVersion(user));
+    }
+
+    private int currentTokenVersion(User user) {
+        return user.getTokenVersion() == null ? 0 : user.getTokenVersion();
     }
 
     // ==================== 工具方法 ====================

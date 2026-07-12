@@ -8,6 +8,7 @@ import org.example.selfwebblog.service.upload.StoredUpload;
 import org.example.selfwebblog.service.upload.UploadStorageService;
 import org.example.selfwebblog.service.upload.UploadTarget;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,15 +25,18 @@ public class UploadController {
     private final BlogInfoService blogInfoService;
     private final UserService userService;
     private final UploadStorageService uploadStorageService;
+    private final String adminUsername;
 
     public UploadController(
         BlogInfoService blogInfoService,
         UserService userService,
-        UploadStorageService uploadStorageService
+        UploadStorageService uploadStorageService,
+        @Value("${auth.admin.username:admin}") String adminUsername
     ) {
         this.blogInfoService = blogInfoService;
         this.userService = userService;
         this.uploadStorageService = uploadStorageService;
+        this.adminUsername = adminUsername;
     }
 
     @PostMapping("/image")
@@ -53,7 +57,7 @@ public class UploadController {
             String avatarUrl = result.getData();
             blogInfoService.updateAvatar(avatarUrl);
             // 同步更新 admin 用户的头像，保持 /auth/me 和评论区一致
-            User adminUser = userService.getByUsername("admin");
+            User adminUser = userService.getByUsername(adminUsername);
             if (adminUser != null) {
                 adminUser.setAvatarUrl(avatarUrl);
                 userService.updateById(adminUser);

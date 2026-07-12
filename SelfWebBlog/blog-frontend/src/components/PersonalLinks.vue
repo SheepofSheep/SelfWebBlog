@@ -24,7 +24,7 @@ const links = [
           />
         </svg>
       </template>
-      <component v-else :is="link.icon" :size="18" />
+      <component :is="link.icon" v-else :size="18" />
     </a>
   </div>
 </template>

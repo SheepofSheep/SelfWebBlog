@@ -2,6 +2,7 @@ package org.example.selfwebblog.controller;
 
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.config.ResultHttpStatusAdvice;
+import org.example.selfwebblog.exception.GlobalExceptionHandler;
 import org.example.selfwebblog.service.PostService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,7 +37,7 @@ class PostControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new PostController(postService))
-                .setControllerAdvice(new ResultHttpStatusAdvice())
+                .setControllerAdvice(new ResultHttpStatusAdvice(), new GlobalExceptionHandler())
                 .build();
     }
 
@@ -123,5 +125,13 @@ class PostControllerTest {
 
         verify(postService, never()).save(any(Post.class));
         verify(postService, never()).updateById(any(Post.class));
+    }
+
+    @Test
+    void rejectsOversizedPageBeforeQueryingDatabase() throws Exception {
+        mockMvc.perform(get("/posts").param("page", "1").param("size", "101"))
+                .andExpect(status().isBadRequest());
+
+        verify(postService, never()).listByPage(anyInt(), anyInt());
     }
 }

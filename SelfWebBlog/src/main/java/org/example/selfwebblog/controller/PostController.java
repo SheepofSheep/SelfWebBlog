@@ -2,6 +2,7 @@ package org.example.selfwebblog.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
+import org.example.selfwebblog.config.PaginationPolicy;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.service.PostService;
@@ -37,7 +38,8 @@ public class PostController {
     public Result<Page<Post>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return Result.success(postService.listByPage(page, size));
+        PaginationPolicy.PageRequest request = PaginationPolicy.require(page, size);
+        return Result.success(postService.listByPage(request.page(), request.size()));
     }
 
     @GetMapping("/{id}")
@@ -93,7 +95,8 @@ public class PostController {
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
-        return Result.success(postService.listDrafts(page, size));
+        PaginationPolicy.PageRequest pagination = PaginationPolicy.require(page, size);
+        return Result.success(postService.listDrafts(pagination.page(), pagination.size()));
     }
 
     @GetMapping("/search")
@@ -104,7 +107,9 @@ public class PostController {
             @RequestParam(defaultValue = "date") String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return Result.success(postService.search(keyword, category, tag, sort, page, size));
+        PaginationPolicy.PageRequest request = PaginationPolicy.require(page, size);
+        return Result.success(postService.search(
+                keyword, category, tag, sort, request.page(), request.size()));
     }
 
     @GetMapping("/categories")

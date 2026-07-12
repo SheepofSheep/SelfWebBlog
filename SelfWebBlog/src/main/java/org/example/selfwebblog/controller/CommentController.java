@@ -2,6 +2,7 @@ package org.example.selfwebblog.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
+import org.example.selfwebblog.config.PaginationPolicy;
 import org.example.selfwebblog.entity.Comment;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
@@ -25,6 +26,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/comments")
@@ -53,18 +58,29 @@ public class CommentController {
             @PathVariable Long postId,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
-        Page<Comment> comments = commentService.getCommentsByPostId(postId, pageNum, pageSize);
+        PaginationPolicy.PageRequest pagination = PaginationPolicy.require(pageNum, pageSize);
+        Page<Comment> comments = commentService.getCommentsByPostId(
+                postId, pagination.page(), pagination.size());
         // 博主评论同步当前头像
         BlogInfo blogInfo = blogInfoService.getById(1);
         String adminAvatar = blogInfo != null ? blogInfo.getAvatarUrl() : null;
-        // 普通用户评论同步最新昵称和头像
+        Map<Long, User> usersById = userService.listByIds(
+                        comments.getRecords().stream()
+                                .filter(comment -> !"ADMIN".equals(comment.getRole()))
+                                .map(Comment::getUserId)
+                                .filter(java.util.Objects::nonNull)
+                                .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // 评论展示信息使用当前资料，避免逐条查询数据库。
         for (Comment c : comments.getRecords()) {
             if ("ADMIN".equals(c.getRole())) {
                 if (adminAvatar != null && !adminAvatar.isEmpty()) {
                     c.setAvatarUrl(adminAvatar);
                 }
             } else if (c.getUserId() != null) {
-                User commentUser = userService.getById(c.getUserId());
+                User commentUser = usersById.get(c.getUserId());
                 if (commentUser != null) {
                     String name = (commentUser.getNickname() != null && !commentUser.getNickname().isBlank())
                             ? commentUser.getNickname() : commentUser.getUsername();
@@ -118,7 +134,8 @@ public class CommentController {
             @RequestParam(defaultValue = "20") int pageSize,
             HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
-        return Result.success(commentService.listAll(pageNum, pageSize));
+        PaginationPolicy.PageRequest pagination = PaginationPolicy.require(pageNum, pageSize);
+        return Result.success(commentService.listAll(pagination.page(), pagination.size()));
     }
 
     @PutMapping("/{id}/pin")

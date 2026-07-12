@@ -1,7 +1,7 @@
 package org.example.selfwebblog.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import org.example.selfwebblog.controller.AuthHelper;
+import org.example.selfwebblog.config.PaginationPolicy;
 import org.example.selfwebblog.entity.BlogInfo;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.Result;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Value;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,11 +27,17 @@ public class ProfileController {
     private final BlogInfoService blogInfoService;
     private final PostService postService;
     private final UserService userService;
+    private final String adminUsername;
 
-    public ProfileController(BlogInfoService blogInfoService, PostService postService, UserService userService) {
+    public ProfileController(
+            BlogInfoService blogInfoService,
+            PostService postService,
+            UserService userService,
+            @Value("${auth.admin.username:admin}") String adminUsername) {
         this.blogInfoService = blogInfoService;
         this.postService = postService;
         this.userService = userService;
+        this.adminUsername = adminUsername;
     }
 
     // 获取个人主页数据，支持可选分页
@@ -43,16 +50,14 @@ public class ProfileController {
         BlogInfo blogInfo = blogInfoService.getBlogInfo();
         data.put("blogInfo", blogInfo);
 
-        if (page != null && size != null) {
-            Page<Post> postPage = postService.listByPage(page, size);
-            data.put("posts", postPage.getRecords());
-            long total = postPage.getTotal() > 0 ? postPage.getTotal() : postService.count();
-            data.put("total", total);
-            data.put("pages", Math.max(1, (int) Math.ceil((double) total / size)));
-        } else {
-            Page<Post> all = postService.listByPage(1, Integer.MAX_VALUE);
-            data.put("posts", all.getRecords());
-        }
+        PaginationPolicy.PageRequest pagination = PaginationPolicy.require(
+                page == null ? 1 : page,
+                size == null ? 20 : size);
+        Page<Post> postPage = postService.listByPage(pagination.page(), pagination.size());
+        data.put("posts", postPage.getRecords());
+        long total = postPage.getTotal() > 0 ? postPage.getTotal() : postService.count();
+        data.put("total", total);
+        data.put("pages", Math.max(1, (int) Math.ceil((double) total / pagination.size())));
 
         return Result.success(data);
     }
@@ -86,7 +91,7 @@ public class ProfileController {
         blogInfoService.updateById(existing);
 
         // 同步更新 admin 用户记录，确保 /auth/me 返回最新头像和昵称
-        User adminUser = userService.getByUsername("admin");
+        User adminUser = userService.getByUsername(adminUsername);
         if (adminUser != null) {
             if (body.containsKey("nickname") && existing.getNickname() != null) {
                 adminUser.setNickname(existing.getNickname());

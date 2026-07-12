@@ -23,7 +23,6 @@ import {
   Smile,
   Edit3
 } from 'lucide-vue-next'
-import { gsap } from 'gsap'
 import { formatTime } from '../utils/format'
 
 function goBack() {
@@ -116,7 +115,7 @@ const renderedContent = computed(() =>
 
 const readTime = computed(() => {
   if (!post.value?.content) return 1
-  const text = post.value.content.replace(/[#*_`\[\]!\(\)>\-\s]/g, '')
+  const text = post.value.content.replace(/[#*_`[\]!()>\-\s]/g, '')
   return Math.max(1, Math.ceil(text.length / 400))
 })
 
@@ -145,15 +144,6 @@ const tocItems = computed(() => {
 watch(renderedContent, async () => {
   await nextTick()
   prepareArticleEnhancements()
-  if (document.querySelector('.post-content > *')) {
-    gsap.from('.post-content > *', {
-      opacity: 0,
-      y: 15,
-      duration: 0.6,
-      stagger: 0.05,
-      ease: 'power2.out'
-    })
-  }
 })
 
 async function loadPost() {
@@ -337,18 +327,11 @@ onBeforeUnmount(() => {
         <button
           v-if="user?.role === 'ADMIN'"
           class="edit-btn"
-          @click="editPost"
           aria-label="编辑文章"
+          @click="editPost"
         >
           <Edit3 :size="14" /> 编辑
         </button>
-      </div>
-
-      <!-- 封面图 — 手账相纸风 -->
-      <div v-if="post.coverUrl" class="post-cover-photo">
-        <div class="cover-frame">
-          <img :src="post.coverUrl" :alt="post.title" />
-        </div>
       </div>
 
       <h1 class="post-title">{{ post.title }}</h1>
@@ -374,6 +357,12 @@ onBeforeUnmount(() => {
         <span v-for="t in tagList" :key="t" class="tag">{{ t }}</span>
       </div>
 
+      <div v-if="post.coverUrl" class="post-cover-photo">
+        <div class="cover-frame">
+          <img :src="post.coverUrl" :alt="post.title" />
+        </div>
+      </div>
+
       <div class="article-layout" :class="{ 'has-toc': tocItems.length }">
         <aside v-if="tocItems.length" class="post-toc" aria-label="文章目录">
           <p class="toc-title">目录</p>
@@ -389,8 +378,8 @@ onBeforeUnmount(() => {
         <div
           ref="articleRef"
           class="post-content"
-          v-html="renderedContent"
           @click="handleArticleClick"
+          v-html="renderedContent"
         ></div>
       </div>
 
@@ -409,9 +398,9 @@ onBeforeUnmount(() => {
             <div class="emoji-picker-wrap">
               <button
                 class="emoji-btn"
-                @click="showEmoji = !showEmoji"
                 aria-label="表情"
                 title="表情"
+                @click="showEmoji = !showEmoji"
               >
                 <Smile :size="18" />
               </button>
@@ -477,8 +466,8 @@ onBeforeUnmount(() => {
             <div v-if="user?.role === 'ADMIN'" class="comment-actions" @click.stop>
               <button
                 class="menu-btn"
-                @click="toggleMenu(c.id)"
                 :aria-label="openMenuId === c.id ? '关闭菜单' : '评论操作'"
+                @click="toggleMenu(c.id)"
               >
                 <MoreHorizontal :size="16" />
               </button>
@@ -554,7 +543,7 @@ onBeforeUnmount(() => {
 
 .post-container {
   padding: clamp(20px, 4vw, 44px);
-  border-radius: 30px;
+  border-radius: 12px;
 }
 .back-btn {
   display: inline-flex;
@@ -612,7 +601,20 @@ onBeforeUnmount(() => {
 }
 
 .post-cover-photo .cover-frame img {
-  max-height: 460px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.post-cover-photo {
+  margin: 26px 0 42px;
+  padding: 0;
+}
+
+.post-cover-photo .cover-frame {
+  width: 100%;
+  max-height: 420px;
+  aspect-ratio: 16 / 7;
 }
 
 .post-title {
@@ -631,11 +633,10 @@ onBeforeUnmount(() => {
   font-size: 1rem;
   line-height: 1.78;
   color: var(--text-secondary);
-  padding: 14px 18px;
-  background: rgba(217, 154, 29, 0.1);
-  border: 1px solid var(--border-warm);
-  border-left: 4px solid var(--primary);
-  border-radius: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .post-meta {
@@ -657,7 +658,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: var(--space-lg);
+  margin-bottom: 0;
   flex-wrap: wrap;
   color: var(--text-muted);
 }
@@ -677,6 +678,21 @@ onBeforeUnmount(() => {
 .article-layout:not(.has-toc) {
   max-width: 780px;
   margin: 0 auto;
+}
+
+.post-content :deep(> *) {
+  animation: article-content-enter var(--motion-normal) both;
+}
+
+@keyframes article-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .post-toc {

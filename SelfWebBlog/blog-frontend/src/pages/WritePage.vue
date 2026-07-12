@@ -4,6 +4,14 @@ import { navigate } from '../router'
 import { savePost, uploadImage, listTags, listCategories } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
+import {
+  getDraftKey,
+  hasUsefulDraft,
+  migrateLegacyDraft,
+  readDraft,
+  removeDraft,
+  writeDraft
+} from '../composables/draftStorage'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import {
   ArrowLeft,
@@ -62,8 +70,6 @@ const confirmDialog = ref({
 const draftStatus = ref('') // '' | 'saving' | 'saved'
 const pendingDraft = ref(null)
 let draftTimer = null
-const LEGACY_DRAFT_KEY = 'postDraft'
-const NEW_DRAFT_KEY = 'postDraft:new'
 
 const isEditing = computed(() => !!editingId.value)
 const canSubmit = computed(() => title.value.trim() && content.value.trim())
@@ -149,7 +155,7 @@ function removeTag(name) {
 }
 
 onMounted(() => {
-  migrateLegacyDraft()
+  migrateLegacyDraft(localStorage)
   const editing = sessionStorage.getItem('editingPost')
   if (editing) {
     try {
@@ -171,20 +177,6 @@ onBeforeUnmount(() => {
   clearTimeout(draftTimer)
 })
 
-function getDraftKey(id) {
-  return id ? `postDraft:${id}` : NEW_DRAFT_KEY
-}
-
-function migrateLegacyDraft() {
-  const legacy = localStorage.getItem(LEGACY_DRAFT_KEY)
-  if (!legacy) return
-  try {
-    const d = JSON.parse(legacy)
-    localStorage.setItem(getDraftKey(d.editingId || null), legacy)
-  } catch {}
-  localStorage.removeItem(LEGACY_DRAFT_KEY)
-}
-
 function getDraftData() {
   return {
     title: title.value,
@@ -201,7 +193,7 @@ function getDraftData() {
 
 function saveDraft() {
   draftStatus.value = 'saving'
-  localStorage.setItem(draftKey.value, JSON.stringify(getDraftData()))
+  writeDraft(localStorage, draftKey.value, getDraftData())
   clearTimeout(draftTimer)
   draftTimer = setTimeout(() => {
     draftStatus.value = 'saved'
@@ -209,36 +201,22 @@ function saveDraft() {
 }
 
 function loadDraft({ ask = false } = {}) {
-  const draft = localStorage.getItem(draftKey.value)
+  const draft = readDraft(localStorage, draftKey.value)
   if (!draft) return
-  try {
-    const d = JSON.parse(draft)
-    if (ask && hasUsefulDraft(d)) {
-      pendingDraft.value = d
-      askConfirm({
-        title: '发现本地草稿',
-        message: '这里有一份之前自动保存的内容，要恢复继续写吗？',
-        confirmText: '恢复草稿',
-        cancelText: '先不用',
-        tone: 'primary',
-        onConfirm: restorePendingDraft,
-        onCancel: discardPendingDraft
-      })
-      return
-    }
-    applyDraftData(d)
-  } catch {}
-}
-
-function hasUsefulDraft(d) {
-  return Boolean(
-    d?.title ||
-    d?.content ||
-    d?.summary ||
-    d?.coverUrl ||
-    d?.category ||
-    (Array.isArray(d?.tags) ? d.tags.length : d?.tags)
-  )
+  if (ask && hasUsefulDraft(draft)) {
+    pendingDraft.value = draft
+    askConfirm({
+      title: '发现本地草稿',
+      message: '这里有一份之前自动保存的内容，要恢复继续写吗？',
+      confirmText: '恢复草稿',
+      cancelText: '先不用',
+      tone: 'primary',
+      onConfirm: restorePendingDraft,
+      onCancel: discardPendingDraft
+    })
+    return
+  }
+  applyDraftData(draft)
 }
 
 function applyDraftData(d) {
@@ -253,8 +231,7 @@ function applyDraftData(d) {
 }
 
 function clearCurrentDraft() {
-  localStorage.removeItem(draftKey.value)
-  localStorage.removeItem(LEGACY_DRAFT_KEY)
+  removeDraft(localStorage, draftKey.value)
 }
 
 function askConfirm({
@@ -575,8 +552,8 @@ watch(
         <button
           class="tool-pill"
           :class="{ active: showSettings }"
-          @click="showSettings = !showSettings"
           title="文章设置"
+          @click="showSettings = !showSettings"
         >
           <Settings2 :size="16" />
           设置

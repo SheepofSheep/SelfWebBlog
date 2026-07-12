@@ -26,13 +26,14 @@ public class JwtUtil {
         this.key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(Long userId, String role) {
+    public String generateToken(Long userId, String role, int tokenVersion) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + jwtProperties.getExpiration() * 1000);
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("role", role)
+                .claim("tokenVersion", tokenVersion)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(key)
@@ -62,5 +63,9 @@ public class JwtUtil {
 
     public String getRole(String token) {
         return parseToken(token).get("role", String.class);
+    }
+
+    public Integer getTokenVersion(String token) {
+        return parseToken(token).get("tokenVersion", Integer.class);
     }
 }

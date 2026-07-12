@@ -22,6 +22,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         user.setEmail(email);
         user.setAvatarUrl(avatarUrl != null ? avatarUrl : "");
         user.setRole("USER");
+        user.setTokenVersion(0);
         user.setIpAddress(ipAddress);
         save(user);
         return user;
@@ -57,6 +58,7 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         user.setAvatarUrl(avatarUrl);
         user.setEmail(email);
         user.setRole("USER");
+        user.setTokenVersion(0);
         user.setIpAddress(ipAddress);
         save(user);
         return user;

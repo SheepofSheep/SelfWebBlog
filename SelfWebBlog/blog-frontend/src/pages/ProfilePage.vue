@@ -17,17 +17,7 @@ import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
 import { formatTime, toPlainText, getFirstImageUrl } from '../utils/format'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
-import {
-  Image,
-  Settings,
-  Edit3,
-  Trash2,
-  Camera,
-  FileText,
-  Images,
-  Users,
-  FileClock
-} from 'lucide-vue-next'
+import { Image, Settings, Edit3, Trash2, Camera, FileText, Users, FileClock } from 'lucide-vue-next'
 
 const { push } = useToast()
 const user = inject('user', ref(null))
@@ -345,7 +335,7 @@ onMounted(async () => {
             @load="(e) => e.target.classList.add('loaded')"
           />
           <div class="avatar-overlay"><Camera :size="18" /></div>
-          <input type="file" accept="image/*" @change="onPickAvatar" class="hidden-input" />
+          <input type="file" accept="image/*" class="hidden-input" @change="onPickAvatar" />
         </label>
         <h2 class="profile-name">{{ blogInfo?.nickname || '加载中...' }}</h2>
         <p class="profile-bio">{{ blogInfo?.bio || '...' }}</p>
@@ -445,10 +435,10 @@ onMounted(async () => {
               </p>
             </div>
             <div class="post-actions" @click.stop>
-              <button class="act-btn edit" @click="editPost(p)" aria-label="编辑文章">
+              <button class="act-btn edit" aria-label="编辑文章" @click="editPost(p)">
                 <Edit3 :size="14" />
               </button>
-              <button class="act-btn del" @click="remove(p.id)" aria-label="删除文章">
+              <button class="act-btn del" aria-label="删除文章" @click="remove(p.id)">
                 <Trash2 :size="14" />
               </button>
             </div>
@@ -492,7 +482,7 @@ onMounted(async () => {
               </div>
               <div class="user-meta">
                 <span class="user-email">{{ u.email || '未填邮箱' }}</span>
-                <span class="user-ip" v-if="showIpDiagnostics && u.ipAddress"
+                <span v-if="showIpDiagnostics && u.ipAddress" class="user-ip"
                   >IP: {{ u.ipAddress }}</span
                 >
                 <span
@@ -510,9 +500,9 @@ onMounted(async () => {
             <button
               v-if="u.role !== 'ADMIN'"
               class="user-del-btn"
-              @click="handleDeleteUser(u)"
               :aria-label="'删除用户' + u.username"
               title="删除用户"
+              @click="handleDeleteUser(u)"
             >
               <Trash2 :size="14" />
             </button>
@@ -552,7 +542,7 @@ onMounted(async () => {
             </div>
             <div class="post-actions" @click.stop>
               <span class="draft-badge">草稿</span>
-              <button class="act-btn del" @click="remove(p.id)" aria-label="删除草稿">
+              <button class="act-btn del" aria-label="删除草稿" @click="remove(p.id)">
                 <Trash2 :size="14" />
               </button>
             </div>
@@ -590,7 +580,7 @@ onMounted(async () => {
               </button>
             </div>
           </div>
-          <div class="modal-field" v-if="titleName">
+          <div v-if="titleName" class="modal-field">
             <label class="field-label">预览</label>
             <span :class="['title-badge', 'title-' + titleStyle]">{{ titleName }}</span>
           </div>

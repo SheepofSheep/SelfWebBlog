@@ -1,9 +1,8 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { navigate, useRoute } from '../router'
 import { login, register, getGithubAuthUrl } from '../utils/api'
 import { showToast } from '../composables/toast'
-import { gsap } from 'gsap'
 import { Github } from 'lucide-vue-next'
 
 const tab = ref('login')
@@ -19,38 +18,10 @@ const regPassword = ref('')
 const regEmail = ref('')
 const regAvatar = ref('')
 
-onMounted(() => {
-  gsap.to('.login-layout', { opacity: 1, duration: 0.4, ease: 'power1.out' })
-})
-
 function switchTab(t) {
   if (t === tab.value || loading.value) return
-  const illust = document.querySelector('.login-illust')
-  const panel = document.querySelector('.login-panel-wrap')
-  const dir = tab.value === 'login' ? 1 : -1
-
-  if (illust && panel) {
-    // 快速滑出
-    gsap.to([illust, panel], {
-      autoAlpha: 0,
-      x: dir * -40,
-      duration: 0.2,
-      ease: 'power2.in',
-      onComplete: () => {
-        tab.value = t
-        imageKey.value++
-        const newIllust = document.querySelector('.login-illust')
-        const newPanel = document.querySelector('.login-panel-wrap')
-        if (newIllust && newPanel) {
-          gsap.fromTo(
-            [newIllust, newPanel],
-            { autoAlpha: 0, x: dir * 40 },
-            { autoAlpha: 1, x: 0, duration: 0.3, ease: 'power2.out' }
-          )
-        }
-      }
-    })
-  }
+  tab.value = t
+  imageKey.value++
 }
 
 const illustSrc = computed(
@@ -278,7 +249,7 @@ async function handleGithubLogin() {
   width: min(1000px, 100%);
   min-height: 620px;
   overflow: hidden;
-  opacity: 0;
+  animation: login-enter var(--motion-slow) both;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-paper);
@@ -309,6 +280,29 @@ async function handleGithubLogin() {
   height: 100%;
   object-fit: cover;
   display: block;
+  animation: login-image-enter var(--motion-normal) both;
+}
+
+@keyframes login-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-image-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .illust-placeholder {

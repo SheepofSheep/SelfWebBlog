@@ -28,5 +28,6 @@ public class User {
     private String ipAddress;
     private String titleName;
     private String titleStyle;
+    private Integer tokenVersion;
     private LocalDateTime createTime;
 }

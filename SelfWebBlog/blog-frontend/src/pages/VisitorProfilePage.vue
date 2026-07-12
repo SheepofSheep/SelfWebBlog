@@ -77,11 +77,11 @@ async function onPickAvatar(e) {
           :src="avatarSrc"
           :alt="displayName"
           class="vp-avatar"
-          @load="(e) => e.target.classList.add('loaded')"
           :class="{ loaded: user?.avatarUrl }"
+          @load="(e) => e.target.classList.add('loaded')"
         />
         <div class="vp-avatar-overlay"><Camera :size="20" /></div>
-        <input type="file" accept="image/*" @change="onPickAvatar" class="hidden-input" />
+        <input type="file" accept="image/*" class="hidden-input" @change="onPickAvatar" />
       </label>
 
       <p class="vp-hint">点击头像上传新图片，会同步到评论区</p>

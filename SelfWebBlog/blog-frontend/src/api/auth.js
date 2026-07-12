@@ -20,6 +20,11 @@ export async function getGithubAuthUrl() {
   return unwrap(res.data)
 }
 
+export async function exchangeOAuthTicket(ticket) {
+  const res = await api.post('/auth/exchange', { ticket })
+  return unwrap(res.data)
+}
+
 export async function githubCallback(code, state) {
   const res = await api.get('/auth/github/callback', { params: { code, state } })
   return unwrap(res.data)

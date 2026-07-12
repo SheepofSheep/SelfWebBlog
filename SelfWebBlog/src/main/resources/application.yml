@@ -63,7 +63,7 @@ github:
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5174}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5174}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5174,http://127.0.0.1:5174}
 
 server:
   port: 8080

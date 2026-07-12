@@ -10,7 +10,7 @@ export function toPlainText(markdown) {
   const content = markdown || ''
   return content
     .replace(/!\[.*?\]\(.*?\)/g, '[图片]')
-    .replace(/[#*_`\[\]]/g, '')
+    .replace(/[#*_`[\]]/g, '')
     .replace(/\n/g, ' ')
     .trim()
 }
