@@ -10,6 +10,7 @@ const WritePage = () => import('../pages/WritePage.vue')
 const AdminPage = () => import('../pages/ProfilePage.vue')
 const VisitorProfilePage = () => import('../pages/VisitorProfilePage.vue')
 const AboutPage = () => import('../pages/AboutPage.vue')
+const GuestbookPage = () => import('../pages/GuestbookPage.vue')
 const RoutePlaceholderPage = () => import('../pages/RoutePlaceholderPage.vue')
 
 export const router = createRouter({
@@ -39,8 +40,7 @@ export const router = createRouter({
     {
       path: '/guestbook',
       name: 'guestbook',
-      component: RoutePlaceholderPage,
-      props: { title: '留言板', description: '给 Gabriel 留下一段话。' },
+      component: GuestbookPage,
       meta: { public: true }
     },
     {

@@ -1,25 +1,20 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getPost, addComment, deleteComment, getComments, togglePinComment } from '../utils/api'
+import { getPost } from '../utils/api'
 import { showToast } from '../composables/toast'
-import { renderArticleMarkdown, renderCommentMarkdown } from '../utils/marked'
+import { renderArticleMarkdown } from '../utils/marked'
 import loadingStore from '../stores/loadingStore'
-import ConfirmDialog from '../components/ConfirmDialog.vue'
+import InteractionThread from '../features/interaction/components/InteractionThread.vue'
+import LikeButton from '../features/interaction/components/LikeButton.vue'
+import { recordPostView } from '../features/interaction/api/interactions'
 import {
   ArrowLeft,
-  Send,
-  Trash2,
-  MessageCircle,
   Clock,
-  MoreHorizontal,
-  Pin,
-  PinOff,
   Tag,
   Folder,
   RefreshCw,
   Eye,
-  Smile,
   Edit3
 } from 'lucide-vue-next'
 import { formatTime } from '../utils/format'
@@ -52,64 +47,12 @@ function editPost() {
 
 const postId = computed(() => String(route.params.id || ''))
 const post = ref(null)
-const comments = ref([])
-const commentContent = ref('')
 const user = inject('user', null)
 const refreshUser = inject('refreshUser', null)
-const commentSubmitting = ref(false)
-const showEmoji = ref(false)
 const articleRef = ref(null)
 const readingProgress = ref(0)
 const activeHeading = ref('')
 const previewImage = ref('')
-const confirmDialog = ref({
-  open: false,
-  title: '',
-  message: '',
-  confirmText: '确认',
-  onConfirm: null
-})
-
-const emojis = [
-  'love',
-  'love眼',
-  'wink',
-  '卖萌',
-  '吃瓜',
-  '呵呵',
-  '哇',
-  '哦',
-  '啊？',
-  '喜欢',
-  '喵',
-  '嘲笑',
-  '嘿嘿',
-  '嫌弃',
-  '害怕',
-  '小狗农',
-  '小生气',
-  '尴尬',
-  '我去',
-  '搭讪',
-  '摸头',
-  '星星眼',
-  '欸嘿',
-  '求收留',
-  '狐狸农',
-  '王德法',
-  '生气',
-  '看热闹',
-  '耶',
-  '赞',
-  '酷笑',
-  '馋',
-  '鬼迷日眼'
-]
-
-function insertEmoji(name) {
-  commentContent.value += ` ![${name}](/images/emojis/${name}.jpg) `
-  showEmoji.value = false
-}
 
 const renderedContent = computed(() =>
   post.value ? renderArticleMarkdown(post.value.content) : ''
@@ -159,107 +102,6 @@ async function loadPost() {
   }
 }
 
-async function loadComments() {
-  if (!postId.value) return
-  try {
-    const result = await getComments(postId.value)
-    comments.value = user?.value
-      ? result.records.map((c) => ({
-          ...c,
-          avatarUrl: c.role === 'ADMIN' && user.value ? user.value.avatarUrl : c.avatarUrl
-        }))
-      : result.records
-  } catch {
-    comments.value = []
-  }
-}
-
-async function handleAddComment() {
-  if (!commentContent.value.trim()) return
-  if (!user?.value) {
-    showToast('登录后就可以发表评论。')
-    navigate('/login')
-    return
-  }
-  commentSubmitting.value = true
-  try {
-    await addComment({ postId: postId.value, content: commentContent.value })
-    commentContent.value = ''
-    await loadComments()
-    showToast('评论发表成功')
-  } catch (error) {
-    const message =
-      error?.status === 429 || error?.code === 429
-        ? '评论太快啦，稍等一下再发。'
-        : error?.status === 401 || error?.code === 401
-          ? '登录状态过期了，重新登录一下就好。'
-          : error?.message || '评论没有发出去，稍后再试一次。'
-    showToast(message, 'error')
-  } finally {
-    commentSubmitting.value = false
-  }
-}
-
-const openMenuId = ref(null)
-
-function toggleMenu(id) {
-  openMenuId.value = openMenuId.value === id ? null : id
-}
-
-async function handleDeleteComment(commentId) {
-  askConfirm({
-    title: '删除评论',
-    message: '确定要删除这条评论吗？删除后访客将看不到这条内容。',
-    confirmText: '删除评论',
-    onConfirm: async () => {
-      await deleteCommentById(commentId)
-    }
-  })
-}
-
-async function deleteCommentById(commentId) {
-  try {
-    await deleteComment(commentId)
-    openMenuId.value = null
-    await loadComments()
-    showToast('评论删除成功')
-  } catch {
-    comments.value = comments.value.filter((c) => c.id !== commentId)
-  }
-}
-
-function askConfirm({ title, message, confirmText = '确认', onConfirm }) {
-  confirmDialog.value = { open: true, title, message, confirmText, onConfirm }
-}
-
-async function handleConfirmAction() {
-  const action = confirmDialog.value.onConfirm
-  confirmDialog.value.open = false
-  confirmDialog.value.onConfirm = null
-  if (action) await action()
-}
-
-async function handleTogglePin(comment) {
-  try {
-    await togglePinComment(comment.id)
-    openMenuId.value = null
-    await loadComments()
-  } catch (e) {
-    showToast(e?.message || '这次没有处理成功，稍后再试一次。', 'error')
-  }
-}
-
-function formatRelativeTime(dateString) {
-  const diff = Date.now() - new Date(dateString).getTime()
-  const d = Math.floor(diff / 86400000)
-  const h = Math.floor(diff / 3600000)
-  const m = Math.floor(diff / 60000)
-  if (d > 0) return `${d}天前`
-  if (h > 0) return `${h}小时前`
-  if (m > 0) return `${m}分钟前`
-  return '刚刚'
-}
-
 function prepareArticleEnhancements() {
   const root = articleRef.value
   if (!root) return
@@ -305,7 +147,9 @@ function handleArticleClick(event) {
 onMounted(async () => {
   if (refreshUser) await refreshUser()
   await loadPost()
-  await loadComments()
+  if (post.value) {
+    recordPostView(postId.value).catch(() => {})
+  }
   await nextTick()
   prepareArticleEnhancements()
   updateReadingProgress()
@@ -347,7 +191,9 @@ onBeforeUnmount(() => {
         <span v-if="post.updateTime && post.updateTime !== post.createTime" class="meta-item"
           ><RefreshCw :size="14" /> {{ formatTime(post.updateTime) }}</span
         >
-        <span class="meta-item"><Eye :size="14" /> 约 {{ readTime }} 分钟</span>
+        <span class="meta-item"
+          ><Eye :size="14" /> {{ post.viewCount || 0 }} 次浏览 · 约 {{ readTime }} 分钟</span
+        >
         <span v-if="post.category" class="meta-item"
           ><Folder :size="14" /> {{ post.category }}</span
         >
@@ -357,6 +203,15 @@ onBeforeUnmount(() => {
       <div v-if="tagList.length" class="post-tags">
         <Tag :size="14" />
         <span v-for="t in tagList" :key="t" class="tag">{{ t }}</span>
+      </div>
+
+      <div class="post-engagement">
+        <LikeButton
+          target-type="POST"
+          :target-id="post.id"
+          :initial-count="post.likeCount || 0"
+          label="喜欢这篇文章"
+        />
       </div>
 
       <div v-if="post.coverUrl" class="post-cover-photo">
@@ -385,111 +240,8 @@ onBeforeUnmount(() => {
         ></div>
       </div>
 
-      <!-- 评论区 -->
       <div class="comments-section">
-        <h2 class="comments-title"><MessageCircle :size="18" /> 评论</h2>
-
-        <div v-if="user" class="comment-form">
-          <div class="comment-input-wrap">
-            <textarea
-              v-model="commentContent"
-              class="field-control"
-              placeholder="写下你的评论..."
-              rows="3"
-            ></textarea>
-            <div class="emoji-picker-wrap">
-              <button
-                class="emoji-btn"
-                aria-label="表情"
-                title="表情"
-                @click="showEmoji = !showEmoji"
-              >
-                <Smile :size="18" />
-              </button>
-              <Transition name="fade">
-                <div v-if="showEmoji" class="emoji-popover glass-card">
-                  <div class="emoji-grid">
-                    <button
-                      v-for="e in emojis"
-                      :key="e"
-                      class="emoji-item"
-                      :title="e"
-                      @click="insertEmoji(e)"
-                    >
-                      <img :src="`/images/emojis/${e}.jpg`" :alt="e" loading="lazy" />
-                    </button>
-                  </div>
-                </div>
-              </Transition>
-            </div>
-          </div>
-          <button
-            class="pill-btn pill-btn-primary"
-            :disabled="!commentContent.trim() || commentSubmitting"
-            @click="handleAddComment"
-          >
-            <Send :size="14" /> {{ commentSubmitting ? '发布中...' : '发表评论' }}
-          </button>
-        </div>
-        <div v-else class="comment-login-hint glass-card">
-          <p class="login-hint-title">想留下一点想法？</p>
-          <p class="login-hint-desc">登录后就可以发表评论，头像和昵称会一起显示在评论区。</p>
-          <button class="pill-btn pill-btn-primary" @click="navigate('/login')">去登录</button>
-        </div>
-
-        <div v-if="comments.length > 0" class="comments-list">
-          <div
-            v-for="c in comments"
-            :key="c.id"
-            class="comment-item"
-            :class="{ 'admin-comment': c.role === 'ADMIN', pinned: c.pinned }"
-          >
-            <img
-              :src="c.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=guest'"
-              :alt="c.nickname + '的头像'"
-              class="comment-avatar avatar-img"
-              :class="{ loaded: c.avatarUrl }"
-              @load="(e) => e.target.classList.add('loaded')"
-            />
-            <div class="comment-body">
-              <div class="comment-head">
-                <span v-if="c.pinned" class="pinned-badge"><Pin :size="10" /> 置顶</span>
-                <span class="comment-name">{{ c.nickname }}</span>
-                <span
-                  v-if="c.titleName"
-                  :class="['title-badge', 'title-' + (c.titleStyle || 'default')]"
-                  >{{ c.titleName }}</span
-                >
-                <span v-if="c.role === 'ADMIN'" class="comment-badge">博主</span>
-                <span class="comment-time">{{ formatRelativeTime(c.createTime) }}</span>
-              </div>
-              <p class="comment-text" v-html="renderCommentMarkdown(c.content)"></p>
-            </div>
-            <div v-if="user?.role === 'ADMIN'" class="comment-actions" @click.stop>
-              <button
-                class="menu-btn"
-                :aria-label="openMenuId === c.id ? '关闭菜单' : '评论操作'"
-                @click="toggleMenu(c.id)"
-              >
-                <MoreHorizontal :size="16" />
-              </button>
-              <Transition name="fade">
-                <div v-if="openMenuId === c.id" class="action-menu glass-card">
-                  <button @click="handleTogglePin(c)">
-                    <PinOff v-if="c.pinned" :size="14" />
-                    <Pin v-else :size="14" />
-                    {{ c.pinned ? '取消置顶' : '置顶' }}
-                  </button>
-                  <button class="danger" @click="handleDeleteComment(c.id)">
-                    <Trash2 :size="14" />
-                    删除
-                  </button>
-                </div>
-              </Transition>
-            </div>
-          </div>
-        </div>
-        <div v-else class="comments-empty">还没有评论，留下一点想法吧。</div>
+        <InteractionThread target-type="POST" :target-id="post.id" title="评论" />
       </div>
     </div>
 
@@ -507,13 +259,6 @@ onBeforeUnmount(() => {
       </Transition>
     </Teleport>
 
-    <ConfirmDialog
-      v-model="confirmDialog.open"
-      :title="confirmDialog.title"
-      :message="confirmDialog.message"
-      :confirm-text="confirmDialog.confirmText"
-      @confirm="handleConfirmAction"
-    />
   </div>
 </template>
 

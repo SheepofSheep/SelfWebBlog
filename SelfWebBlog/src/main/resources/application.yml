@@ -65,6 +65,13 @@ app:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5174,http://127.0.0.1:5174}
 
+interaction:
+  security:
+    ip-encryption-key: ${IP_ENCRYPTION_KEY:}
+    ip-hash-secret: ${IP_HASH_SECRET:}
+  region:
+    xdb-path: ${IP_REGION_XDB_PATH:${blog.data-dir}/ip-data/ip2region_v4.xdb}
+
 server:
   port: 8080
 
@@ -84,6 +91,11 @@ spring:
       maximum-pool-size: 2
       connection-timeout: 30000
       idle-timeout: 600000
+
+interaction:
+  security:
+    ip-encryption-key: ${IP_ENCRYPTION_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+    ip-hash-secret: ${IP_HASH_SECRET:selfwebblog-dev-hash-secret-change-me}
 
 mybatis-plus:
   type-aliases-package: org.example.selfwebblog.entity

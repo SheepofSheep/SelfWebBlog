@@ -123,6 +123,10 @@ public class CommentController {
         comment.setRole(user.getRole());
         comment.setTitleName(user.getTitleName());
         comment.setTitleStyle(user.getTitleStyle());
+        comment.setTargetType("POST");
+        comment.setTargetId(comment.getPostId());
+        comment.setStatus("PUBLISHED");
+        comment.setLikeCount(0);
         commentService.save(comment);
         log.info("评论成功：{}", user.getUsername());
         return Result.success("评论成功");

@@ -19,6 +19,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         Page<Comment> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Comment> queryWrapper = new LambdaQueryWrapper<Comment>()
                 .eq(Comment::getPostId, postId)
+                .eq(Comment::getStatus, "PUBLISHED")
                 .orderByDesc(Comment::getPinned)
                 .orderByDesc(Comment::getCreateTime);
         return baseMapper.selectPage(page, queryWrapper);

@@ -34,6 +34,8 @@ public class Post {
     private String tags;
 
     private String status; // DRAFT / PUBLISHED
+    private Integer likeCount;
+    private Integer viewCount;
 
     private String imageUrl;
 

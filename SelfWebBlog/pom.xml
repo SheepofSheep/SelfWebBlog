@@ -111,6 +111,13 @@
 			<version>33.3.1-jre</version>
 		</dependency>
 
+		<!-- Offline IP region lookup -->
+		<dependency>
+			<groupId>org.lionsoul</groupId>
+			<artifactId>ip2region</artifactId>
+			<version>3.3.7</version>
+		</dependency>
+
 		<!-- Spring Boot Actuator (health checks) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
