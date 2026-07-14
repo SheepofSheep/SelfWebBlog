@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { toAbsoluteUrl } from '../../../utils/url'
+import { optimizedImageUrl, toAbsoluteUrl } from '../../../utils/url'
 
 const props = defineProps({ profile: { type: Object, required: true } })
 const avatar = computed(() => toAbsoluteUrl(props.profile.avatarUrl || ''))
@@ -9,7 +9,11 @@ const avatar = computed(() => toAbsoluteUrl(props.profile.avatarUrl || ''))
 <template>
   <section class="about-profile">
     <span class="profile-avatar">
-      <img v-if="avatar" :src="avatar" :alt="profile.nickname || 'Gabriel'" />
+      <img
+        v-if="avatar"
+        :src="optimizedImageUrl(avatar, 160)"
+        :alt="profile.nickname || 'Gabriel'"
+      />
       <span v-else>G</span>
     </span>
     <div>

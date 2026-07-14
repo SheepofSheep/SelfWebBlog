@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.mapper.UserMapper;
+import org.example.selfwebblog.interaction.security.VisitorIdentityService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,11 @@ import org.springframework.stereotype.Service;
 public class UserService extends ServiceImpl<UserMapper, User> {
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final VisitorIdentityService visitorIdentityService;
+
+    public UserService(VisitorIdentityService visitorIdentityService) {
+        this.visitorIdentityService = visitorIdentityService;
+    }
 
     public User register(String username, String password, String email, String avatarUrl, String ipAddress) {
         if (getByUsername(username) != null) {
@@ -23,7 +29,8 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         user.setAvatarUrl(avatarUrl != null ? avatarUrl : "");
         user.setRole("USER");
         user.setTokenVersion(0);
-        user.setIpAddress(ipAddress);
+        user.setIpAddress("");
+        user.setRegistrationIpHash(hashIp(ipAddress));
         save(user);
         return user;
     }
@@ -59,8 +66,13 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         user.setEmail(email);
         user.setRole("USER");
         user.setTokenVersion(0);
-        user.setIpAddress(ipAddress);
+        user.setIpAddress("");
+        user.setRegistrationIpHash(hashIp(ipAddress));
         save(user);
         return user;
+    }
+
+    private String hashIp(String ipAddress) {
+        return ipAddress == null || ipAddress.isBlank() ? "" : visitorIdentityService.hash(ipAddress.trim());
     }
 }

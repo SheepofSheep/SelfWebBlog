@@ -68,7 +68,12 @@ function saveImage() {
 async function systemShare() {
   if (!card.value || !canSystemShare.value) return
   const file = new File([card.value.blob], `gabriel-${props.post.id}.png`, { type: 'image/png' })
-  await navigator.share({ title: props.post.title, text: props.post.summary || '', url: props.url, files: [file] })
+  await navigator.share({
+    title: props.post.title,
+    text: props.post.summary || '',
+    url: props.url,
+    files: [file]
+  })
 }
 
 watch(() => [props.open, props.post?.id, orientation.value], generate)
@@ -88,10 +93,16 @@ onBeforeUnmount(clearPreview)
       <img v-else-if="imageUrl" :src="imageUrl" alt="文章分享卡片预览" />
     </div>
     <div class="share-actions">
-      <button type="button" :disabled="!card" @click="copyImage"><Clipboard :size="16" />复制图片</button>
-      <button type="button" :disabled="!card" @click="saveImage"><Download :size="16" />保存 PNG</button>
+      <button type="button" :disabled="!card" @click="copyImage">
+        <Clipboard :size="16" />复制图片
+      </button>
+      <button type="button" :disabled="!card" @click="saveImage">
+        <Download :size="16" />保存 PNG
+      </button>
       <button type="button" @click="copyLink"><Link :size="16" />复制链接</button>
-      <button v-if="canSystemShare" type="button" :disabled="!card" @click="systemShare"><Share2 :size="16" />系统分享</button>
+      <button v-if="canSystemShare" type="button" :disabled="!card" @click="systemShare">
+        <Share2 :size="16" />系统分享
+      </button>
     </div>
   </AppDialog>
 </template>

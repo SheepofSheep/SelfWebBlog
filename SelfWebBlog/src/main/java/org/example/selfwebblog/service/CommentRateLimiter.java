@@ -30,7 +30,12 @@ public class CommentRateLimiter {
     }
 
     public boolean tryAcquire(Long userId, String ipAddress) {
-        String key = userId != null ? "user:" + userId : "ip:" + normalizeIp(ipAddress);
+        return tryAcquire("comment", userId, ipAddress);
+    }
+
+    public boolean tryAcquire(String action, Long userId, String ipAddress) {
+        String identity = userId != null ? "user:" + userId : "ip:" + normalizeIp(ipAddress);
+        String key = action + ":" + identity;
         try {
             AtomicInteger counter = attempts.get(key, AtomicInteger::new);
             return counter.incrementAndGet() <= maxComments;

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getCurrentUser, getProfile, logout as logoutRequest } from '../api'
+import { getProfile, getSession, logout as logoutRequest } from '../api'
 
 const user = ref(null)
 
@@ -27,14 +27,12 @@ function clearUserState() {
 }
 
 async function loadUserInfo() {
-  const token = localStorage.getItem('token')
-  if (!token) {
-    user.value = null
-    return null
-  }
-
   try {
-    const userInfo = await getCurrentUser()
+    const userInfo = await getSession()
+    if (!userInfo) {
+      clearUserState()
+      return null
+    }
     if (userInfo?.role === 'ADMIN') {
       try {
         const profile = await getProfile()

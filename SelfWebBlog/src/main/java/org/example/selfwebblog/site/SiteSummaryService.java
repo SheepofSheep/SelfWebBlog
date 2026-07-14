@@ -21,21 +21,25 @@ public class SiteSummaryService {
                   (SELECT COUNT(*) FROM post WHERE status = 'PUBLISHED') AS post_count,
                   (SELECT COUNT(*) FROM comment WHERE status = 'PUBLISHED') AS interaction_count,
                   (SELECT COALESCE(SUM(view_count), 0) FROM post WHERE status = 'PUBLISHED') AS view_count,
-                  (SELECT MIN(create_time) FROM post WHERE status = 'PUBLISHED') AS started_at,
+                  (SELECT site_start_date FROM blog_info WHERE id = 1) AS started_at,
+                  (SELECT current_status FROM blog_info WHERE id = 1) AS current_status,
+                  (SELECT status_updated_time FROM blog_info WHERE id = 1) AS status_updated_time,
                   MAX(
                     COALESCE((SELECT MAX(COALESCE(update_time, create_time)) FROM post WHERE status = 'PUBLISHED'), ''),
                     COALESCE((SELECT MAX(create_time) FROM comment WHERE status = 'PUBLISHED'), '')
                   ) AS latest_activity
                 """, (result, row) -> {
-            LocalDateTime startedAt = parse(result.getString("started_at"));
+            LocalDate startedAt = parseDate(result.getString("started_at"));
             LocalDateTime latestActivity = parse(result.getString("latest_activity"));
             return new SiteSummary(
-                    runningDays(startedAt == null ? null : startedAt.toLocalDate(), LocalDate.now()),
+                    runningDays(startedAt, LocalDate.now()),
                     result.getLong("post_count"),
                     result.getLong("interaction_count"),
                     result.getLong("view_count"),
                     startedAt,
-                    latestActivity);
+                    latestActivity,
+                    result.getString("current_status"),
+                    parse(result.getString("status_updated_time")));
         });
     }
 
@@ -49,12 +53,19 @@ public class SiteSummaryService {
         return LocalDateTime.parse(value.replace(' ', 'T'));
     }
 
+    private static LocalDate parseDate(String value) {
+        if (value == null || value.isBlank()) return null;
+        return LocalDate.parse(value.substring(0, 10));
+    }
+
     public record SiteSummary(
             long runningDays,
             long postCount,
             long interactionCount,
             long viewCount,
-            LocalDateTime startedAt,
-            LocalDateTime latestActivity) {
+            LocalDate startedAt,
+            LocalDateTime latestActivity,
+            String currentStatus,
+            LocalDateTime statusUpdatedTime) {
     }
 }

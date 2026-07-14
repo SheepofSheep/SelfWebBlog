@@ -1,5 +1,5 @@
 <script setup>
-import { Activity, BookOpen, CalendarDays } from 'lucide-vue-next'
+import { Activity, BookOpen, CalendarDays, Eye, MessageSquareText } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { getSiteSummary } from '../../../api'
 import { formatTime } from '../../../utils/format'
@@ -40,23 +40,25 @@ onMounted(async () => {
 <template>
   <section class="site-stats">
     <h2>站点概况</h2>
-    <dl>
+    <div class="stat-list">
       <div>
-        <BookOpen :size="16" />
-        <dt>公开文章</dt>
-        <dd>{{ summary?.postCount ?? totalPosts }}</dd>
+        <BookOpen :size="16" /><span>公开文章</span
+        ><strong>{{ summary?.postCount ?? totalPosts }}</strong>
       </div>
       <div>
-        <CalendarDays :size="16" />
-        <dt>记录天数</dt>
-        <dd>{{ runningDays }}</dd>
+        <Eye :size="16" /><span>累计浏览</span><strong>{{ summary?.viewCount ?? 0 }}</strong>
       </div>
       <div>
-        <Activity :size="16" />
-        <dt>最近活动</dt>
-        <dd>{{ activityLabel }}</dd>
+        <MessageSquareText :size="16" /><span>公开互动</span
+        ><strong>{{ summary?.interactionCount ?? 0 }}</strong>
       </div>
-    </dl>
+      <div>
+        <CalendarDays :size="16" /><span>记录天数</span><strong>{{ runningDays }}</strong>
+      </div>
+      <div>
+        <Activity :size="16" /><span>最近活动</span><strong>{{ activityLabel }}</strong>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -68,11 +70,11 @@ h2 {
   margin: 0 0 10px;
   font-size: 0.82rem;
 }
-dl {
+.stat-list {
   margin: 0;
   border-top: 1px solid var(--border-subtle);
 }
-dl div {
+.stat-list > div {
   min-height: 48px;
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) auto;
@@ -81,12 +83,12 @@ dl div {
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
 }
-dt,
-dd {
+.stat-list span,
+.stat-list strong {
   margin: 0;
   font-size: 0.74rem;
 }
-dd {
+.stat-list strong {
   color: var(--text-primary);
   font-weight: 700;
   text-align: right;

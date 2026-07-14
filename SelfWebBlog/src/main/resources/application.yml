@@ -38,6 +38,8 @@ upload:
 
 # 登录配置（生产环境务必通过环境变量覆盖）
 auth:
+  cookie:
+    secure: ${AUTH_COOKIE_SECURE:false}
   admin:
     username: ${BLOG_ADMIN_USERNAME:admin}
     password: ${BLOG_ADMIN_PASSWORD:admin123}
@@ -63,7 +65,11 @@ github:
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5174}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5174,http://127.0.0.1:5174}
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5174,http://127.0.0.1:5174,http://localhost:4174,http://127.0.0.1:4174}
+
+security:
+  # Only these direct peers may supply X-Real-IP/X-Forwarded-For.
+  trusted-proxies: ${TRUSTED_PROXIES:127.0.0.1,::1}
 
 interaction:
   security:
@@ -74,6 +80,7 @@ interaction:
 
 server:
   port: 8080
+  forward-headers-strategy: none
 
 ---
 # dev 环境配置
@@ -124,6 +131,10 @@ spring:
       maximum-pool-size: 2
       connection-timeout: 30000
       idle-timeout: 600000
+
+auth:
+  cookie:
+    secure: ${AUTH_COOKIE_SECURE:true}
 
 mybatis-plus:
   type-aliases-package: org.example.selfwebblog.entity

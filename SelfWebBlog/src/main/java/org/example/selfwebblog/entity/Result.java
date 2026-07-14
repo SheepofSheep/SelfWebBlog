@@ -15,6 +15,8 @@ public class Result<T> {
     private Integer code; // 业务码：与 HTTP 状态保持一致
     private String msg;   // 给用户看的提示词
     private T data;       // 真正给前端的数据（比如博客列表）
+    private String traceId;
+    private Long retryAfterSeconds;
 
     // 快捷返回成功的方法（带数据）
     public static <T> Result<T> success(T data) {
@@ -56,7 +58,13 @@ public class Result<T> {
     }
 
     public static <T> Result<T> rateLimited(String msg) {
-        return of(RATE_LIMITED, msg, null);
+        return rateLimited(msg, 60);
+    }
+
+    public static <T> Result<T> rateLimited(String msg, long retryAfterSeconds) {
+        Result<T> result = of(RATE_LIMITED, msg, null);
+        result.retryAfterSeconds = Math.max(1, retryAfterSeconds);
+        return result;
     }
 
     public static <T> Result<T> serverError(String msg) {

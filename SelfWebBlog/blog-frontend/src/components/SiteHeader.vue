@@ -1,20 +1,25 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Archive,
   BookOpen,
+  ChevronDown,
+  FileText,
   LogIn,
   LogOut,
   Menu,
   MessageSquareText,
+  Search,
   Settings,
+  Tags,
   User,
   X
 } from 'lucide-vue-next'
 import AppearanceControl from './AppearanceControl.vue'
+import SiteSearchDialog from './SiteSearchDialog.vue'
 import IconButton from './ui/IconButton.vue'
-import { toAbsoluteUrl } from '../utils/url'
+import { optimizedImageUrl, toAbsoluteUrl } from '../utils/url'
 
 const props = defineProps({
   path: { type: String, required: true },
@@ -24,6 +29,9 @@ const props = defineProps({
 const emit = defineEmits(['logout'])
 const router = useRouter()
 const mobileOpen = ref(false)
+const accountOpen = ref(false)
+const searchOpen = ref(false)
+const accountRoot = ref(null)
 
 const brandName = computed(() => props.siteInfo?.nickname || 'Gabriel')
 const brandAvatar = computed(() =>
@@ -33,23 +41,30 @@ const navItems = computed(() => {
   const items = [
     { path: '/', label: '首页', icon: BookOpen },
     { path: '/archive', label: '归档', icon: Archive },
+    { path: '/tags', label: '标签', icon: Tags },
     { path: '/guestbook', label: '留言', icon: MessageSquareText },
     { path: '/about', label: '关于', icon: User }
   ]
-  if (props.user?.role === 'ADMIN') {
-    items.push({ path: '/admin', label: '工作台', icon: Settings })
-  } else if (props.user) {
-    items.push({ path: '/me', label: '我的', icon: User })
-  } else {
-    items.push({ path: '/login', label: '登录', icon: LogIn })
-  }
   return items
 })
 
 function go(path) {
   mobileOpen.value = false
+  accountOpen.value = false
   router.push(path)
 }
+
+function closeOutside(event) {
+  if (!accountRoot.value?.contains(event.target)) accountOpen.value = false
+}
+
+function logout() {
+  accountOpen.value = false
+  emit('logout')
+}
+
+document.addEventListener('pointerdown', closeOutside)
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
 </script>
 
 <template>
@@ -57,7 +72,7 @@ function go(path) {
     <div class="header-inner page-width">
       <button class="site-brand" type="button" @click="go('/')">
         <span class="brand-avatar">
-          <img v-if="brandAvatar" :src="brandAvatar" :alt="brandName" />
+          <img v-if="brandAvatar" :src="optimizedImageUrl(brandAvatar, 160)" :alt="brandName" />
           <span v-else>G</span>
         </span>
         <span class="brand-text">
@@ -80,10 +95,59 @@ function go(path) {
       </nav>
 
       <div class="header-actions">
+        <IconButton label="搜索文章" @click="searchOpen = true"><Search :size="18" /></IconButton>
         <AppearanceControl />
-        <IconButton v-if="user" label="退出登录" @click="emit('logout')">
-          <LogOut :size="17" />
-        </IconButton>
+        <div ref="accountRoot" class="account-control">
+          <IconButton
+            :label="user ? '账号菜单' : '登录'"
+            :active="accountOpen"
+            :aria-expanded="accountOpen"
+            @click="accountOpen = !accountOpen"
+          >
+            <User v-if="user" :size="18" />
+            <LogIn v-else :size="18" />
+            <ChevronDown v-if="user" class="account-chevron" :size="11" />
+          </IconButton>
+          <Transition name="account-menu">
+            <div v-if="accountOpen" class="account-menu" role="menu">
+              <div v-if="user" class="account-summary">
+                <strong>{{ user.nickname || user.username }}</strong>
+                <span>{{ user.role === 'ADMIN' ? '博主管理员' : '已登录访客' }}</span>
+              </div>
+              <button
+                v-if="user?.role === 'ADMIN'"
+                type="button"
+                role="menuitem"
+                @click="go('/write')"
+              >
+                <FileText :size="16" />写文章
+              </button>
+              <button
+                v-if="user?.role === 'ADMIN'"
+                type="button"
+                role="menuitem"
+                @click="go('/admin')"
+              >
+                <Settings :size="16" />工作台
+              </button>
+              <button v-else-if="user" type="button" role="menuitem" @click="go('/me')">
+                <User :size="16" />我的资料
+              </button>
+              <button
+                v-if="user"
+                class="account-logout"
+                type="button"
+                role="menuitem"
+                @click="logout"
+              >
+                <LogOut :size="16" />退出登录
+              </button>
+              <button v-else type="button" role="menuitem" @click="go('/login')">
+                <LogIn :size="16" />登录或注册
+              </button>
+            </div>
+          </Transition>
+        </div>
         <IconButton
           class="menu-toggle"
           :label="mobileOpen ? '关闭菜单' : '打开菜单'"
@@ -110,6 +174,7 @@ function go(path) {
         </button>
       </nav>
     </Transition>
+    <SiteSearchDialog :open="searchOpen" @close="searchOpen = false" />
   </header>
 </template>
 
@@ -120,7 +185,7 @@ function go(path) {
   z-index: 220;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-glass);
-  backdrop-filter: blur(18px) saturate(1.05);
+  backdrop-filter: blur(10px) saturate(1.02);
 }
 .header-inner {
   min-height: 70px;
@@ -213,6 +278,81 @@ function go(path) {
   align-items: center;
   gap: 2px;
 }
+.account-control {
+  position: relative;
+}
+.account-control :deep(.icon-button) {
+  position: relative;
+}
+.account-chevron {
+  position: absolute;
+  right: 3px;
+  bottom: 5px;
+}
+.account-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 270;
+  width: 190px;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-float);
+}
+.account-summary {
+  display: grid;
+  gap: 2px;
+  padding: 8px 9px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+.account-summary strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-summary span {
+  color: var(--text-tertiary);
+  font-size: 0.65rem;
+}
+.account-menu button {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.account-menu button:hover {
+  background: var(--surface-soft);
+  color: var(--text-primary);
+}
+.account-menu .account-logout {
+  color: var(--danger-color);
+}
+.account-menu-enter-active,
+.account-menu-leave-active {
+  transition:
+    opacity var(--motion-fast-duration),
+    transform var(--motion-fast-duration) var(--motion-ease);
+}
+.account-menu-enter-from,
+.account-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-5px);
+}
 .menu-toggle {
   display: none;
 }
@@ -257,6 +397,24 @@ function go(path) {
   }
   .menu-toggle {
     display: inline-grid;
+  }
+}
+@media (max-width: 480px) {
+  .header-inner {
+    gap: 8px;
+  }
+  .brand-avatar {
+    width: 36px;
+    height: 36px;
+  }
+  .brand-text small {
+    display: none;
+  }
+  .account-menu {
+    position: fixed;
+    top: 58px;
+    right: 10px;
+    width: min(220px, calc(100vw - 20px));
   }
 }
 </style>

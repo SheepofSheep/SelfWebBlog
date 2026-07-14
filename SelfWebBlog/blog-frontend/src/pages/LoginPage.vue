@@ -15,6 +15,7 @@ const loading = ref(false)
 const route = useRoute()
 const router = useRouter()
 const { saveUser } = useAuthStore()
+const registerForm = ref(null)
 const modes = [
   { value: 'login', label: '登录' },
   { value: 'register', label: '注册' }
@@ -24,7 +25,6 @@ const imageSrc = computed(() =>
 )
 
 function saveAuth(data) {
-  localStorage.setItem('token', data.token)
   saveUser(data.user)
 }
 
@@ -65,6 +65,7 @@ async function handleRegister(payload) {
     await goAfterLogin()
   } catch (error) {
     showToast(error?.message || '注册没有成功，请稍后重试。', 'error')
+    registerForm.value?.refreshCaptcha()
   } finally {
     loading.value = false
   }
@@ -99,7 +100,13 @@ async function handleGithubLogin() {
   <AuthShell v-model:mode="mode" :modes="modes" :image-src="imageSrc" @home="router.push('/')">
     <Transition name="form-switch" mode="out-in">
       <LoginForm v-if="mode === 'login'" key="login" :loading="loading" @submit="handleLogin" />
-      <RegisterForm v-else key="register" :loading="loading" @submit="handleRegister" />
+      <RegisterForm
+        v-else
+        ref="registerForm"
+        key="register"
+        :loading="loading"
+        @submit="handleRegister"
+      />
     </Transition>
 
     <template #footer>

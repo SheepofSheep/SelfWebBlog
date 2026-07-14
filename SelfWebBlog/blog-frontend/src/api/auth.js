@@ -35,7 +35,17 @@ export async function getCurrentUser() {
   return unwrap(res.data)
 }
 
+export async function getSession() {
+  const res = await api.get('/auth/session')
+  return unwrap(res.data)
+}
+
 export async function logout() {
   const res = await api.post('/auth/logout')
+  return unwrap(res.data)
+}
+
+export async function getAuthCaptcha() {
+  const res = await api.get('/captcha', { params: { purpose: 'register' } })
   return unwrap(res.data)
 }

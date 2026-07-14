@@ -110,4 +110,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
   opacity: 0;
   transform: translateY(-6px) scale(0.98);
 }
+@media (max-width: 560px) {
+  .appearance-menu {
+    position: fixed;
+    top: 58px;
+    right: 10px;
+    width: min(310px, calc(100vw - 20px));
+  }
+}
 </style>

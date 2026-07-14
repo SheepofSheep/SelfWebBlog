@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { ArrowUpRight, Clock, Folder } from 'lucide-vue-next'
 import { formatTime, getFirstImageUrl } from '../../utils/format'
-import { toAbsoluteUrl } from '../../utils/url'
+import { optimizedImageUrl, toAbsoluteUrl } from '../../utils/url'
 
 const props = defineProps({ posts: { type: Array, default: () => [] } })
 defineEmits(['open'])
@@ -58,7 +58,7 @@ function imageUrl(post) {
             <span><Clock :size="13" /> {{ formatTime(post.createTime).slice(-5) }}</span>
           </span>
           <span v-if="imageUrl(post)" class="timeline-thumb">
-            <img :src="imageUrl(post)" :alt="post.title" loading="lazy" />
+            <img :src="optimizedImageUrl(imageUrl(post), 480)" :alt="post.title" loading="lazy" />
           </span>
           <ArrowUpRight class="timeline-arrow" :size="18" />
         </button>

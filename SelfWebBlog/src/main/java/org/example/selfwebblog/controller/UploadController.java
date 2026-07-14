@@ -1,5 +1,6 @@
 package org.example.selfwebblog.controller;
 
+import org.example.selfwebblog.admin.security.AdminOnly;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.BlogInfoService;
@@ -46,10 +47,8 @@ public class UploadController {
     }
 
     @PostMapping("/image")
+    @AdminOnly(action = "ASSET_UPLOAD")
     public Result<ImageAssetResponse> uploadImage(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) {
-            return Result.forbidden("无权限操作");
-        }
         try {
             return Result.success(imageAssetService.storeArticleImage(file, AuthHelper.getUserId(request)));
         } catch (IllegalArgumentException e) {
@@ -61,16 +60,14 @@ public class UploadController {
     }
 
     @GetMapping("/assets")
+    @AdminOnly
     public Result<List<ImageAssetResponse>> listAssets(HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         return Result.success(imageAssetService.listArticleAssets(AuthHelper.getUserId(request)));
     }
 
     @PostMapping("/avatar")
+    @AdminOnly(action = "AVATAR_UPLOAD")
     public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) {
-            return Result.forbidden("无权限操作");
-        }
         Result<String> result = uploadFile(file, UploadTarget.AVATAR);
         if (result.getCode() == 200) {
             String avatarUrl = result.getData();

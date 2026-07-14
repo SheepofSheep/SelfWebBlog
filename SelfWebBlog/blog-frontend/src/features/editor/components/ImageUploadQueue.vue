@@ -13,10 +13,20 @@ defineEmits(['retry', 'dismiss'])
       <CircleAlert v-else-if="task.status === 'failed'" :size="15" />
       <span>{{ task.file?.name || '图片' }}</span>
       <small v-if="task.status === 'uploading'">{{ task.progress }}%</small>
-      <button v-if="task.status === 'failed'" type="button" title="重试" @click="$emit('retry', task.id)">
+      <button
+        v-if="task.status === 'failed'"
+        type="button"
+        title="重试"
+        @click="$emit('retry', task.id)"
+      >
         <RotateCcw :size="14" />
       </button>
-      <button v-else-if="task.status === 'completed'" type="button" title="关闭" @click="$emit('dismiss', task.id)">
+      <button
+        v-else-if="task.status === 'completed'"
+        type="button"
+        title="关闭"
+        @click="$emit('dismiss', task.id)"
+      >
         <X :size="14" />
       </button>
     </div>

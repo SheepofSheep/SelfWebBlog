@@ -8,6 +8,8 @@ import org.example.selfwebblog.service.CommentRateLimiter;
 import org.example.selfwebblog.service.CommentService;
 import org.example.selfwebblog.service.PostService;
 import org.example.selfwebblog.service.UserService;
+import org.example.selfwebblog.interaction.InteractionService;
+import org.example.selfwebblog.security.ClientIpResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,10 +48,17 @@ class CommentControllerTest {
     @Mock
     private CommentRateLimiter commentRateLimiter;
 
+    @Mock
+    private InteractionService interactionService;
+
+    @Mock
+    private ClientIpResolver clientIpResolver;
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CommentController(commentService, userService, blogInfoService, postService, commentRateLimiter))
+                .standaloneSetup(new CommentController(commentService, userService, blogInfoService, postService,
+                        commentRateLimiter, interactionService, clientIpResolver))
                 .setControllerAdvice(new ResultHttpStatusAdvice())
                 .build();
     }
@@ -121,6 +131,7 @@ class CommentControllerTest {
         post.setContent("visible");
         post.setStatus("PUBLISHED");
         when(postService.getById(99L)).thenReturn(post);
+        when(clientIpResolver.resolve(any())).thenReturn("127.0.0.1");
         when(commentRateLimiter.tryAcquire(10L, "127.0.0.1")).thenReturn(false);
 
         mockMvc.perform(post("/comments")
@@ -139,6 +150,32 @@ class CommentControllerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(429));
 
+        verify(commentService, never()).save(any());
+    }
+
+    @Test
+    void legacyWriteDelegatesToTheInteractionCore() throws Exception {
+        User user = new User();
+        user.setId(10L);
+        user.setUsername("reader");
+        user.setRole("USER");
+        when(userService.getById(10L)).thenReturn(user);
+        Post post = new Post();
+        post.setId(99L);
+        post.setStatus("PUBLISHED");
+        when(postService.getById(99L)).thenReturn(post);
+        when(clientIpResolver.resolve(any())).thenReturn("198.51.100.8");
+        when(commentRateLimiter.tryAcquire(10L, "198.51.100.8")).thenReturn(true);
+
+        mockMvc.perform(post("/api/comments")
+                        .requestAttr("userId", 10L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"postId":99,"content":"hello"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(interactionService).create(any(), eq(user), eq("198.51.100.8"), eq(false));
         verify(commentService, never()).save(any());
     }
 }

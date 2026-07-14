@@ -1,6 +1,6 @@
 <script setup>
 import { ref, inject, onMounted, computed } from 'vue'
-import { updateUserProfile, uploadUserAvatar } from '../utils/api'
+import { updateUserProfile, uploadUserAvatar } from '../api'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
 import { Camera } from 'lucide-vue-next'
@@ -67,7 +67,7 @@ async function onPickAvatar(e) {
 </script>
 
 <template>
-  <main class="vp-main">
+  <div class="vp-main">
     <div class="vp-card glass-card">
       <h2 class="vp-title">我的小名片</h2>
 
@@ -122,7 +122,7 @@ async function onPickAvatar(e) {
         </div>
       </div>
     </div>
-  </main>
+  </div>
 </template>
 
 <style scoped>

@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 @Data
 @TableName("blog_info")
 public class BlogInfo {
@@ -21,4 +24,14 @@ public class BlogInfo {
     private String bio;
 
     private String bgUrl;
+
+    private LocalDate siteStartDate;
+
+    private String currentStatus;
+
+    private LocalDateTime statusUpdatedTime;
+
+    private String aboutMarkdown;
+
+    private String socialLinks;
 }

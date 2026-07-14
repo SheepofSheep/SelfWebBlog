@@ -5,8 +5,12 @@ export const AUTH_EXPIRED_EVENT = 'auth:expired'
 export const api = axios.create({
   baseURL: '/api',
   timeout: 15000,
-  withCredentials: true
+  withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN'
 })
+
+let csrfRequest = null
 
 export function clearAuthState({ emit = true } = {}) {
   localStorage.removeItem('token')
@@ -17,18 +21,39 @@ export function clearAuthState({ emit = true } = {}) {
 }
 
 export function isAuthFailure(payload, status) {
-  if (status === 401 || status === 403) return true
+  if (status === 401) return true
   if (!payload || typeof payload !== 'object') return false
-  if (payload.code === 401 || payload.code === 403) return true
+  if (payload.code === 401) return true
   const msg = String(payload.msg || '')
-  return /未登录|请先登录|无权限|登录已过期|token/i.test(msg)
+  return /未登录|请先登录|登录已过期|登录凭证|token.*(?:过期|失效|无效)/i.test(msg)
 }
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers = config.headers || {}
-    config.headers.Authorization = `Bearer ${token}`
+function hasCsrfCookie() {
+  return Boolean(readCsrfCookie())
+}
+
+function readCsrfCookie() {
+  if (typeof document === 'undefined') return ''
+  const item = document.cookie.split('; ').find((entry) => entry.startsWith('XSRF-TOKEN='))
+  if (!item) return ''
+  return decodeURIComponent(item.slice('XSRF-TOKEN='.length))
+}
+
+async function ensureCsrfCookie() {
+  if (hasCsrfCookie()) return
+  if (!csrfRequest) {
+    csrfRequest = axios.get('/api/auth/csrf', { withCredentials: true }).finally(() => {
+      csrfRequest = null
+    })
+  }
+  await csrfRequest
+}
+
+api.interceptors.request.use(async (config) => {
+  const method = String(config.method || 'get').toLowerCase()
+  if (!['get', 'head', 'options'].includes(method)) {
+    await ensureCsrfCookie()
+    config.headers.set('X-XSRF-TOKEN', readCsrfCookie())
   }
   return config
 })
@@ -54,6 +79,10 @@ function toApiError(error) {
     const apiError = new Error(payload.msg || error.message || '请求失败')
     apiError.code = payload.code
     apiError.status = error.response?.status
+    apiError.traceId = payload.traceId || error.response?.headers?.['x-request-id']
+    apiError.retryAfterSeconds = Number(
+      payload.retryAfterSeconds || error.response?.headers?.['retry-after'] || 0
+    )
     apiError.authRequired = isAuthFailure(payload, error.response?.status)
     return apiError
   }

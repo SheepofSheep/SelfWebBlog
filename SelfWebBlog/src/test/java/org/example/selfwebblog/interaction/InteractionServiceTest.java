@@ -1,6 +1,7 @@
 package org.example.selfwebblog.interaction;
 
 import org.example.selfwebblog.interaction.model.Interaction;
+import org.example.selfwebblog.entity.User;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +34,13 @@ class InteractionServiceTest {
         assertTrue(InteractionPolicy.canTransition("PUBLISHED", "HIDDEN"));
         assertFalse(InteractionPolicy.canTransition("PUBLISHED", "PENDING"));
         assertFalse(InteractionPolicy.canTransition("SPAM", "PUBLISHED"));
+    }
+
+    @Test
+    void anonymousVisitorsCannotReply() {
+        assertThrows(IllegalArgumentException.class,
+                () -> InteractionService.requireAuthenticatedReply(null, 10L));
+        InteractionService.requireAuthenticatedReply(new User(), 10L);
     }
 
     private Interaction interaction(Long id, Long rootId, String targetType, Long targetId) {

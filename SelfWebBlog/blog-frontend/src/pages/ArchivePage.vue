@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, SearchX } from 'lucide-vue-next'
 import { listCategories, listTags, searchPosts } from '../api'
+import { createRequestCoordinator } from '../utils/requestCoordinator'
 import ArticleFilterBar from '../components/articles/ArticleFilterBar.vue'
 import ArchiveTimeline from '../components/articles/ArchiveTimeline.vue'
 
@@ -21,6 +22,9 @@ const tag = ref('')
 const sort = ref('date')
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 let debounceTimer
+const requests = createRequestCoordinator()
+let searchVersion = 0
+let syncingRoute = false
 
 function initializeFromQuery() {
   keyword.value = String(route.query.keyword || '')
@@ -40,30 +44,39 @@ function archiveUrl() {
   return params.size ? `/archive?${params}` : '/archive'
 }
 
-async function loadPosts({ resetPage = false } = {}) {
+async function loadPosts({ resetPage = false, syncRoute = true } = {}) {
   if (resetPage) currentPage.value = 1
+  const version = ++searchVersion
   loading.value = true
   try {
-    const data = await searchPosts({
-      keyword: keyword.value || undefined,
-      category: category.value || undefined,
-      tag: tag.value || undefined,
-      sort: sort.value,
-      page: currentPage.value,
-      size: pageSize
-    })
+    const data = await requests.replace('archive-search', (signal) =>
+      searchPosts({
+        keyword: keyword.value || undefined,
+        category: category.value || undefined,
+        tag: tag.value || undefined,
+        sort: sort.value,
+        page: currentPage.value,
+        size: pageSize,
+        signal
+      })
+    )
     posts.value = data.records || []
     total.value = data.total || 0
     const nextUrl = archiveUrl()
-    if (route.fullPath !== nextUrl) await router.replace(nextUrl)
+    if (syncRoute && route.fullPath !== nextUrl) {
+      syncingRoute = true
+      await router.push(nextUrl)
+    }
+  } catch (error) {
+    if (error?.name !== 'CanceledError' && error?.name !== 'AbortError') throw error
   } finally {
-    loading.value = false
+    if (version === searchVersion) loading.value = false
   }
 }
 
 function scheduleSearch() {
   clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => loadPosts({ resetPage: true }), 220)
+  debounceTimer = setTimeout(() => loadPosts({ resetPage: true }), 250)
 }
 
 function clearFilters() {
@@ -82,7 +95,21 @@ function changePage(nextPage) {
 }
 
 watch([category, tag, sort], scheduleSearch)
-onBeforeUnmount(() => clearTimeout(debounceTimer))
+watch(
+  () => route.fullPath,
+  async () => {
+    if (syncingRoute) {
+      syncingRoute = false
+      return
+    }
+    initializeFromQuery()
+    await loadPosts({ syncRoute: false })
+  }
+)
+onBeforeUnmount(() => {
+  clearTimeout(debounceTimer)
+  requests.cancelAll()
+})
 onMounted(async () => {
   initializeFromQuery()
   await Promise.all([
@@ -98,7 +125,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="archive-page">
+  <div class="archive-page">
     <header class="archive-header">
       <p>所有公开记录</p>
       <div>
@@ -149,7 +176,7 @@ onMounted(async () => {
         下一页 <ArrowRight :size="16" />
       </button>
     </nav>
-  </main>
+  </div>
 </template>
 
 <style scoped>

@@ -1,5 +1,6 @@
 package org.example.selfwebblog.controller;
 
+import org.example.selfwebblog.admin.security.AdminOnly;
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.selfwebblog.content.tag.TagService;
 import org.example.selfwebblog.content.tag.TagSummary;
@@ -37,30 +38,30 @@ public class TagController {
     }
 
     @PostMapping
+    @AdminOnly(action = "TAG_CREATE")
     public Result<Tag> create(@RequestBody NameRequest body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         return Result.success(tagService.create(body.name()));
     }
 
     @PutMapping("/{id}")
+    @AdminOnly(action = "TAG_RENAME")
     public Result<Tag> rename(
             @PathVariable Long id,
             @RequestBody NameRequest body,
             HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         return Result.success(tagService.rename(id, body.name()));
     }
 
     @PostMapping("/merge")
+    @AdminOnly(action = "TAG_MERGE")
     public Result<String> merge(@RequestBody MergeRequest body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         tagService.merge(body.sourceId(), body.targetId());
         return Result.success("合并成功");
     }
 
     @DeleteMapping("/{id}")
+    @AdminOnly(action = "TAG_DELETE")
     public Result<String> delete(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         tagService.deleteUnused(id);
         return Result.success("删除成功");
     }

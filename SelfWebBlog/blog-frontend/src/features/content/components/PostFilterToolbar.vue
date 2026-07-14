@@ -59,7 +59,7 @@ defineEmits(['update:keyword', 'update:category', 'update:tag', 'submit', 'clear
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-glass);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(8px);
 }
 .search-field {
   min-width: 0;

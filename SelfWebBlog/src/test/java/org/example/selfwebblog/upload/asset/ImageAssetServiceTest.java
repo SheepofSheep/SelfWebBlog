@@ -4,6 +4,7 @@ import org.example.selfwebblog.service.upload.UploadStorageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,7 +38,8 @@ class ImageAssetServiceTest {
         UploadStorageService storage = mock(UploadStorageService.class);
         ImageVariantService variants = mock(ImageVariantService.class);
         when(mapper.findReusable(3L, hash, "ARTICLE")).thenReturn(asset);
-        ImageAssetService service = new ImageAssetService(mapper, storage, variants, tempDir.toString());
+        ImageAssetService service = new ImageAssetService(
+                mapper, storage, variants, mock(JdbcTemplate.class), tempDir.toString());
 
         ImageAssetResponse response = service.storeArticleImage(
                 new MockMultipartFile("file", "a.png", "image/png", content), 3L);

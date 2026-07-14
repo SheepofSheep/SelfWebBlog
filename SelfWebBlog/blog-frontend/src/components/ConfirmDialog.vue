@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
+import AppDialog from './ui/AppDialog.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -7,133 +8,109 @@ const props = defineProps({
   message: { type: String, default: '确定要执行此操作吗？' },
   confirmText: { type: String, default: '确定' },
   cancelText: { type: String, default: '取消' },
-  tone: { type: String, default: 'danger' }
+  tone: { type: String, default: 'danger' },
+  requiredText: { type: String, default: '' }
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
-
-const isVisible = ref(props.modelValue)
-
+const typed = ref('')
 watch(
   () => props.modelValue,
-  (newValue) => {
-    isVisible.value = newValue
+  (open) => {
+    if (open) typed.value = ''
   }
 )
-
-function handleConfirm() {
-  emit('confirm')
+function cancel() {
+  emit('cancel')
   emit('update:modelValue', false)
 }
-
-function handleCancel() {
-  emit('cancel')
+function confirm() {
+  if (props.requiredText && typed.value !== props.requiredText) return
+  emit('confirm')
   emit('update:modelValue', false)
 }
 </script>
 
 <template>
-  <div v-if="isVisible" class="confirm-backdrop" @click="handleCancel">
-    <div class="confirm-dialog glass-card" role="dialog" aria-modal="true" @click.stop>
-      <h3 class="confirm-title">{{ title }}</h3>
-      <p class="confirm-message">{{ message }}</p>
-      <div class="confirm-footer">
-        <button class="pill-btn pill-btn-ghost" @click="handleCancel">
-          {{ cancelText }}
-        </button>
-        <button class="pill-btn confirm-ok" :class="'tone-' + tone" @click="handleConfirm">
-          {{ confirmText }}
-        </button>
-      </div>
-    </div>
-  </div>
+  <AppDialog :open="modelValue" :title="title" :description="message" @close="cancel">
+    <p class="confirm-note">请确认这不是误操作。</p>
+    <label v-if="requiredText" class="confirm-proof">
+      <span
+        >输入 <strong>{{ requiredText }}</strong> 继续</span
+      >
+      <input v-model="typed" type="text" autocomplete="off" autofocus />
+    </label>
+    <template #footer>
+      <button class="confirm-button secondary" type="button" @click="cancel">
+        {{ cancelText }}
+      </button>
+      <button
+        :class="['confirm-button', tone]"
+        type="button"
+        :disabled="requiredText && typed !== requiredText"
+        @click="confirm"
+      >
+        {{ confirmText }}
+      </button>
+    </template>
+  </AppDialog>
 </template>
 
 <style scoped>
-.confirm-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(63, 52, 41, 0.2);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  animation: fadeIn 0.3s ease;
+.confirm-note {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
 }
-
-.confirm-dialog {
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
-  animation: scaleIn 0.25s var(--ease-out);
-}
-
-.confirm-title {
-  margin: 0 0 0.75rem;
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.confirm-message {
-  margin: 0 0 1.5rem;
-  font-size: var(--font-size-sm);
+.confirm-proof {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
   color: var(--text-secondary);
-  line-height: var(--line-height);
+  font-size: 0.74rem;
 }
-
-.confirm-footer {
-  display: flex;
-  gap: var(--space-sm);
-  justify-content: flex-end;
+.confirm-proof input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  outline: 0;
 }
-
-.confirm-ok.tone-danger {
-  background: var(--danger);
-  color: var(--on-primary);
+.confirm-proof input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.confirm-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.confirm-button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #2c1d06;
+}
+.confirm-button.danger {
   border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
 }
-
-.confirm-ok.tone-danger:hover {
-  background: #c95f68;
-  transform: translateY(-1px);
+.confirm-button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
-
-.confirm-ok.tone-primary {
-  background: linear-gradient(180deg, #e8ad37, var(--primary));
-  color: var(--on-primary);
-  border-color: var(--primary);
-}
-
-.confirm-ok.tone-primary:hover {
-  background: linear-gradient(180deg, #e4a52c, var(--primary-hover));
-  transform: translateY(-1px);
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@media (max-width: 768px) {
-  .confirm-dialog {
-    padding: 1.5rem;
-    width: 95%;
-  }
+.confirm-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>

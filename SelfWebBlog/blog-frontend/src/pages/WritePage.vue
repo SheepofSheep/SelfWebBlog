@@ -1,8 +1,9 @@
 <script setup>
 import { ArrowLeft, Check, Cloud, LoaderCircle, PanelRight, Save } from 'lucide-vue-next'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { listCategories, listTags, savePost } from '../api'
+import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave } from 'vue-router'
+import { getPost, listCategories, listTags, savePost } from '../api'
 import AppDialog from '../components/ui/AppDialog.vue'
 import IconButton from '../components/ui/IconButton.vue'
 import SegmentedControl from '../components/ui/SegmentedControl.vue'
@@ -25,6 +26,7 @@ import PublishChecklist from '../features/editor/components/PublishChecklist.vue
 import { validatePost } from '../features/editor/model/publishValidation'
 
 const router = useRouter()
+const route = useRoute()
 const refreshHome = inject('refreshHome', async () => {})
 const form = reactive({
   title: '',
@@ -49,6 +51,7 @@ const titleInput = ref(null)
 const tags = ref([])
 const categories = ref([])
 let draftTimer = null
+let leavingAfterSave = false
 
 const modes = [
   { value: 'edit', label: '编辑' },
@@ -107,6 +110,12 @@ function queueLocalSave() {
   }, 500)
 }
 
+function flushLocalSave() {
+  clearTimeout(draftTimer)
+  writeDraft(localStorage, draftKey.value, draftData())
+  localState.value = 'saved'
+}
+
 function restoreDraft() {
   if (pendingDraft.value) applyData(pendingDraft.value)
   pendingDraft.value = null
@@ -152,9 +161,12 @@ async function submit() {
     await savePost({ id: editingId.value, ...form })
     serverState.value = 'saved'
     removeDraft(localStorage, draftKey.value)
+    leavingAfterSave = true
     await refreshHome()
     showToast(form.status === 'DRAFT' ? '草稿已保存。' : '文章已发布。', 'success')
-    await router.push(form.status === 'DRAFT' ? { name: 'admin', query: { tab: 'drafts' } } : '/')
+    await router.push(
+      form.status === 'DRAFT' ? { name: 'admin', query: { section: 'content' } } : '/'
+    )
   } catch (error) {
     serverState.value = 'failed'
     showToast(error.message || '保存失败，请稍后重试。', 'error')
@@ -175,7 +187,22 @@ function handleBeforeUnload(event) {
 
 watch(form, queueLocalSave, { deep: true })
 
-onMounted(() => {
+onBeforeRouteLeave(() => {
+  if (leavingAfterSave) return true
+  const needsConfirmation =
+    localState.value === 'saving' ||
+    serverState.value === 'saving' ||
+    serverState.value === 'failed' ||
+    hasActiveUploads.value
+  flushLocalSave()
+  if (needsConfirmation && !window.confirm('内容已保存到本地草稿。仍要离开编辑器吗？')) {
+    return false
+  }
+  editor.value?.cancelUploads()
+  return true
+})
+
+onMounted(async () => {
   migrateLegacyDraft(localStorage)
   const editing = sessionStorage.getItem('editingPost')
   if (editing) {
@@ -185,6 +212,15 @@ onMounted(() => {
       sessionStorage.removeItem('editingPost')
     }
     sessionStorage.removeItem('editingPost')
+  }
+  if (!editingId.value && route.params.id) {
+    try {
+      applyData(await getPost(route.params.id))
+    } catch (error) {
+      showToast(error.message || '文章没有加载成功。', 'error')
+      await router.replace({ name: 'admin', query: { section: 'content' } })
+      return
+    }
   }
   const savedDraft = readDraft(localStorage, draftKey.value)
   if (savedDraft && hasUsefulDraft(savedDraft)) {
@@ -196,7 +232,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  clearTimeout(draftTimer)
+  if (!leavingAfterSave) flushLocalSave()
+  else clearTimeout(draftTimer)
+  editor.value?.cancelUploads()
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 </script>
@@ -214,7 +252,12 @@ onBeforeUnmount(() => {
         <IconButton label="发布设置" @click="settingsOpen = !settingsOpen">
           <PanelRight :size="18" />
         </IconButton>
-        <button class="save-button" type="button" :disabled="serverState === 'saving'" @click="submit">
+        <button
+          class="save-button"
+          type="button"
+          :disabled="serverState === 'saving'"
+          @click="submit"
+        >
           <LoaderCircle v-if="serverState === 'saving'" :size="16" class="spin" />
           <Save v-else-if="form.status === 'DRAFT'" :size="16" />
           <Check v-else :size="16" />
@@ -223,7 +266,7 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <main class="write-main page-width">
+    <div class="write-main page-width">
       <label class="title-field">
         <span class="sr-only">文章标题</span>
         <input ref="titleInput" v-model="form.title" maxlength="120" placeholder="文章标题" />
@@ -253,7 +296,7 @@ onBeforeUnmount(() => {
           <PublishChecklist :issues="validation.issues" @focus="focusIssue" />
         </template>
       </EditorWorkspace>
-    </main>
+    </div>
 
     <ArticleAssetPicker
       :open="assetPickerOpen"
@@ -287,7 +330,7 @@ onBeforeUnmount(() => {
   z-index: 300;
   border-bottom: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-glass) 94%, transparent);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
 }
 .toolbar-inner {
   width: min(1440px, calc(100% - 24px));

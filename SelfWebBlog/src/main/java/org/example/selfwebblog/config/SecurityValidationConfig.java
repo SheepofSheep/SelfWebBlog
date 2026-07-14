@@ -22,6 +22,21 @@ public class SecurityValidationConfig {
     @Value("${auth.admin.password}")
     private String adminPassword;
 
+    @Value("${auth.cookie.secure:false}")
+    private boolean secureCookie;
+
+    @Value("${interaction.security.ip-encryption-key:}")
+    private String ipEncryptionKey;
+
+    @Value("${interaction.security.ip-hash-secret:}")
+    private String ipHashSecret;
+
+    @Value("${app.frontend-url:}")
+    private String frontendUrl;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String corsOrigins;
+
     @Bean
     @Profile("prod")
     public CommandLineRunner validateProdSecurity() {
@@ -37,6 +52,11 @@ public class SecurityValidationConfig {
                 failed = true;
             }
 
+            if (jwtSecret == null || jwtSecret.length() < 32) {
+                log.error("JWT_SECRET 长度必须至少为 32 个字符。");
+                failed = true;
+            }
+
             if (DEV_ADMIN_PASSWORD.equals(adminPassword)) {
                 log.error("==========================================");
                 log.error("❌ 生产环境安全校验失败！");
@@ -45,12 +65,33 @@ public class SecurityValidationConfig {
                 failed = true;
             }
 
+            if (!secureCookie) {
+                log.error("生产环境必须启用 Secure 会话 Cookie。");
+                failed = true;
+            }
+
+            if (ipEncryptionKey == null || ipEncryptionKey.isBlank()
+                    || ipHashSecret == null || ipHashSecret.length() < 24) {
+                log.error("生产环境必须配置独立的 IP_ENCRYPTION_KEY 与 IP_HASH_SECRET。");
+                failed = true;
+            }
+
+            if (frontendUrl == null || !frontendUrl.startsWith("https://")) {
+                log.error("生产环境 FRONTEND_URL 必须使用 HTTPS。");
+                failed = true;
+            }
+
+            if (corsOrigins == null || corsOrigins.contains("*") || !corsOrigins.contains(frontendUrl)) {
+                log.error("CORS_ORIGINS 必须显式包含 FRONTEND_URL，且不能使用通配符。");
+                failed = true;
+            }
+
             if (failed) {
                 throw new IllegalStateException(
                     "生产环境安全配置不完整，请设置 JWT_SECRET 和 BLOG_ADMIN_PASSWORD 环境变量后重新启动");
             }
 
-            log.info("✅ 生产环境安全配置校验通过");
+            log.info("生产环境安全配置校验通过");
         };
     }
 }

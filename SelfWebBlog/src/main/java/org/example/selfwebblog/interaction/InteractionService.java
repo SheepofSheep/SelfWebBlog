@@ -7,6 +7,7 @@ import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.identity.captcha.CaptchaService;
 import org.example.selfwebblog.interaction.dto.InteractionCreateRequest;
 import org.example.selfwebblog.interaction.dto.InteractionItemResponse;
+import org.example.selfwebblog.interaction.dto.AdminInteractionResponse;
 import org.example.selfwebblog.interaction.dto.InteractionThreadResponse;
 import org.example.selfwebblog.interaction.mapper.InteractionLikeMapper;
 import org.example.selfwebblog.interaction.mapper.InteractionMapper;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -71,6 +73,7 @@ public class InteractionService {
 
         Interaction parent = null;
         if (request.getReplyToId() != null) {
+            requireAuthenticatedReply(actor, request.getReplyToId());
             parent = requireInteraction(request.getReplyToId());
             requireSameTarget(parent, targetType, targetId);
         }
@@ -113,6 +116,7 @@ public class InteractionService {
             Long viewerId,
             boolean includeModeration) {
         String targetType = normalizeTargetType(rawTargetType);
+        validateReadableTarget(targetType, targetId);
         LambdaQueryWrapper<Interaction> rootsQuery = targetQuery(targetType, targetId, includeModeration)
                 .isNull(Interaction::getRootId)
                 .orderByDesc(Interaction::getPinned)
@@ -143,11 +147,20 @@ public class InteractionService {
         return new InteractionThreadResponse(items, roots.getTotal(), page, size);
     }
 
-    public Page<Interaction> listForModeration(String status, int page, int size) {
+    public Page<AdminInteractionResponse> listForModeration(String status, int page, int size) {
         LambdaQueryWrapper<Interaction> query = new LambdaQueryWrapper<Interaction>()
                 .orderByDesc(Interaction::getCreateTime);
         if (status != null && !status.isBlank()) query.eq(Interaction::getStatus, status.toUpperCase(Locale.ROOT));
-        return interactionMapper.selectPage(new Page<>(page, size), query);
+        Page<Interaction> entities = interactionMapper.selectPage(new Page<>(page, size), query);
+        Page<AdminInteractionResponse> result = new Page<>(page, size, entities.getTotal());
+        result.setRecords(entities.getRecords().stream().map(this::toAdminResponse).toList());
+        return result;
+    }
+
+    public String revealIp(Long id) {
+        Interaction interaction = requireInteraction(id);
+        if (interaction.getIpCiphertext() == null || interaction.getIpCiphertext().isBlank()) return "unknown";
+        return ipCipher.decrypt(interaction.getIpCiphertext());
     }
 
     @Transactional
@@ -162,6 +175,41 @@ public class InteractionService {
         return toResponse(interaction, false);
     }
 
+    @Transactional
+    public int moderateBatch(List<Long> ids, String nextStatus) {
+        if (ids == null || ids.isEmpty() || ids.size() > 100) {
+            throw new IllegalArgumentException("单次可处理 1 到 100 条互动");
+        }
+        List<Long> normalized = new LinkedHashSet<>(ids).stream()
+                .filter(id -> id != null && id > 0)
+                .toList();
+        if (normalized.isEmpty()) throw new IllegalArgumentException("至少选择一条互动");
+        for (Long id : normalized) moderate(id, nextStatus);
+        return normalized.size();
+    }
+
+    @Transactional
+    public InteractionItemResponse setPinned(Long id, boolean pinned) {
+        Interaction interaction = requireInteraction(id);
+        if (interaction.getRootId() != null) {
+            throw new IllegalArgumentException("仅顶层互动可以置顶");
+        }
+        if (!"PUBLISHED".equals(interaction.getStatus())) {
+            throw new IllegalArgumentException("仅已发布互动可以置顶");
+        }
+        interaction.setPinned(pinned ? 1 : 0);
+        interactionMapper.updateById(interaction);
+        return toResponse(interaction, false);
+    }
+
+    @Transactional
+    public void softDelete(Long id) {
+        Interaction interaction = requireInteraction(id);
+        interaction.setStatus("DELETED");
+        interaction.setPinned(0);
+        interactionMapper.updateById(interaction);
+    }
+
     public Interaction requireInteraction(Long id) {
         Interaction interaction = interactionMapper.selectById(id);
         if (interaction == null) throw new IllegalArgumentException("评论不存在");
@@ -170,6 +218,10 @@ public class InteractionService {
 
     static long resolveRootId(Interaction parent) {
         return parent.getRootId() == null ? parent.getId() : parent.getRootId();
+    }
+
+    static void requireAuthenticatedReply(User actor, Long replyToId) {
+        if (replyToId != null && actor == null) throw new IllegalArgumentException("回复需要登录");
     }
 
     static void requireSameTarget(Interaction parent, String targetType, Long targetId) {
@@ -183,6 +235,18 @@ public class InteractionService {
         if (targetId == null || targetId <= 0) throw new IllegalArgumentException("目标不存在");
         if ("POST".equals(targetType)) {
             if (actor == null) throw new IllegalArgumentException("文章评论需要登录");
+            Post post = postService.getById(targetId);
+            if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
+                throw new IllegalArgumentException("文章不存在或未发布");
+            }
+        } else if (targetId != 1L) {
+            throw new IllegalArgumentException("留言板目标无效");
+        }
+    }
+
+    private void validateReadableTarget(String targetType, Long targetId) {
+        if (targetId == null || targetId <= 0) throw new IllegalArgumentException("目标不存在");
+        if ("POST".equals(targetType)) {
             Post post = postService.getById(targetId);
             if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
                 throw new IllegalArgumentException("文章不存在或未发布");
@@ -284,5 +348,23 @@ public class InteractionService {
         response.setEditedTime(interaction.getEditedTime());
         response.setCreateTime(interaction.getCreateTime());
         return response;
+    }
+
+    private AdminInteractionResponse toAdminResponse(Interaction interaction) {
+        return new AdminInteractionResponse(
+                interaction.getId(),
+                interaction.getTargetType(),
+                interaction.getTargetId(),
+                interaction.getRootId(),
+                interaction.getReplyToId(),
+                interaction.getContent(),
+                interaction.getUserId(),
+                interaction.getNickname(),
+                interaction.getRole(),
+                interaction.getStatus(),
+                interaction.getIpRegion(),
+                interaction.getLikeCount() == null ? 0 : interaction.getLikeCount(),
+                Integer.valueOf(1).equals(interaction.getPinned()),
+                interaction.getCreateTime());
     }
 }

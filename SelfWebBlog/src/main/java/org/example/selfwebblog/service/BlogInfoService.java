@@ -5,6 +5,8 @@ import org.example.selfwebblog.entity.BlogInfo;
 import org.example.selfwebblog.mapper.BlogInfoMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+
 @Service
 public class BlogInfoService extends ServiceImpl<BlogInfoMapper, BlogInfo> {
 
@@ -18,6 +20,10 @@ public class BlogInfoService extends ServiceImpl<BlogInfoMapper, BlogInfo> {
             info.setAvatarUrl("https://api.dicebear.com/7.x/avataaars/svg?seed=Felix");
             info.setNickname("博主");
             info.setBio("OvO");
+            info.setSiteStartDate(LocalDate.now());
+            info.setCurrentStatus("");
+            info.setAboutMarkdown("");
+            info.setSocialLinks("{}");
             // 使用 saveOrUpdate 而不是 save，避免获取生成的 key
             saveOrUpdate(info);
         }

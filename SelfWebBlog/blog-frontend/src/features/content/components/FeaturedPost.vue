@@ -1,7 +1,7 @@
 <script setup>
 import { ArrowUpRight, Clock, Folder } from 'lucide-vue-next'
 import { formatTime, getFirstImageUrl, toPlainText } from '../../../utils/format'
-import { toAbsoluteUrl } from '../../../utils/url'
+import { optimizedImageSrcset, optimizedImageUrl, toAbsoluteUrl } from '../../../utils/url'
 
 const props = defineProps({ post: { type: Object, required: true } })
 defineEmits(['open'])
@@ -12,7 +12,15 @@ const cover = toAbsoluteUrl(props.post.coverUrl || getFirstImageUrl(props.post.c
 <template>
   <article class="featured-post">
     <button class="featured-cover" type="button" @click="$emit('open', post.id)">
-      <img v-if="cover" :src="cover" :alt="post.title" />
+      <img
+        v-if="cover"
+        :src="optimizedImageUrl(cover, 1280)"
+        :srcset="optimizedImageSrcset(cover) || undefined"
+        sizes="(max-width: 720px) calc(100vw - 24px), 55vw"
+        :alt="post.title"
+        fetchpriority="high"
+        decoding="async"
+      />
       <span v-else>{{ post.title?.slice(0, 1) || '文' }}</span>
     </button>
     <div class="featured-copy">

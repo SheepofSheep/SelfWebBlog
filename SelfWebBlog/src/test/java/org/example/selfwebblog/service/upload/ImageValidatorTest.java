@@ -63,6 +63,17 @@ class ImageValidatorTest {
     }
 
     @Test
+    void rejectsWebpHeaderWithoutDecodableImage() {
+        ImageValidator validator = new ImageValidator(1024 * 1024, 100, 100);
+        byte[] headerOnly = new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
+        MockMultipartFile file = new MockMultipartFile("file", "broken.webp", "image/webp", headerOnly);
+
+        assertThatThrownBy(() -> validator.validate(file))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("无法解析图片尺寸");
+    }
+
+    @Test
     void storesImageInTargetDirectory(@TempDir Path tempDir) throws Exception {
         ImageValidator validator = new ImageValidator(1024 * 1024, 100, 100);
         UploadStorageService service = new UploadStorageService(tempDir.toString(), validator);

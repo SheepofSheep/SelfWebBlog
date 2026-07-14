@@ -1,13 +1,16 @@
 package org.example.selfwebblog.controller;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
+import org.example.selfwebblog.admin.audit.SecurityAuditService;
+import org.example.selfwebblog.identity.captcha.CaptchaService;
+import org.example.selfwebblog.interaction.security.VisitorIdentityService;
 import org.example.selfwebblog.security.JwtUtil;
 import org.example.selfwebblog.security.ClientIpResolver;
 import org.example.selfwebblog.security.LoginRateLimiter;
 import org.example.selfwebblog.security.OAuthLoginTicketService;
+import org.example.selfwebblog.security.OAuthStateService;
+import org.example.selfwebblog.security.SessionCookieService;
 import org.example.selfwebblog.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +20,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -41,13 +45,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 @RestController
 @RequestMapping({"/auth", "/api/auth"})
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+    private static final String OAUTH_STATE_COOKIE = "OAUTH_STATE";
 
     private final JwtUtil jwtUtil;
     private final UserService userService;
@@ -55,13 +59,12 @@ public class AuthController {
     private final ClientIpResolver clientIpResolver;
     private final LoginRateLimiter loginRateLimiter;
     private final OAuthLoginTicketService loginTicketService;
+    private final SessionCookieService sessionCookieService;
+    private final CaptchaService captchaService;
+    private final SecurityAuditService auditService;
+    private final VisitorIdentityService visitorIdentityService;
+    private final OAuthStateService oauthStateService;
     private RestTemplate restTemplate;
-
-    // OAuth state 防 CSRF，10 分钟过期自动淘汰
-    private final Cache<String, String> oauthStates = CacheBuilder.newBuilder()
-            .expireAfterWrite(Duration.ofMinutes(10))
-            .maximumSize(10000)
-            .build();
 
     @Value("${github.oauth.proxy-host:}")
     private String proxyHost;
@@ -90,6 +93,9 @@ public class AuthController {
     @Value("${app.frontend-url:http://localhost:5174}")
     private String frontendUrl;
 
+    @Value("${auth.cookie.secure:false}")
+    private boolean secureCookies;
+
     private String adminPasswordHash;
 
     public AuthController(
@@ -97,12 +103,38 @@ public class AuthController {
             UserService userService,
             ClientIpResolver clientIpResolver,
             LoginRateLimiter loginRateLimiter,
-            OAuthLoginTicketService loginTicketService) {
+            OAuthLoginTicketService loginTicketService,
+            SessionCookieService sessionCookieService,
+            CaptchaService captchaService,
+            SecurityAuditService auditService,
+            VisitorIdentityService visitorIdentityService) {
+        this(jwtUtil, userService, clientIpResolver, loginRateLimiter, loginTicketService,
+                sessionCookieService, captchaService, auditService, visitorIdentityService,
+                new OAuthStateService());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AuthController(
+            JwtUtil jwtUtil,
+            UserService userService,
+            ClientIpResolver clientIpResolver,
+            LoginRateLimiter loginRateLimiter,
+            OAuthLoginTicketService loginTicketService,
+            SessionCookieService sessionCookieService,
+            CaptchaService captchaService,
+            SecurityAuditService auditService,
+            VisitorIdentityService visitorIdentityService,
+            OAuthStateService oauthStateService) {
         this.jwtUtil = jwtUtil;
         this.userService = userService;
         this.clientIpResolver = clientIpResolver;
         this.loginRateLimiter = loginRateLimiter;
         this.loginTicketService = loginTicketService;
+        this.sessionCookieService = sessionCookieService;
+        this.captchaService = captchaService;
+        this.auditService = auditService;
+        this.visitorIdentityService = visitorIdentityService;
+        this.oauthStateService = oauthStateService;
     }
 
     @PostConstruct
@@ -147,18 +179,43 @@ public class AuthController {
         return null;
     }
 
+    private ResponseCookie oauthStateCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(OAUTH_STATE_COOKIE, value)
+                .httpOnly(true)
+                .secure(secureCookies)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(maxAge)
+                .build();
+    }
+
+    private String readCookie(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) return null;
+        for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+            if (name.equals(cookie.getName())) return cookie.getValue();
+        }
+        return null;
+    }
+
     // ==================== 注册 ====================
 
     @PostMapping("/register")
-    public Result<?> register(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        if (!tryAcquireRateLimit(request)) {
-            return Result.rateLimited("请求过于频繁，请稍后再试");
+    public Result<?> register(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        if (!tryAcquireRateLimit("register", request)) {
+            return Result.rateLimited("注册请求过于频繁，请稍后再试", 60);
         }
 
         String username = body.get("username");
         String password = body.get("password");
         String email = body.get("email");
         String avatarUrl = body.get("avatarUrl");
+
+        if (!captchaService.verify(body.get("captchaId"), body.get("captchaAnswer"), "register")) {
+            return Result.badRequest("验证码不正确或已过期");
+        }
 
         if (isBlank(username) || isBlank(password)) {
             return Result.badRequest("用户名和密码不能为空");
@@ -172,11 +229,12 @@ public class AuthController {
 
         try {
             User user = userService.register(username.trim(), password, email, avatarUrl, getClientIp(request));
-            String token = issueToken(user);
+            issueSession(user, response);
             UserInfo info = toUserInfo(user);
-            Map<String, Object> data = Map.of("token", token, "user", info);
-            return Result.success(data);
+            recordAuthEvent(request, user.getId(), "REGISTER_SUCCESS", username);
+            return Result.success(Map.of("user", info));
         } catch (RuntimeException e) {
+            recordAuthEvent(request, null, "REGISTER_FAILURE", username);
             return Result.badRequest(e.getMessage());
         }
     }
@@ -184,9 +242,12 @@ public class AuthController {
     // ==================== 账号密码登录 ====================
 
     @PostMapping("/login")
-    public Result<?> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        if (!tryAcquireRateLimit(request)) {
-            return Result.rateLimited("请求过于频繁，请稍后再试");
+    public Result<?> login(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        if (!tryAcquireRateLimit("login", request)) {
+            return Result.rateLimited("登录请求过于频繁，请稍后再试", 60);
         }
 
         String username = body.get("username");
@@ -199,20 +260,23 @@ public class AuthController {
         // 管理员可通过此接口登录
         if (adminUsername.equals(username) && passwordEncoder.matches(password, adminPasswordHash)) {
             User adminUser = ensureAdminUser();
-            String token = issueToken(adminUser);
+            issueSession(adminUser, response);
             UserInfo info = toUserInfo(adminUser);
+            recordAuthEvent(request, adminUser.getId(), "LOGIN_SUCCESS", username);
             log.info("管理员登录成功");
-            return Result.success(Map.of("token", token, "user", info));
+            return Result.success(Map.of("user", info));
         }
 
         try {
             User user = userService.login(username.trim(), password);
-            String token = issueToken(user);
+            issueSession(user, response);
             UserInfo info = toUserInfo(user);
-            Map<String, Object> data = Map.of("token", token, "user", info);
+            Map<String, Object> data = Map.of("user", info);
+            recordAuthEvent(request, user.getId(), "LOGIN_SUCCESS", username);
             log.info("用户登录成功：{}", username);
             return Result.success(data);
         } catch (RuntimeException e) {
+            recordAuthEvent(request, null, "LOGIN_FAILURE", username);
             return Result.unauthorized(e.getMessage());
         }
     }
@@ -232,9 +296,12 @@ public class AuthController {
     // ==================== 管理员登录 ====================
 
     @PostMapping("/admin")
-    public Result<?> adminLogin(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        if (!tryAcquireRateLimit(request)) {
-            return Result.rateLimited("请求过于频繁，请稍后再试");
+    public Result<?> adminLogin(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        if (!tryAcquireRateLimit("admin-login", request)) {
+            return Result.rateLimited("登录请求过于频繁，请稍后再试", 60);
         }
 
         String username = body.get("username");
@@ -245,25 +312,27 @@ public class AuthController {
         }
 
         if (!adminUsername.equals(username) || !passwordEncoder.matches(password, adminPasswordHash)) {
+            recordAuthEvent(request, null, "ADMIN_LOGIN_FAILURE", username);
             return Result.unauthorized("用户名或密码错误");
         }
 
         User adminUser = ensureAdminUser();
-        String token = issueToken(adminUser);
+        issueSession(adminUser, response);
         UserInfo info = toUserInfo(adminUser);
+        recordAuthEvent(request, adminUser.getId(), "ADMIN_LOGIN_SUCCESS", username);
         log.info("博主登录成功");
-        return Result.success(Map.of("token", token, "user", info));
+        return Result.success(Map.of("user", info));
     }
 
     // ==================== GitHub OAuth ====================
 
     @GetMapping("/github")
-    public Result<?> githubLogin() {
+    public Result<?> githubLogin(HttpServletResponse response) {
         if (isBlank(githubClientId)) {
             return Result.serverError("GitHub OAuth 未配置");
         }
-        String state = UUID.randomUUID().toString();
-        oauthStates.put(state, "");
+        String state = oauthStateService.issue();
+        response.addHeader(HttpHeaders.SET_COOKIE, oauthStateCookie(state, Duration.ofMinutes(10)).toString());
         String url = "https://github.com/login/oauth/authorize"
                 + "?client_id=" + URLEncoder.encode(githubClientId, StandardCharsets.UTF_8)
                 + "&redirect_uri=" + URLEncoder.encode(githubRedirectUri, StandardCharsets.UTF_8)
@@ -274,16 +343,18 @@ public class AuthController {
 
     @GetMapping("/github/callback")
     public void githubCallback(@RequestParam("code") String code, @RequestParam("state") String state,
-                               HttpServletResponse response) throws Exception {
+                               HttpServletRequest request, HttpServletResponse response) throws Exception {
         if (isBlank(githubClientId) || isBlank(githubClientSecret)) {
-            response.sendRedirect(frontendUrl + "/#/login?error=not_configured");
+            response.sendRedirect(frontendUrl + "/login?error=not_configured");
             return;
         }
-        if (oauthStates.getIfPresent(state) == null) {
-            response.sendRedirect(frontendUrl + "/#/login?error=invalid_state");
+        String browserState = readCookie(request, OAUTH_STATE_COOKIE);
+        if (!oauthStateService.consume(state, browserState)) {
+            response.addHeader(HttpHeaders.SET_COOKIE, oauthStateCookie("", Duration.ZERO).toString());
+            response.sendRedirect(frontendUrl + "/login?error=invalid_state");
             return;
         }
-        oauthStates.invalidate(state);
+        response.addHeader(HttpHeaders.SET_COOKIE, oauthStateCookie("", Duration.ZERO).toString());
 
         try {
             // 用 code 换取 access_token
@@ -304,7 +375,7 @@ public class AuthController {
 
             String accessToken = (String) tokenResponse.getBody().get("access_token");
             if (accessToken == null) {
-                response.sendRedirect(frontendUrl + "/#/login?error=no_access_token");
+                response.sendRedirect(frontendUrl + "/login?error=no_access_token");
                 return;
             }
 
@@ -322,7 +393,8 @@ public class AuthController {
             String avatarUrl = (String) githubUser.get("avatar_url");
 
             // 查找或创建用户，如果是博主 GitHub 账号则赋予 ADMIN 角色
-            User user = userService.findOrCreateGithubUser(githubId, login, avatarUrl, null, "");
+            User user = userService.findOrCreateGithubUser(
+                    githubId, login, avatarUrl, null, getClientIp(request));
             if (githubId.equals(adminGithubId) && !"ADMIN".equals(user.getRole())) {
                 user.setRole("ADMIN");
                 user.setTokenVersion(currentTokenVersion(user) + 1);
@@ -332,22 +404,31 @@ public class AuthController {
             log.info("GitHub 用户登录成功：{} (role={})", login, user.getRole());
 
             String ticket = loginTicketService.issue(user);
-            response.sendRedirect(frontendUrl + "/#/login?ticket=" + ticket);
+            response.sendRedirect(frontendUrl + "/login?ticket=" + ticket);
         } catch (Exception e) {
             log.error("GitHub OAuth 回调失败", e);
-            response.sendRedirect(frontendUrl + "/#/login?error=oauth_error");
+            response.sendRedirect(frontendUrl + "/login?error=oauth_error");
         }
     }
 
     @PostMapping("/exchange")
-    public Result<?> exchangeOAuthTicket(@RequestBody Map<String, String> body) {
+    public Result<?> exchangeOAuthTicket(
+            @RequestBody Map<String, String> body,
+            HttpServletResponse response) {
         return loginTicketService.consume(body.get("ticket"))
                 .map(userService::getById)
                 .filter(Objects::nonNull)
-                .<Result<?>>map(user -> Result.success(Map.of(
-                        "token", issueToken(user),
-                        "user", toUserInfo(user))))
+                .<Result<?>>map(user -> {
+                    issueSession(user, response);
+                    return Result.success(Map.of("user", toUserInfo(user)));
+                })
                 .orElseGet(() -> Result.unauthorized("登录票据无效或已过期"));
+    }
+
+    @GetMapping("/csrf")
+    public Result<Map<String, String>> csrf(HttpServletRequest request, HttpServletResponse response) {
+        String token = sessionCookieService.ensureCsrfToken(request, response);
+        return Result.success(Map.of("token", token));
     }
 
     // ==================== 获取当前用户 ====================
@@ -366,6 +447,16 @@ public class AuthController {
         return Result.success(info);
     }
 
+    @GetMapping("/session")
+    public Result<UserInfo> getSession(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.success(null);
+        }
+        User user = userService.getById(userId);
+        return Result.success(user == null ? null : toUserInfo(user));
+    }
+
     private UserInfo toUserInfo(User user) {
         return new UserInfo(
             user.getId(),
@@ -381,7 +472,7 @@ public class AuthController {
     // ==================== 退出登录 ====================
 
     @PostMapping("/logout")
-    public Result<?> logout(HttpServletRequest request) {
+    public Result<?> logout(HttpServletRequest request, HttpServletResponse response) {
         Long userId = AuthHelper.getUserId(request);
         if (userId != null) {
             User user = userService.getById(userId);
@@ -390,21 +481,28 @@ public class AuthController {
                 userService.updateById(user);
             }
         }
+        sessionCookieService.clearSession(response);
         return Result.success("退出成功");
     }
 
     // ==================== 频率限制（滑动窗口） ====================
 
-    private boolean tryAcquireRateLimit(HttpServletRequest request) {
-        return loginRateLimiter.tryAcquire(getClientIp(request));
+    private boolean tryAcquireRateLimit(String action, HttpServletRequest request) {
+        return loginRateLimiter.tryAcquire(action, getClientIp(request));
     }
 
     private String getClientIp(HttpServletRequest request) {
         return clientIpResolver.resolve(request);
     }
 
-    private String issueToken(User user) {
-        return jwtUtil.generateToken(user.getId(), user.getRole(), currentTokenVersion(user));
+    private void issueSession(User user, HttpServletResponse response) {
+        String token = jwtUtil.generateToken(user.getId(), user.getRole(), currentTokenVersion(user));
+        sessionCookieService.issueSession(response, token);
+    }
+
+    private void recordAuthEvent(HttpServletRequest request, Long userId, String action, String username) {
+        String ipHash = visitorIdentityService.hash(getClientIp(request));
+        auditService.record(userId, action, "AUTH", "", username == null ? "" : username, ipHash);
     }
 
     private int currentTokenVersion(User user) {

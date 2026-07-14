@@ -14,7 +14,13 @@ const options = [
 <template>
   <Transition name="menu">
     <div v-if="open" class="command-menu" role="menu" aria-label="插入内容">
-      <button v-for="item in options" :key="item.value" type="button" role="menuitem" @click="$emit('select', item.value)">
+      <button
+        v-for="item in options"
+        :key="item.value"
+        type="button"
+        role="menuitem"
+        @click="$emit('select', item.value)"
+      >
         {{ item.label }}
       </button>
     </div>

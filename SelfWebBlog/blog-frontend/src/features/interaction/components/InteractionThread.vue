@@ -6,11 +6,7 @@ import EmptyState from '../../../components/ui/EmptyState.vue'
 import InlineNotice from '../../../components/ui/InlineNotice.vue'
 import { showToast } from '../../../composables/toast'
 import { useAuthStore } from '../../../stores/authStore'
-import {
-  createInteraction,
-  getInteractionThread,
-  replyToInteraction
-} from '../api/interactions'
+import { createInteraction, getInteractionThread, replyToInteraction } from '../api/interactions'
 import { insertReply, normalizeThread } from '../model/threadModel'
 import GuestbookComposer from './GuestbookComposer.vue'
 import InteractionItem from './InteractionItem.vue'
@@ -70,6 +66,11 @@ async function loadMore() {
 }
 
 async function beginReply(item) {
+  if (!user.value) {
+    showToast('回复需要先登录。', 'warning')
+    goToLogin()
+    return
+  }
   replyingTo.value = item
   if (user.value) {
     await nextTick()
@@ -139,7 +140,9 @@ watch(
       <ReplyComposer
         v-if="user"
         ref="loggedComposer"
-        :placeholder="replyingTo ? '写下回复...' : isGuestbook ? '写下留言...' : '参与这篇文章的讨论...'"
+        :placeholder="
+          replyingTo ? '写下回复...' : isGuestbook ? '写下留言...' : '参与这篇文章的讨论...'
+        "
         :submit-label="replyingTo ? '回复' : isGuestbook ? '发布留言' : '发布评论'"
         :busy="submitting"
         @submit="submitLogged"
@@ -189,7 +192,13 @@ watch(
       </template>
     </div>
 
-    <button v-if="canLoadMore" class="load-more" type="button" :disabled="loadingMore" @click="loadMore">
+    <button
+      v-if="canLoadMore"
+      class="load-more"
+      type="button"
+      :disabled="loadingMore"
+      @click="loadMore"
+    >
       {{ loadingMore ? '加载中' : '加载更多' }}
     </button>
   </section>

@@ -21,7 +21,9 @@ const taskList = ref([])
 const commandMenuOpen = ref(false)
 const queue = createUploadQueue()
 const dismissed = new Set()
+const uploadControllers = new Map()
 let view = null
+let unmounting = false
 
 function syncTasks() {
   taskList.value = queue.list().filter((task) => !dismissed.has(task.id))
@@ -76,8 +78,11 @@ async function startUpload(taskId) {
   if (!task) return
   queue.transition(taskId, 'uploading')
   syncTasks()
+  const controller = new AbortController()
+  uploadControllers.set(taskId, controller)
   try {
     const asset = await uploadImage(task.file, {
+      signal: controller.signal,
       onUploadProgress(event) {
         queue.updateProgress(taskId, event.total ? (event.loaded / event.total) * 100 : 0)
         syncTasks()
@@ -88,10 +93,19 @@ async function startUpload(taskId) {
     replaceLiteral(uploadPlaceholder(taskId), markdownText)
     queue.transition(taskId, 'completed', { progress: 100, markdown: markdownText, asset })
   } catch (error) {
+    if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+      if (!unmounting) {
+        replaceLiteral(uploadPlaceholder(taskId), `![上传已取消](upload-canceled:${taskId})`)
+        queue.transition(taskId, 'failed', { error: '上传已取消' })
+        syncTasks()
+      }
+      return
+    }
     replaceLiteral(uploadPlaceholder(taskId), `![上传失败](upload-failed:${taskId})`)
     queue.transition(taskId, 'failed', { error: error.message || '上传失败' })
     showToast(error.message || '图片上传失败，可在队列中重试。', 'error')
   }
+  uploadControllers.delete(taskId)
   syncTasks()
 }
 
@@ -119,7 +133,9 @@ function dismiss(taskId) {
 }
 
 function onPaste(event) {
-  const images = [...(event.clipboardData?.files || [])].filter((file) => file.type.startsWith('image/'))
+  const images = [...(event.clipboardData?.files || [])].filter((file) =>
+    file.type.startsWith('image/')
+  )
   if (!images.length) return false
   event.preventDefault()
   enqueueFiles(images)
@@ -127,7 +143,9 @@ function onPaste(event) {
 }
 
 function onDrop(event) {
-  const images = [...(event.dataTransfer?.files || [])].filter((file) => file.type.startsWith('image/'))
+  const images = [...(event.dataTransfer?.files || [])].filter((file) =>
+    file.type.startsWith('image/')
+  )
   if (!images.length) return false
   event.preventDefault()
   enqueueFiles(images)
@@ -168,10 +186,20 @@ watch(
   }
 )
 
-onBeforeUnmount(() => view?.destroy())
+function cancelUploads() {
+  uploadControllers.forEach((controller) => controller.abort())
+  uploadControllers.clear()
+}
+
+onBeforeUnmount(() => {
+  unmounting = true
+  cancelUploads()
+  view?.destroy()
+})
 
 defineExpose({
   focus: () => view?.focus(),
+  cancelUploads,
   insert,
   replaceRange(from, to, text) {
     view?.dispatch({ changes: { from, to, insert: text } })

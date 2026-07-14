@@ -26,4 +26,14 @@ class ClientIpResolverTest {
 
         assertThat(resolver.resolve(request)).isEqualTo("198.51.100.8");
     }
+
+    @Test
+    void rejectsMalformedProxyAddresses() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader("X-Real-IP", "attacker.example");
+        request.addHeader("X-Forwarded-For", "999.2.3.4");
+
+        assertThat(resolver.resolve(request)).isEqualTo("127.0.0.1");
+    }
 }

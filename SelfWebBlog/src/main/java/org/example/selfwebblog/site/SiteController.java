@@ -9,13 +9,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/site")
 public class SiteController {
     private final SiteSummaryService summaryService;
+    private final SiteProfileService profileService;
 
-    public SiteController(SiteSummaryService summaryService) {
+    public SiteController(SiteSummaryService summaryService, SiteProfileService profileService) {
         this.summaryService = summaryService;
+        this.profileService = profileService;
     }
 
     @GetMapping("/summary")
     public Result<SiteSummaryService.SiteSummary> summary() {
         return Result.success(summaryService.summary());
+    }
+
+    @GetMapping("/about")
+    public Result<SiteProfileService.SiteProfile> about() {
+        return Result.success(profileService.get());
     }
 }

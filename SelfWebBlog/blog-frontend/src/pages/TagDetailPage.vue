@@ -15,10 +15,7 @@ const loading = ref(true)
 async function load() {
   loading.value = true
   try {
-    const [postResult, tags] = await Promise.all([
-      listPostsByTag(route.params.slug),
-      listTags()
-    ])
+    const [postResult, tags] = await Promise.all([listPostsByTag(route.params.slug), listTags()])
     posts.value = postResult
     tag.value = tags.find((item) => item.slug === route.params.slug) || null
   } finally {
@@ -42,7 +39,12 @@ watch(() => route.params.slug, load)
     </header>
     <div v-if="loading" class="loading-shimmer post-loading"></div>
     <div v-else-if="posts.length" class="tag-posts">
-      <button v-for="post in posts" :key="post.id" type="button" @click="router.push(`/post/${post.id}`)">
+      <button
+        v-for="post in posts"
+        :key="post.id"
+        type="button"
+        @click="router.push(`/post/${post.id}`)"
+      >
         <time>{{ formatTime(post.createTime).slice(0, 11) }}</time>
         <span>
           <strong>{{ post.title }}</strong>

@@ -28,9 +28,7 @@ export function createShareCardLayout({ orientation = 'horizontal', title = '' }
   const width = horizontal ? 1200 : 900
   const height = horizontal ? 675 : 1200
   const margin = 64
-  const cover = horizontal
-    ? { x: 0, y: 0, width: 480, height }
-    : { x: 0, y: 0, width, height: 480 }
+  const cover = horizontal ? { x: 0, y: 0, width: 480, height } : { x: 0, y: 0, width, height: 480 }
   const content = horizontal
     ? { x: 540, y: margin, width: 596, height: height - margin * 2 }
     : { x: margin, y: 540, width: width - margin * 2, height: 596 }

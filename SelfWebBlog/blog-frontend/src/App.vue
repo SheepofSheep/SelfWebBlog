@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, provide, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
@@ -34,9 +34,15 @@ router.beforeEach(() => {
   loadingStore.setRouterLoading(true)
 })
 
-router.afterEach(() => {
+router.afterEach(async () => {
   loadingStore.setRouterLoading(false)
   NProgress.done()
+  await nextTick()
+  const heading = document.querySelector('#main-content h1')
+  if (heading) {
+    heading.setAttribute('tabindex', '-1')
+    heading.focus({ preventScroll: true })
+  }
 })
 
 router.onError(() => {
@@ -57,7 +63,6 @@ async function handleOAuthRedirect() {
 
   try {
     const data = await exchangeOAuthTicket(String(ticket))
-    localStorage.setItem('token', data.token)
     saveUser(data.user)
     showToast('GitHub 登录成功', 'success')
     await router.replace({ name: 'home' })
@@ -71,11 +76,6 @@ async function loadSiteInfo() {
   try {
     const data = await getProfile({ page: 1, size: 1 })
     siteInfo.value = data?.blogInfo || null
-    if (data?.blogInfo?.bgUrl) {
-      document.documentElement.style.setProperty('--user-bg-image', `url("${data.blogInfo.bgUrl}")`)
-    } else {
-      document.documentElement.style.removeProperty('--user-bg-image')
-    }
   } catch {
     siteInfo.value = null
   }
@@ -88,7 +88,7 @@ async function handleLogout() {
 }
 
 function handleAuthExpired() {
-  if (!user.value && !localStorage.getItem('token')) return
+  if (!user.value) return
   clearUserState()
   showToast('登录状态已失效，请重新登录。', 'warning')
   if (!route.meta.public) router.push({ name: 'login', query: { redirect: route.fullPath } })
@@ -116,7 +116,7 @@ onUnmounted(() => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpir
     <main id="main-content" :class="['page-shell', { 'login-page-shell': isLoginPage }]">
       <RouterView v-slot="{ Component, route: viewRoute }">
         <Transition name="page" mode="out-in">
-          <KeepAlive :include="['HomePage', 'ProfilePage']">
+          <KeepAlive :include="['HomePage']">
             <component :is="Component" :key="`${viewRoute.fullPath}-${refreshKey}`" />
           </KeepAlive>
         </Transition>

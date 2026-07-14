@@ -70,8 +70,9 @@ public class InteractionController {
         if (userId != null && actor == null) return Result.unauthorized("登录状态已失效");
 
         String ipAddress = clientIpResolver.resolve(request);
-        if (!rateLimiter.tryAcquire(userId, ipAddress)) {
-            return Result.rateLimited("发送太频繁了，请稍后再试");
+        String action = "GUESTBOOK".equalsIgnoreCase(body.getTargetType()) ? "guestbook" : "comment";
+        if (!rateLimiter.tryAcquire(action, userId, ipAddress)) {
+            return Result.rateLimited("发送太频繁了，请稍后再试", 60);
         }
         return Result.success(interactionService.create(body, actor, ipAddress, false));
     }
@@ -93,8 +94,8 @@ public class InteractionController {
         create.setReplyToId(id);
         create.setContent(body.getContent());
         String ipAddress = clientIpResolver.resolve(request);
-        if (!rateLimiter.tryAcquire(userId, ipAddress)) {
-            return Result.rateLimited("回复太频繁了，请稍后再试");
+        if (!rateLimiter.tryAcquire("reply", userId, ipAddress)) {
+            return Result.rateLimited("回复太频繁了，请稍后再试", 60);
         }
         return Result.success(interactionService.create(create, actor, ipAddress, false));
     }

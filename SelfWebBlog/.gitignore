@@ -18,15 +18,32 @@ Thumbs.db
 
 # Logs
 *.log
+.runtime/
+
+# Local reports and browser artifacts
+output/
+playwright-report/
+test-results/
 
 # Secrets
 github-credentials.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
 
 # Uploads (local dev)
 uploads/
 
 # SQLite database (local dev)
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Local IP databases
+*.xdb
 
 # Claude Code
 .claude/

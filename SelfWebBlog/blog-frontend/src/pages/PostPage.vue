@@ -10,24 +10,16 @@ import {
   defineAsyncComponent
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getPost } from '../utils/api'
+import { getPost } from '../api'
 import { showToast } from '../composables/toast'
 import { renderArticleMarkdown } from '../utils/marked'
 import loadingStore from '../stores/loadingStore'
 import InteractionThread from '../features/interaction/components/InteractionThread.vue'
 import LikeButton from '../features/interaction/components/LikeButton.vue'
 import { recordPostView } from '../features/interaction/api/interactions'
-import {
-  ArrowLeft,
-  Clock,
-  Tag,
-  Folder,
-  RefreshCw,
-  Eye,
-  Share2,
-  Edit3
-} from 'lucide-vue-next'
+import { ArrowLeft, Clock, Tag, Folder, RefreshCw, Eye, Share2, Edit3 } from 'lucide-vue-next'
 import { formatTime } from '../utils/format'
+import { optimizedImageSrcset, optimizedImageUrl } from '../utils/url'
 
 const route = useRoute()
 const router = useRouter()
@@ -234,7 +226,14 @@ onBeforeUnmount(() => {
 
       <div v-if="post.coverUrl" class="post-cover-photo">
         <div class="cover-frame">
-          <img :src="post.coverUrl" :alt="post.title" />
+          <img
+            :src="optimizedImageUrl(post.coverUrl, 1280)"
+            :srcset="optimizedImageSrcset(post.coverUrl) || undefined"
+            sizes="(max-width: 760px) calc(100vw - 28px), 900px"
+            :alt="post.title"
+            fetchpriority="high"
+            decoding="async"
+          />
         </div>
       </div>
 
@@ -284,7 +283,6 @@ onBeforeUnmount(() => {
       :url="shareUrl"
       @close="shareOpen = false"
     />
-
   </div>
 </template>
 
@@ -316,7 +314,7 @@ onBeforeUnmount(() => {
 
 .post-container {
   padding: clamp(20px, 4vw, 44px);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 .back-btn {
   display: inline-flex;
@@ -501,14 +499,11 @@ onBeforeUnmount(() => {
   order: 2;
   padding: 16px;
   border: 1px solid var(--border-warm);
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(255, 250, 238, 0.7), rgba(255, 240, 207, 0.48)),
-    var(--surface-muted);
+  border-radius: 8px;
+  background: var(--surface-muted);
 }
 [data-theme='dark'] .post-toc {
-  background:
-    linear-gradient(180deg, rgba(39, 31, 21, 0.72), rgba(17, 16, 13, 0.45)), var(--surface-muted);
+  background: var(--surface-muted);
 }
 
 .toc-title {
@@ -891,7 +886,7 @@ onBeforeUnmount(() => {
   }
   .post-container {
     padding: var(--space-md);
-    border-radius: 24px;
+    border-radius: 8px;
   }
   .post-title {
     font-size: clamp(1.8rem, 10vw, 2.5rem);

@@ -8,6 +8,11 @@ import org.example.selfwebblog.security.ClientIpResolver;
 import org.example.selfwebblog.security.JwtUtil;
 import org.example.selfwebblog.security.LoginRateLimiter;
 import org.example.selfwebblog.security.OAuthLoginTicketService;
+import org.example.selfwebblog.security.RequestTraceFilter;
+import org.example.selfwebblog.security.SessionCookieService;
+import org.example.selfwebblog.identity.captcha.CaptchaService;
+import org.example.selfwebblog.admin.audit.SecurityAuditService;
+import org.example.selfwebblog.interaction.security.VisitorIdentityService;
 import org.example.selfwebblog.service.PostService;
 import org.example.selfwebblog.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,11 +53,24 @@ class ApiNamespaceTest {
     @Mock
     private OAuthLoginTicketService loginTicketService;
 
+    @Mock
+    private SessionCookieService sessionCookieService;
+
+    @Mock
+    private CaptchaService captchaService;
+
+    @Mock
+    private SecurityAuditService auditService;
+
+    @Mock
+    private VisitorIdentityService visitorIdentityService;
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new PostController(postService))
                 .setControllerAdvice(new ResultHttpStatusAdvice(), new GlobalExceptionHandler())
+                .addFilters(new RequestTraceFilter())
                 .build();
     }
 
@@ -70,7 +88,8 @@ class ApiNamespaceTest {
 
         mockMvc.perform(get("/posts").param("page", "1").param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.records[0].id").value("42"));
+                .andExpect(jsonPath("$.data.records[0].id").value("42"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
 
         mockMvc.perform(get("/api/posts").param("page", "1").param("size", "1"))
                 .andExpect(status().isOk())
@@ -85,7 +104,11 @@ class ApiNamespaceTest {
                         userService,
                         clientIpResolver,
                         loginRateLimiter,
-                        loginTicketService))
+                        loginTicketService,
+                        sessionCookieService,
+                        captchaService,
+                        auditService,
+                        visitorIdentityService))
                 .setControllerAdvice(new ResultHttpStatusAdvice(), new GlobalExceptionHandler())
                 .build();
 
@@ -94,5 +117,13 @@ class ApiNamespaceTest {
 
         authMockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rejectsAnInvalidPostIdAsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/posts/not-a-number"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("请求参数类型不正确：id"));
     }
 }

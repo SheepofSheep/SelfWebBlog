@@ -23,6 +23,15 @@ public class ImageVariantService {
         return new VariantPaths(small, large);
     }
 
+    public Path createVariant(BufferedImage original, Path originalFile, int requestedWidth)
+            throws IOException {
+        if (!ImageIO.getImageWritersByFormatName("webp").hasNext()) {
+            throw new IllegalStateException("WebP writer is unavailable");
+        }
+        int width = Math.min(original.getWidth(), requestedWidth);
+        return writeVariant(original, originalFile, width, "-" + requestedWidth + ".webp");
+    }
+
     private Path writeVariant(BufferedImage source, Path originalFile, int width, String suffix)
             throws IOException {
         int height = Math.max(1, Math.round((float) source.getHeight() * width / source.getWidth()));

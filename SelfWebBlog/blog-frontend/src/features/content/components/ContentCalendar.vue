@@ -27,7 +27,9 @@ const entries = computed(() => {
 <template>
   <div class="calendar-shell">
     <div class="calendar-weekdays" aria-hidden="true">
-      <span v-for="label in ['一', '二', '三', '四', '五', '六', '日']" :key="label">{{ label }}</span>
+      <span v-for="label in ['一', '二', '三', '四', '五', '六', '日']" :key="label">{{
+        label
+      }}</span>
     </div>
     <div class="calendar-grid">
       <template v-for="item in entries" :key="item.key">

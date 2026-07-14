@@ -83,7 +83,7 @@ header h2 {
   background: var(--surface-soft);
 }
 .index {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }

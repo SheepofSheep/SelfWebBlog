@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 		"org.example.selfwebblog.analytics",
 		"org.example.selfwebblog.content",
 		"org.example.selfwebblog.upload"
+		,"org.example.selfwebblog.admin"
 })
 public class SelfWebBlogApplication {
 

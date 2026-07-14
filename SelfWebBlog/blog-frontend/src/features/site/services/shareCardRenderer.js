@@ -82,7 +82,12 @@ export async function renderShareCard({ post, url, orientation = 'horizontal' })
 
   context.fillStyle = '#6d6559'
   context.font = '28px sans-serif'
-  const summaryLines = wrapText(context, post.summary || post.category || '', layout.content.width, 2)
+  const summaryLines = wrapText(
+    context,
+    post.summary || post.category || '',
+    layout.content.width,
+    2
+  )
   top += 14
   for (const line of summaryLines) {
     context.fillText(line, left, top + 34)
@@ -105,7 +110,15 @@ export async function renderShareCard({ post, url, orientation = 'horizontal' })
   context.drawImage(qrImage, layout.qr.x, layout.qr.y, layout.qr.width, layout.qr.height)
 
   const blob = await new Promise((resolve, reject) => {
-    canvas.toBlob((value) => (value ? resolve(value) : reject(new Error('分享卡片生成失败'))), 'image/png')
+    canvas.toBlob(
+      (value) => (value ? resolve(value) : reject(new Error('分享卡片生成失败'))),
+      'image/png'
+    )
   })
-  return { blob, dataUrl: canvas.toDataURL('image/png'), width: layout.width, height: layout.height }
+  return {
+    blob,
+    dataUrl: canvas.toDataURL('image/png'),
+    width: layout.width,
+    height: layout.height
+  }
 }

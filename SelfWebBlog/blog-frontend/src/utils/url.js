@@ -14,3 +14,18 @@ export function toAbsoluteUrl(url) {
 
   return url // 默认返回原路径
 }
+
+const OPTIMIZED_WIDTHS = new Set([160, 480, 1280])
+
+export function optimizedImageUrl(url, width = 480) {
+  const source = toAbsoluteUrl(url)
+  if (!source || !source.startsWith('/uploads/')) return source
+  const safeWidth = OPTIMIZED_WIDTHS.has(Number(width)) ? Number(width) : 480
+  return `/api/media/optimized?path=${encodeURIComponent(source)}&width=${safeWidth}`
+}
+
+export function optimizedImageSrcset(url) {
+  const source = toAbsoluteUrl(url)
+  if (!source?.startsWith('/uploads/')) return ''
+  return `${optimizedImageUrl(source, 480)} 480w, ${optimizedImageUrl(source, 1280)} 1280w`
+}

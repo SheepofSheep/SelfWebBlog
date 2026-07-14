@@ -14,8 +14,14 @@ test('wraps selected text and keeps the selection inside markers', () => {
 
 test('inserts structural markdown commands', () => {
   assert.equal(applyEditorCommand('heading', { text: 'Title', from: 0, to: 5 }).text, '## Title')
-  assert.match(applyEditorCommand('link', { text: 'docs', from: 0, to: 4 }).text, /\[docs\]\(https:\/\/\)/)
-  assert.match(applyEditorCommand('codeBlock', { text: 'const a = 1', from: 0, to: 11 }).text, /```/)
+  assert.match(
+    applyEditorCommand('link', { text: 'docs', from: 0, to: 4 }).text,
+    /\[docs\]\(https:\/\/\)/
+  )
+  assert.match(
+    applyEditorCommand('codeBlock', { text: 'const a = 1', from: 0, to: 11 }).text,
+    /```/
+  )
   assert.match(applyEditorCommand('table', { text: '', from: 0, to: 0 }).text, /\| 列 1 \|/)
   assert.equal(applyEditorCommand('task', { text: '', from: 0, to: 0 }).text, '- [ ] 待办事项')
 })

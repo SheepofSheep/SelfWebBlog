@@ -1,5 +1,6 @@
 package org.example.selfwebblog.controller;
 
+import org.example.selfwebblog.admin.security.AdminOnly;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.selfwebblog.config.PaginationPolicy;
 import org.example.selfwebblog.entity.BlogInfo;
@@ -64,8 +65,8 @@ public class ProfileController {
 
     // 更新个人信息（只更新非空字段，避免清空未传入的字段）
     @PostMapping("/update")
+    @AdminOnly(action = "SITE_PROFILE_UPDATE")
     public Result<Void> updateProfile(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
 
         BlogInfo existing = blogInfoService.getBlogInfo();
 
@@ -107,8 +108,8 @@ public class ProfileController {
 
     // 更新背景图
     @PostMapping("/background")
+    @AdminOnly(action = "SITE_BACKGROUND_UPDATE")
     public Result<Void> updateBackground(@RequestBody Map<String, String> body, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
         String bgUrl = body.get("bgUrl");
         blogInfoService.updateBackground(bgUrl);
         return Result.success();

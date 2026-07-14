@@ -10,7 +10,12 @@ defineEmits(['focus'])
     <div v-if="!issues.length"><CheckCircle2 :size="17" /> 发布检查已通过</div>
     <template v-else>
       <p><CircleAlert :size="17" /> 发布前还需处理 {{ issues.length }} 项</p>
-      <button v-for="item in issues" :key="`${item.field}-${item.message}`" type="button" @click="$emit('focus', item.field)">
+      <button
+        v-for="item in issues"
+        :key="`${item.field}-${item.message}`"
+        type="button"
+        @click="$emit('focus', item.field)"
+      >
         {{ item.message }}
       </button>
     </template>

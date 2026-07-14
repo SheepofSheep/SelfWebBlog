@@ -4,6 +4,9 @@ import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.config.ResultHttpStatusAdvice;
 import org.example.selfwebblog.exception.GlobalExceptionHandler;
 import org.example.selfwebblog.service.PostService;
+import org.example.selfwebblog.analytics.EngagementMapper;
+import org.example.selfwebblog.content.tag.TagService;
+import org.example.selfwebblog.interaction.mapper.InteractionMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +24,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,10 +37,19 @@ class PostControllerTest {
     @Mock
     private PostService postService;
 
+    @Mock
+    private TagService tagService;
+
+    @Mock
+    private InteractionMapper interactionMapper;
+
+    @Mock
+    private EngagementMapper engagementMapper;
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new PostController(postService))
+                .standaloneSetup(new PostController(postService, tagService, interactionMapper, engagementMapper))
                 .setControllerAdvice(new ResultHttpStatusAdvice(), new GlobalExceptionHandler())
                 .build();
     }
@@ -133,5 +146,23 @@ class PostControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(postService, never()).listByPage(anyInt(), anyInt());
+    }
+
+    @Test
+    void deletingPostAlsoRemovesDependentRecords() throws Exception {
+        Post post = new Post();
+        post.setId(7L);
+        when(postService.getById(7L)).thenReturn(post);
+        when(postService.removeById(7L)).thenReturn(true);
+
+        mockMvc.perform(delete("/posts/7").requestAttr("role", "ADMIN"))
+                .andExpect(status().isOk());
+
+        verify(engagementMapper).deleteCommentLikesForPost(7L);
+        verify(engagementMapper).deletePostLikes(7L);
+        verify(engagementMapper).deletePostViews(7L);
+        verify(interactionMapper).delete(any());
+        verify(tagService).replacePostTags(7L, "");
+        verify(postService).removeById(7L);
     }
 }

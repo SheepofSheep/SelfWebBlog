@@ -48,12 +48,14 @@ public class TagService {
             Tag tag = findOrCreate(name);
             postTagMapper.insertRelation(postId, tag.getId());
         }
+        postTagMapper.syncPostTagText(postId);
     }
 
     @Transactional
     public Tag rename(Long id, String rawName) {
         String name = normalizeName(rawName);
         Tag tag = requireTag(id);
+        List<Long> affectedPosts = postTagMapper.listPostIdsForTag(id);
         Tag conflict = postTagMapper.findByName(name);
         if (conflict != null && !conflict.getId().equals(id)) {
             throw new IllegalArgumentException("标签名称已存在");
@@ -61,6 +63,7 @@ public class TagService {
         tag.setName(name);
         tag.setSlug(uniqueSlug(name, id));
         tagMapper.updateById(tag);
+        affectedPosts.forEach(postTagMapper::syncPostTagText);
         return tag;
     }
 
@@ -71,9 +74,13 @@ public class TagService {
         }
         requireTag(sourceId);
         requireTag(targetId);
+        List<Long> affectedPosts = new ArrayList<>();
+        affectedPosts.addAll(postTagMapper.listPostIdsForTag(sourceId));
+        affectedPosts.addAll(postTagMapper.listPostIdsForTag(targetId));
         postTagMapper.mergeRelations(sourceId, targetId);
         postTagMapper.deleteRelationsForTag(sourceId);
         tagMapper.deleteById(sourceId);
+        affectedPosts.stream().distinct().forEach(postTagMapper::syncPostTagText);
     }
 
     @Transactional

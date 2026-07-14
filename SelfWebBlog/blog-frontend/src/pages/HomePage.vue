@@ -7,6 +7,7 @@ import { useHomeData } from '../composables/useHomeData'
 import { useToast } from '../composables/toast'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
+import DeferredMount from '../components/ui/DeferredMount.vue'
 import FeaturedPost from '../features/content/components/FeaturedPost.vue'
 import RecentPostRows from '../features/content/components/RecentPostRows.vue'
 import PostFilterToolbar from '../features/content/components/PostFilterToolbar.vue'
@@ -85,11 +86,11 @@ onBeforeUnmount(dispose)
 </script>
 
 <template>
-  <main class="home-page page-width">
+  <div class="home-page page-width">
     <header class="home-status">
       <div>
         <span>Gabriel's Blog</span>
-        <p v-if="blogInfo?.status || blogInfo?.bio">{{ blogInfo.status || blogInfo.bio }}</p>
+        <p v-if="blogInfo?.currentStatus">{{ blogInfo.currentStatus }}</p>
       </div>
       <button v-if="isAdmin" type="button" @click="router.push('/write')">
         <PenLine :size="16" />写文章
@@ -129,12 +130,16 @@ onBeforeUnmount(dispose)
         <AuthorSummary :blog-info="blogInfo" @about="router.push('/about')" />
         <div class="sidebar-stack">
           <SiteStatPanel :posts="posts" :total-posts="totalPosts" />
-          <ContentCalendarMini :posts="posts" @open="router.push('/calendar')" />
-          <PopularTags
-            :tags="tags"
-            @select="openArchive({ tag: $event })"
-            @open="router.push('/tags')"
-          />
+          <DeferredMount min-height="180px">
+            <ContentCalendarMini :posts="posts" @open="router.push('/calendar')" />
+          </DeferredMount>
+          <DeferredMount min-height="140px">
+            <PopularTags
+              :tags="tags"
+              @select="openArchive({ tag: $event })"
+              @open="router.push('/tags')"
+            />
+          </DeferredMount>
         </div>
       </aside>
     </div>
@@ -153,7 +158,7 @@ onBeforeUnmount(dispose)
       confirm-text="删除文章"
       @confirm="confirmDelete"
     />
-  </main>
+  </div>
 </template>
 
 <style scoped>

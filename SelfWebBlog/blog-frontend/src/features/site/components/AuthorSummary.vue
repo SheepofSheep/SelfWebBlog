@@ -1,7 +1,7 @@
 <script setup>
 import { ArrowRight } from 'lucide-vue-next'
 import { computed } from 'vue'
-import { toAbsoluteUrl } from '../../../utils/url'
+import { optimizedImageUrl, toAbsoluteUrl } from '../../../utils/url'
 
 const props = defineProps({ blogInfo: { type: Object, default: null } })
 defineEmits(['about'])
@@ -13,7 +13,11 @@ const avatar = computed(() => toAbsoluteUrl(props.blogInfo?.avatarUrl || ''))
   <section v-if="blogInfo" class="author-summary">
     <header>
       <span class="avatar">
-        <img v-if="avatar" :src="avatar" :alt="blogInfo.nickname || 'Gabriel'" />
+        <img
+          v-if="avatar"
+          :src="optimizedImageUrl(avatar, 160)"
+          :alt="blogInfo.nickname || 'Gabriel'"
+        />
         <span v-else>G</span>
       </span>
       <div>
@@ -32,7 +36,7 @@ const avatar = computed(() => toAbsoluteUrl(props.blogInfo?.avatarUrl || ''))
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-glass);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(8px);
 }
 header {
   display: flex;

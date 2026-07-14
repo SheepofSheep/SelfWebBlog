@@ -1,5 +1,6 @@
 package org.example.selfwebblog.controller;
 
+import org.example.selfwebblog.admin.security.AdminOnly;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
 import org.example.selfwebblog.config.PaginationPolicy;
@@ -11,6 +12,9 @@ import org.example.selfwebblog.service.CommentService;
 import org.example.selfwebblog.service.PostService;
 import org.example.selfwebblog.service.UserService;
 import org.example.selfwebblog.service.BlogInfoService;
+import org.example.selfwebblog.interaction.InteractionService;
+import org.example.selfwebblog.interaction.dto.InteractionCreateRequest;
+import org.example.selfwebblog.security.ClientIpResolver;
 import org.example.selfwebblog.entity.BlogInfo;
 import org.example.selfwebblog.entity.Post;
 import org.slf4j.Logger;
@@ -42,15 +46,26 @@ public class CommentController {
     private final UserService userService;
     private final PostService postService;
     private final CommentRateLimiter commentRateLimiter;
+    private final InteractionService interactionService;
+    private final ClientIpResolver clientIpResolver;
 
     private final BlogInfoService blogInfoService;
 
     public CommentController(CommentService commentService, UserService userService, BlogInfoService blogInfoService, PostService postService, CommentRateLimiter commentRateLimiter) {
+        this(commentService, userService, blogInfoService, postService, commentRateLimiter, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CommentController(CommentService commentService, UserService userService, BlogInfoService blogInfoService,
+                             PostService postService, CommentRateLimiter commentRateLimiter,
+                             InteractionService interactionService, ClientIpResolver clientIpResolver) {
         this.commentService = commentService;
         this.userService = userService;
         this.blogInfoService = blogInfoService;
         this.postService = postService;
         this.commentRateLimiter = commentRateLimiter;
+        this.interactionService = interactionService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @GetMapping("/post/{postId}")
@@ -111,8 +126,19 @@ public class CommentController {
         if (comment.getContent() != null && comment.getContent().trim().length() > MAX_COMMENT_LENGTH) {
             return Result.badRequest("评论不能超过1000个字符");
         }
-        if (!commentRateLimiter.tryAcquire(userId, request.getRemoteAddr())) {
+        String clientIp = clientIpResolver == null ? request.getRemoteAddr() : clientIpResolver.resolve(request);
+        if (!commentRateLimiter.tryAcquire(userId, clientIp)) {
             return Result.rateLimited("评论太频繁了，请稍后再试");
+        }
+
+        if (interactionService != null) {
+            InteractionCreateRequest create = new InteractionCreateRequest();
+            create.setTargetType("POST");
+            create.setTargetId(comment.getPostId());
+            create.setContent(comment.getContent());
+            interactionService.create(create, user, clientIp, false);
+            log.info("评论成功：{}", user.getUsername());
+            return Result.success("评论成功");
         }
 
         String displayName = (user.getNickname() != null && !user.getNickname().isBlank())
@@ -133,18 +159,23 @@ public class CommentController {
     }
 
     @GetMapping("/all")
+    @AdminOnly
     public Result<Page<Comment>> listAll(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
             HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
         PaginationPolicy.PageRequest pagination = PaginationPolicy.require(pageNum, pageSize);
         return Result.success(commentService.listAll(pagination.page(), pagination.size()));
     }
 
     @PutMapping("/{id}/pin")
+    @AdminOnly(action = "LEGACY_COMMENT_PIN")
     public Result<String> togglePin(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限");
+        if (interactionService != null) {
+            var updated = interactionService.requireInteraction(id);
+            interactionService.setPinned(id, !Integer.valueOf(1).equals(updated.getPinned()));
+            return Result.success(Integer.valueOf(1).equals(updated.getPinned()) ? "已取消置顶" : "已置顶");
+        }
         Comment comment = commentService.getById(id);
         if (comment == null) return Result.notFound("评论不存在");
         comment.setPinned(comment.getPinned() != null && comment.getPinned() == 1 ? 0 : 1);
@@ -153,9 +184,12 @@ public class CommentController {
     }
 
     @DeleteMapping("/{id}")
+    @AdminOnly(action = "LEGACY_COMMENT_DELETE")
     public Result<String> deleteComment(@PathVariable Long id, HttpServletRequest request) {
-        if (!AuthHelper.isAdmin(request)) {
-            return Result.forbidden("无权限删除评论");
+        if (interactionService != null) {
+            interactionService.softDelete(id);
+            log.info("软删除评论成功：ID={}", id);
+            return Result.success("删除成功");
         }
         boolean removed = commentService.removeById(id);
         if (removed) {

@@ -1,7 +1,7 @@
 <script setup>
 import { Clock, Eye, Folder, Trash2 } from 'lucide-vue-next'
 import { formatTime, getFirstImageUrl, toPlainText } from '../../../utils/format'
-import { toAbsoluteUrl } from '../../../utils/url'
+import { optimizedImageUrl, toAbsoluteUrl } from '../../../utils/url'
 import IconButton from '../../../components/ui/IconButton.vue'
 
 defineProps({
@@ -38,7 +38,12 @@ function postCover(post) {
             </span>
           </span>
           <span class="post-cover" :class="{ empty: !postCover(post) }">
-            <img v-if="postCover(post)" :src="postCover(post)" :alt="post.title" loading="lazy" />
+            <img
+              v-if="postCover(post)"
+              :src="optimizedImageUrl(postCover(post), 480)"
+              :alt="post.title"
+              loading="lazy"
+            />
             <span v-else>{{ post.title?.slice(0, 1) }}</span>
           </span>
         </button>

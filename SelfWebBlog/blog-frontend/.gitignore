@@ -39,6 +39,8 @@ Thumbs.db
 
 # Playwright (E2E)
 .playwright-mcp/
+playwright-report/
+test-results/
 
 # Backups
 *.md.backup

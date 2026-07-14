@@ -9,3 +9,8 @@ export async function getSiteSummary() {
   const res = await api.get('/site/summary')
   return unwrap(res.data)
 }
+
+export async function getSiteAbout() {
+  const res = await api.get('/site/about')
+  return unwrap(res.data)
+}

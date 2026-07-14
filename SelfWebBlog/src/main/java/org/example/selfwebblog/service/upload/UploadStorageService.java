@@ -38,6 +38,20 @@ public class UploadStorageService {
         return new StoredUpload(filename, target.urlPrefix() + filename, validation.extension(), validation.size());
     }
 
+    public void deleteManagedAvatar(String url) {
+        if (url == null || !url.startsWith(UploadTarget.AVATAR.urlPrefix())) return;
+        String filename = url.substring(UploadTarget.AVATAR.urlPrefix().length());
+        if (filename.isBlank() || filename.contains("/") || filename.contains("\\")) return;
+        Path avatarRoot = uploadRoot.resolve(UploadTarget.AVATAR.subdirectory()).normalize();
+        Path candidate = avatarRoot.resolve(filename).normalize();
+        if (!candidate.startsWith(avatarRoot)) return;
+        try {
+            Files.deleteIfExists(candidate);
+        } catch (IOException ignored) {
+            // A stale avatar is preferable to failing a successful profile update.
+        }
+    }
+
     private Path resolveTargetDirectory(UploadTarget target) throws IOException {
         Path directory = target.subdirectory().isBlank()
             ? uploadRoot

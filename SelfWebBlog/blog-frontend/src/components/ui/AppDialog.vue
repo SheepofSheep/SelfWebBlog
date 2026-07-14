@@ -44,7 +44,9 @@ watch(
       previousFocus = document.activeElement
       document.body.style.overflow = 'hidden'
       await nextTick()
-      dialog.value?.querySelector('button, a, input, textarea, select, [tabindex]')?.focus()
+      dialog.value
+        ?.querySelector('[autofocus], input, textarea, select, button, a, [tabindex]')
+        ?.focus()
     } else {
       document.body.style.removeProperty('overflow')
       previousFocus?.focus?.()
@@ -67,15 +69,15 @@ onBeforeUnmount(() => document.body.style.removeProperty('overflow'))
           :aria-labelledby="`${title}-dialog-title`"
           @keydown="onKeydown"
         >
-          <header>
+          <div class="dialog-header">
             <div>
               <h2 :id="`${title}-dialog-title`">{{ title }}</h2>
               <p v-if="description">{{ description }}</p>
             </div>
             <IconButton :label="closeLabel" @click="close"><X :size="18" /></IconButton>
-          </header>
+          </div>
           <div class="dialog-content"><slot /></div>
-          <footer v-if="$slots.footer"><slot name="footer" /></footer>
+          <div v-if="$slots.footer" class="dialog-footer"><slot name="footer" /></div>
         </section>
       </div>
     </Transition>
@@ -102,18 +104,18 @@ onBeforeUnmount(() => document.body.style.removeProperty('overflow'))
   background: var(--surface-solid);
   box-shadow: var(--shadow-float);
 }
-header,
-footer {
+.dialog-header,
+.dialog-footer {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   padding: 18px 20px;
 }
-header {
+.dialog-header {
   border-bottom: 1px solid var(--border-subtle);
 }
-footer {
+.dialog-footer {
   justify-content: flex-end;
   border-top: 1px solid var(--border-subtle);
 }

@@ -6,6 +6,7 @@ import org.example.selfwebblog.service.UserService;
 import org.example.selfwebblog.service.upload.StoredUpload;
 import org.example.selfwebblog.service.upload.UploadStorageService;
 import org.example.selfwebblog.service.upload.UploadTarget;
+import org.example.selfwebblog.security.ActionRateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.Map;
+import java.time.Duration;
 
 @RestController
 @RequestMapping({"/user", "/api/user"})
@@ -23,10 +25,13 @@ public class UserController {
 
     private final UserService userService;
     private final UploadStorageService uploadStorageService;
+    private final ActionRateLimiter rateLimiter;
 
-    public UserController(UserService userService, UploadStorageService uploadStorageService) {
+    public UserController(UserService userService, UploadStorageService uploadStorageService,
+                          ActionRateLimiter rateLimiter) {
         this.userService = userService;
         this.uploadStorageService = uploadStorageService;
+        this.rateLimiter = rateLimiter;
     }
 
     // ==================== 更新个人资料 ====================
@@ -64,6 +69,15 @@ public class UserController {
     public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         Long userId = AuthHelper.getUserId(request);
         if (userId == null) return Result.unauthorized("请先登录");
+        ActionRateLimiter.Decision decision = rateLimiter.acquire(
+                "avatar-upload", "user:" + userId, 10, Duration.ofHours(1));
+        if (!decision.allowed()) {
+            return Result.rateLimited("头像上传太频繁，请稍后再试", decision.retryAfterSeconds());
+        }
+
+        User currentUser = userService.getById(userId);
+        if (currentUser == null) return Result.notFound("用户不存在");
+        String previousAvatar = currentUser.getAvatarUrl();
 
         try {
             StoredUpload upload = uploadStorageService.storeImage(file, UploadTarget.AVATAR);
@@ -71,12 +85,10 @@ public class UserController {
             log.info("用户 {} 上传头像: {}", userId, fileUrl);
 
             // 更新用户头像
-            User currentUser = userService.getById(userId);
-            if (currentUser != null) {
-                currentUser.setAvatarUrl(fileUrl);
-                userService.updateById(currentUser);
-                log.info("用户 {} 头像已更新: {}", currentUser.getUsername(), fileUrl);
-            }
+            currentUser.setAvatarUrl(fileUrl);
+            userService.updateById(currentUser);
+            uploadStorageService.deleteManagedAvatar(previousAvatar);
+            log.info("用户 {} 头像已更新: {}", currentUser.getUsername(), fileUrl);
 
             return Result.success(fileUrl);
         } catch (IllegalArgumentException e) {

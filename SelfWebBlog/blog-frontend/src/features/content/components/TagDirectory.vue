@@ -8,11 +8,18 @@ defineEmits(['open'])
 
 <template>
   <div class="tag-directory">
-    <button v-for="item in tags" :key="item.id || item.slug" type="button" @click="$emit('open', item)">
+    <button
+      v-for="item in tags"
+      :key="item.id || item.slug"
+      type="button"
+      @click="$emit('open', item)"
+    >
       <span class="tag-mark"><Tag :size="16" /></span>
       <span class="tag-copy">
         <strong>{{ item.name }}</strong>
-        <small>{{ item.latestPostTime ? `最近更新 ${formatTime(item.latestPostTime)}` : '暂无公开文章' }}</small>
+        <small>{{
+          item.latestPostTime ? `最近更新 ${formatTime(item.latestPostTime)}` : '暂无公开文章'
+        }}</small>
       </span>
       <span class="tag-count">{{ item.postCount || 0 }} 篇</span>
       <ArrowUpRight :size="17" />

@@ -25,7 +25,10 @@ public class User {
     private String role;
     private String githubId;
     private String nickname;
+    @JsonIgnore
     private String ipAddress;
+    @JsonIgnore
+    private String registrationIpHash;
     private String titleName;
     private String titleStyle;
     private Integer tokenVersion;

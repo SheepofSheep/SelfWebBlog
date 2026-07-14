@@ -9,7 +9,8 @@ function makeFileForm(file) {
 export async function uploadFile(path, file, options = {}) {
   const res = await api.post(path, makeFileForm(file), {
     headers: { 'Content-Type': 'multipart/form-data' },
-    onUploadProgress: options.onUploadProgress
+    onUploadProgress: options.onUploadProgress,
+    signal: options.signal
   })
   return unwrap(res.data)
 }

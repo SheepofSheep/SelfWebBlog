@@ -119,7 +119,13 @@ async function uploadCover(event) {
         <ImagePlus v-else :size="16" />
         {{ uploading ? '上传中' : '选择封面' }}
       </button>
-      <input ref="coverInput" class="file-input" type="file" accept="image/*" @change="uploadCover" />
+      <input
+        ref="coverInput"
+        class="file-input"
+        type="file"
+        accept="image/*"
+        @change="uploadCover"
+      />
       <label>
         <span>或使用图片地址</span>
         <input

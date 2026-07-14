@@ -28,6 +28,9 @@ test('inserting a reply preserves root order', () => {
   ]
   const next = insertReply(roots, '1', { id: '2' })
 
-  assert.deepEqual(next.map((item) => item.id), ['1', '3'])
+  assert.deepEqual(
+    next.map((item) => item.id),
+    ['1', '3']
+  )
   assert.equal(next[0].replies[0].id, '2')
 })

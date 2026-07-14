@@ -21,14 +21,28 @@ export async function deletePost(id) {
   return unwrap(res.data)
 }
 
+export async function deletePosts(ids) {
+  const res = await api.post('/posts/batch-delete', { ids })
+  return unwrap(res.data)
+}
+
 export async function listDrafts(pageNum = 1, pageSize = 20) {
   const res = await api.get('/posts/drafts', { params: { page: pageNum, size: pageSize } })
   return unwrap(res.data)
 }
 
-export async function searchPosts({ keyword, category, tag, sort, page = 1, size = 20 } = {}) {
+export async function searchPosts({
+  keyword,
+  category,
+  tag,
+  sort,
+  page = 1,
+  size = 20,
+  signal
+} = {}) {
   const res = await api.get('/posts/search', {
-    params: { keyword, category, tag, sort, page, size }
+    params: { keyword, category, tag, sort, page, size },
+    signal
   })
   return unwrap(res.data)
 }

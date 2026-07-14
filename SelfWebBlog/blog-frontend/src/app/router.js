@@ -7,7 +7,7 @@ const ArchivePage = () => import('../pages/ArchivePage.vue')
 const PostPage = () => import('../pages/PostPage.vue')
 const LoginPage = () => import('../pages/LoginPage.vue')
 const WritePage = () => import('../pages/WritePage.vue')
-const AdminPage = () => import('../pages/ProfilePage.vue')
+const AdminPage = () => import('../pages/AdminPage.vue')
 const VisitorProfilePage = () => import('../pages/VisitorProfilePage.vue')
 const AboutPage = () => import('../pages/AboutPage.vue')
 const GuestbookPage = () => import('../pages/GuestbookPage.vue')
@@ -72,7 +72,7 @@ export const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/write',
+      path: '/write/:id?',
       name: 'write',
       component: WritePage,
       meta: { requiresAuth: true, requiresRole: 'ADMIN' }
@@ -101,12 +101,11 @@ router.beforeEach(async (to) => {
 
   if (!authRestored) {
     restoreUser()
-    if (localStorage.getItem('token')) {
-      try {
-        await loadUserInfo()
-      } catch {
-        clearUserState()
-      }
+    localStorage.removeItem('token')
+    try {
+      await loadUserInfo()
+    } catch {
+      clearUserState()
     }
     authRestored = true
   }

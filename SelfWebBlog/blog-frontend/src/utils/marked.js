@@ -1,5 +1,6 @@
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { optimizedImageUrl } from './url'
 
 marked.setOptions({
   breaks: true,
@@ -156,6 +157,7 @@ function enforceAttributePolicy(policy) {
       if (!isSafeImage(src, policy)) {
         node.remove()
       } else {
+        node.setAttribute('src', optimizedImageUrl(src, 1280))
         node.setAttribute('loading', 'lazy')
       }
     }

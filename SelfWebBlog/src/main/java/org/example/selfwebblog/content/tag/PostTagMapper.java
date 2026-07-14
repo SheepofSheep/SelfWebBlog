@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.Tag;
 
@@ -64,4 +65,19 @@ public interface PostTagMapper {
 
     @Select("SELECT COUNT(*) FROM post_tag WHERE tag_id = #{tagId}")
     int usageCount(@Param("tagId") Long tagId);
+
+    @Select("SELECT post_id FROM post_tag WHERE tag_id = #{tagId}")
+    List<Long> listPostIdsForTag(@Param("tagId") Long tagId);
+
+    @Update("""
+            UPDATE post SET tags = COALESCE((
+                SELECT group_concat(name, ', ') FROM (
+                    SELECT t.name AS name FROM tag t
+                    JOIN post_tag pt ON pt.tag_id = t.id
+                    WHERE pt.post_id = #{postId}
+                    ORDER BY lower(t.name)
+                )
+            ), '') WHERE id = #{postId}
+            """)
+    int syncPostTagText(@Param("postId") Long postId);
 }

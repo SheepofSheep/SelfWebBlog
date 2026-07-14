@@ -2,6 +2,7 @@
 import { MessageCircle, ShieldCheck } from 'lucide-vue-next'
 import { computed } from 'vue'
 import LikeButton from './LikeButton.vue'
+import { optimizedImageUrl } from '../../../utils/url'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -31,7 +32,12 @@ function relativeTime(value) {
 
 <template>
   <article class="interaction-item" :class="{ nested, pending: item.status === 'PENDING' }">
-    <img v-if="item.avatarUrl" class="avatar" :src="item.avatarUrl" :alt="displayName" />
+    <img
+      v-if="item.avatarUrl"
+      class="avatar"
+      :src="optimizedImageUrl(item.avatarUrl, 160)"
+      :alt="displayName"
+    />
     <span v-else class="avatar avatar-fallback" aria-hidden="true">{{ initial }}</span>
     <div class="interaction-body">
       <header>

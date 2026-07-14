@@ -16,19 +16,19 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserService userService;
+    private final SessionCookieService cookieService;
 
-    public JwtFilter(JwtUtil jwtUtil, UserService userService) {
+    public JwtFilter(JwtUtil jwtUtil, UserService userService, SessionCookieService cookieService) {
         this.jwtUtil = jwtUtil;
         this.userService = userService;
+        this.cookieService = cookieService;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String header = request.getHeader("Authorization");
-
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
+        String token = cookieService.readSessionToken(request);
+        if (token != null && !token.isBlank()) {
             if (jwtUtil.validateToken(token)) {
                 Long userId = jwtUtil.getUserId(token);
                 Integer tokenVersion = jwtUtil.getTokenVersion(token);

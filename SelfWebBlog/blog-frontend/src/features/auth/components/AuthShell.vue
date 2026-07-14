@@ -11,7 +11,7 @@ defineEmits(['update:mode', 'home'])
 </script>
 
 <template>
-  <main class="auth-page">
+  <div class="auth-page">
     <section class="auth-shell">
       <div class="auth-visual">
         <Transition name="auth-image" mode="out-in">
@@ -34,7 +34,7 @@ defineEmits(['update:mode', 'home'])
         <footer><slot name="footer" /></footer>
       </div>
     </section>
-  </main>
+  </div>
 </template>
 
 <style scoped>

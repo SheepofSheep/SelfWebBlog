@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test src/**/*.test.js",
+    "test:e2e": "playwright test",
     "lint": "eslint . --ext .js,.vue --ignore-path .gitignore",
     "format": "prettier --write \"src/**/*.{js,vue,css}\" \"*.{js,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{js,vue,css}\" \"*.{js,json,md}\"",
@@ -16,7 +17,6 @@
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
     "@codemirror/lang-markdown": "^6.5.0",
-    "@codemirror/search": "^6.7.1",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
     "axios": "^1.14.0",
@@ -30,11 +30,12 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@vitejs/plugin-vue": "^6.0.5",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-vue": "^9.33.0",
+    "jsqr": "^1.4.0",
     "prettier": "^3.8.3",
     "vite": "^8.0.1"
   }

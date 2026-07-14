@@ -81,4 +81,13 @@ public interface EngagementMapper {
 
     @Update("UPDATE post SET view_count = view_count + 1 WHERE id = #{postId}")
     int incrementViewCount(@Param("postId") Long postId);
+
+    @Delete("DELETE FROM interaction_like WHERE target_type = 'COMMENT' AND target_id IN (SELECT id FROM comment WHERE target_type = 'POST' AND target_id = #{postId})")
+    int deleteCommentLikesForPost(@Param("postId") Long postId);
+
+    @Delete("DELETE FROM interaction_like WHERE target_type = 'POST' AND target_id = #{postId}")
+    int deletePostLikes(@Param("postId") Long postId);
+
+    @Delete("DELETE FROM post_view_daily WHERE post_id = #{postId}")
+    int deletePostViews(@Param("postId") Long postId);
 }

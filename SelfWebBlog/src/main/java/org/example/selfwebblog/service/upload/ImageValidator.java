@@ -5,10 +5,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HexFormat;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -108,19 +111,26 @@ public class ImageValidator {
     }
 
     private void validateDimensions(MultipartFile file, String extension) {
-        if ("webp".equals(extension)) {
-            return;
-        }
-        try (InputStream in = file.getInputStream()) {
-            BufferedImage image = ImageIO.read(in);
-            if (image == null) {
+        try (InputStream in = file.getInputStream();
+             ImageInputStream imageInput = ImageIO.createImageInputStream(in)) {
+            if (imageInput == null) throw new IllegalArgumentException("无法解析图片尺寸");
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(imageInput);
+            if (!readers.hasNext()) {
                 throw new IllegalArgumentException("无法解析图片尺寸");
             }
-            if (image.getWidth() <= 0 || image.getHeight() <= 0) {
-                throw new IllegalArgumentException("图片尺寸不正确");
-            }
-            if (image.getWidth() > maxWidth || image.getHeight() > maxHeight) {
-                throw new IllegalArgumentException("图片尺寸不能超过 " + maxWidth + "x" + maxHeight);
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(imageInput, true, true);
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width <= 0 || height <= 0) throw new IllegalArgumentException("图片尺寸不正确");
+                if (width > maxWidth || height > maxHeight) {
+                    throw new IllegalArgumentException("图片尺寸不能超过 " + maxWidth + "x" + maxHeight);
+                }
+                BufferedImage decoded = reader.read(0);
+                if (decoded == null) throw new IllegalArgumentException("无法完整解析图片");
+            } finally {
+                reader.dispose();
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("无法解析图片尺寸");

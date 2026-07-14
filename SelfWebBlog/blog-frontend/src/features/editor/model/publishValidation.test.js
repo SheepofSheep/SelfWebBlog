@@ -17,11 +17,17 @@ test('published post requires complete metadata and safe uploads', () => {
     tags: 'Vue, Java'
   }
   assert.equal(validatePost(complete, 'PUBLISHED').valid, true)
-  assert.match(validatePost({ ...complete, tags: 'Vue,vue' }, 'PUBLISHED').issues[0].message, /重复/)
+  assert.match(
+    validatePost({ ...complete, tags: 'Vue,vue' }, 'PUBLISHED').issues[0].message,
+    /重复/
+  )
   assert.match(
     validatePost({ ...complete, content: '![正在上传](uploading:a)' }, 'PUBLISHED').issues[0]
       .message,
     /上传/
   )
-  assert.match(validatePost({ ...complete, content: '![](/uploads/a.png)' }, 'PUBLISHED').issues[0].message, /替代文本/)
+  assert.match(
+    validatePost({ ...complete, content: '![](/uploads/a.png)' }, 'PUBLISHED').issues[0].message,
+    /替代文本/
+  )
 })

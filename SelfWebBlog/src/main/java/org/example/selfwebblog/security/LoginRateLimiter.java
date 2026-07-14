@@ -17,9 +17,14 @@ public class LoginRateLimiter {
             .build();
 
     public boolean tryAcquire(String clientIp) {
+        return tryAcquire("login", clientIp);
+    }
+
+    public boolean tryAcquire(String action, String clientIp) {
         long now = System.currentTimeMillis();
         long cutoff = now - WINDOW_MS;
-        long[] slots = attempts.asMap().computeIfAbsent(clientIp, ignored -> new long[MAX_ATTEMPTS]);
+        String key = action + ":" + clientIp;
+        long[] slots = attempts.asMap().computeIfAbsent(key, ignored -> new long[MAX_ATTEMPTS]);
 
         synchronized (slots) {
             int active = 0;

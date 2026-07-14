@@ -27,7 +27,8 @@ export function validatePost(post, status = 'PUBLISHED') {
     issues.push(issue('tags', '标签中有重复项。'))
   }
   if (/uploading:/.test(content)) issues.push(issue('content', '仍有图片正在上传。'))
-  if (/upload-failed:/.test(content)) issues.push(issue('content', '有图片上传失败，请重试或移除。'))
+  if (/upload-failed:/.test(content))
+    issues.push(issue('content', '有图片上传失败，请重试或移除。'))
   if (/!\[\]\([^)]+\)/.test(content)) issues.push(issue('content', '图片需要填写替代文本。'))
 
   return { valid: issues.length === 0, issues }
