@@ -18,6 +18,11 @@ export async function uploadImage(file, options) {
   return uploadFile('/upload/image', file, options)
 }
 
+export async function listArticleAssets() {
+  const res = await api.get('/upload/assets')
+  return unwrap(res.data)
+}
+
 export async function uploadAvatar(file, options) {
   return uploadFile('/upload/avatar', file, options)
 }

@@ -14,11 +14,18 @@
     "check": "pnpm test && pnpm lint && pnpm build"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/search": "^6.7.1",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
     "axios": "^1.14.0",
+    "codemirror": "^6.0.2",
     "dompurify": "^3.4.3",
     "lucide-vue-next": "^0.460.0",
     "marked": "^18.0.3",
     "nprogress": "^0.2.0",
+    "qrcode": "^1.5.4",
     "vue": "^3.5.30",
     "vue-router": "^4.6.4"
   },

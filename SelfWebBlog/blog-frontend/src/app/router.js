@@ -11,6 +11,9 @@ const AdminPage = () => import('../pages/ProfilePage.vue')
 const VisitorProfilePage = () => import('../pages/VisitorProfilePage.vue')
 const AboutPage = () => import('../pages/AboutPage.vue')
 const GuestbookPage = () => import('../pages/GuestbookPage.vue')
+const TagsPage = () => import('../pages/TagsPage.vue')
+const TagDetailPage = () => import('../pages/TagDetailPage.vue')
+const CalendarPage = () => import('../pages/CalendarPage.vue')
 const RoutePlaceholderPage = () => import('../pages/RoutePlaceholderPage.vue')
 
 export const router = createRouter({
@@ -26,15 +29,19 @@ export const router = createRouter({
     {
       path: '/tags',
       name: 'tags',
-      component: RoutePlaceholderPage,
-      props: { title: '标签', description: '按主题浏览文章。' },
+      component: TagsPage,
+      meta: { public: true }
+    },
+    {
+      path: '/tags/:slug',
+      name: 'tag-detail',
+      component: TagDetailPage,
       meta: { public: true }
     },
     {
       path: '/calendar',
       name: 'calendar',
-      component: RoutePlaceholderPage,
-      props: { title: '内容日历', description: '按发布日期查找文章。' },
+      component: CalendarPage,
       meta: { public: true }
     },
     {

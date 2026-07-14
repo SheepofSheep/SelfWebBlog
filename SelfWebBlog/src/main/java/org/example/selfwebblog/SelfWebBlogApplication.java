@@ -8,7 +8,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @MapperScan({
 		"org.example.selfwebblog.mapper",
 		"org.example.selfwebblog.interaction.mapper",
-		"org.example.selfwebblog.analytics"
+		"org.example.selfwebblog.analytics",
+		"org.example.selfwebblog.content",
+		"org.example.selfwebblog.upload"
 })
 public class SelfWebBlogApplication {
 

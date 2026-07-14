@@ -1,5 +1,14 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  inject,
+  nextTick,
+  watch,
+  defineAsyncComponent
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getPost } from '../utils/api'
 import { showToast } from '../composables/toast'
@@ -15,6 +24,7 @@ import {
   Folder,
   RefreshCw,
   Eye,
+  Share2,
   Edit3
 } from 'lucide-vue-next'
 import { formatTime } from '../utils/format'
@@ -53,6 +63,13 @@ const articleRef = ref(null)
 const readingProgress = ref(0)
 const activeHeading = ref('')
 const previewImage = ref('')
+const shareOpen = ref(false)
+const ShareCardDialog = defineAsyncComponent(
+  () => import('../features/site/components/ShareCardDialog.vue')
+)
+const shareUrl = computed(() =>
+  typeof window === 'undefined' ? '' : `${window.location.origin}${route.fullPath}`
+)
 
 const renderedContent = computed(() =>
   post.value ? renderArticleMarkdown(post.value.content) : ''
@@ -212,6 +229,7 @@ onBeforeUnmount(() => {
           :initial-count="post.likeCount || 0"
           label="喜欢这篇文章"
         />
+        <button type="button" @click="shareOpen = true"><Share2 :size="17" />分享</button>
       </div>
 
       <div v-if="post.coverUrl" class="post-cover-photo">
@@ -258,6 +276,14 @@ onBeforeUnmount(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <ShareCardDialog
+      v-if="post"
+      :open="shareOpen"
+      :post="post"
+      :url="shareUrl"
+      @close="shareOpen = false"
+    />
 
   </div>
 </template>
@@ -412,6 +438,33 @@ onBeforeUnmount(() => {
 .post-tags .tag {
   padding: 4px 12px;
   font-size: 0.72rem;
+}
+
+.post-engagement {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.post-engagement > button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+.post-engagement > button:hover {
+  border-color: var(--border-subtle);
+  background: var(--surface-soft);
+  color: var(--text-primary);
 }
 
 .article-layout.has-toc {

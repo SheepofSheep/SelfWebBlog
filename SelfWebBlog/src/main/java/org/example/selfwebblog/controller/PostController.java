@@ -3,6 +3,7 @@ package org.example.selfwebblog.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
 import org.example.selfwebblog.config.PaginationPolicy;
+import org.example.selfwebblog.content.tag.TagService;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.service.PostService;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
@@ -29,9 +31,16 @@ public class PostController {
     private static final String STATUS_PUBLISHED = "PUBLISHED";
 
     private final PostService postService;
+    private final TagService tagService;
 
     public PostController(PostService postService) {
+        this(postService, null);
+    }
+
+    @Autowired
+    public PostController(PostService postService, TagService tagService) {
         this.postService = postService;
+        this.tagService = tagService;
     }
 
     @GetMapping
@@ -72,11 +81,13 @@ public class PostController {
             mergePost(existing, post);
             existing.setUpdateTime(LocalDateTime.now());
             postService.updateById(existing);
+            syncTags(existing);
             log.info("更新文章 ID:{} status:{}", existing.getId(), existing.getStatus());
             return Result.success("修改成功");
         }
         post.setUpdateTime(LocalDateTime.now());
         postService.save(post);
+        syncTags(post);
         log.info("创建文章 status:{}", post.getStatus());
         return Result.success("添加成功");
     }
@@ -84,6 +95,7 @@ public class PostController {
     @DeleteMapping("/{id}")
     public Result<String> delete(@PathVariable Long id, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
+        if (tagService != null) tagService.replacePostTags(id, "");
         boolean removed = postService.removeById(id);
         log.info("删除文章 ID:{}", id);
         return removed ? Result.success("删除成功") : Result.notFound("删除失败，ID不存在: " + id);
@@ -141,5 +153,9 @@ public class PostController {
         if (incoming.getTags() != null) existing.setTags(incoming.getTags());
         if (incoming.getImageUrl() != null) existing.setImageUrl(incoming.getImageUrl());
         existing.setStatus(incoming.getStatus());
+    }
+
+    private void syncTags(Post post) {
+        if (tagService != null) tagService.replacePostTags(post.getId(), post.getTags());
     }
 }

@@ -10,6 +10,11 @@ export async function createTag(name) {
   return unwrap(res.data)
 }
 
+export async function listPostsByTag(slug) {
+  const res = await api.get(`/tags/${encodeURIComponent(slug)}/posts`)
+  return unwrap(res.data)
+}
+
 export async function deleteTagFromAdmin(id) {
   const res = await api.delete(`/tags/${id}`)
   return unwrap(res.data)

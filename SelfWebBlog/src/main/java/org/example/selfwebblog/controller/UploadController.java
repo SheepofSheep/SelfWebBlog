@@ -7,6 +7,8 @@ import org.example.selfwebblog.service.UserService;
 import org.example.selfwebblog.service.upload.StoredUpload;
 import org.example.selfwebblog.service.upload.UploadStorageService;
 import org.example.selfwebblog.service.upload.UploadTarget;
+import org.example.selfwebblog.upload.asset.ImageAssetResponse;
+import org.example.selfwebblog.upload.asset.ImageAssetService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
@@ -15,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping({"/upload", "/api/upload"})
@@ -25,26 +28,42 @@ public class UploadController {
     private final BlogInfoService blogInfoService;
     private final UserService userService;
     private final UploadStorageService uploadStorageService;
+    private final ImageAssetService imageAssetService;
     private final String adminUsername;
 
     public UploadController(
         BlogInfoService blogInfoService,
         UserService userService,
         UploadStorageService uploadStorageService,
+        ImageAssetService imageAssetService,
         @Value("${auth.admin.username:admin}") String adminUsername
     ) {
         this.blogInfoService = blogInfoService;
         this.userService = userService;
         this.uploadStorageService = uploadStorageService;
+        this.imageAssetService = imageAssetService;
         this.adminUsername = adminUsername;
     }
 
     @PostMapping("/image")
-    public Result<String> uploadImage(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+    public Result<ImageAssetResponse> uploadImage(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         if (!AuthHelper.isAdmin(request)) {
             return Result.forbidden("无权限操作");
         }
-        return uploadFile(file, UploadTarget.ARTICLE_IMAGE);
+        try {
+            return Result.success(imageAssetService.storeArticleImage(file, AuthHelper.getUserId(request)));
+        } catch (IllegalArgumentException e) {
+            return Result.badRequest(e.getMessage());
+        } catch (IOException e) {
+            log.error("文章图片上传失败", e);
+            return Result.serverError("上传失败，请稍后重试");
+        }
+    }
+
+    @GetMapping("/assets")
+    public Result<List<ImageAssetResponse>> listAssets(HttpServletRequest request) {
+        if (!AuthHelper.isAdmin(request)) return Result.forbidden("无权限操作");
+        return Result.success(imageAssetService.listArticleAssets(AuthHelper.getUserId(request)));
     }
 
     @PostMapping("/avatar")

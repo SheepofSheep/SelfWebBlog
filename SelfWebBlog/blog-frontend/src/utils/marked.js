@@ -20,6 +20,8 @@ const ARTICLE_TAGS = [
   'em',
   'del',
   'a',
+  'picture',
+  'source',
   'img',
   'ul',
   'ol',
@@ -58,6 +60,10 @@ const COMMENT_TAGS = [
 const ARTICLE_ATTR = [
   'href',
   'src',
+  'srcset',
+  'sizes',
+  'media',
+  'type',
   'alt',
   'title',
   'class',
@@ -151,6 +157,18 @@ function enforceAttributePolicy(policy) {
         node.remove()
       } else {
         node.setAttribute('loading', 'lazy')
+      }
+    }
+
+    if (node.nodeName === 'SOURCE') {
+      const srcset = node.getAttribute('srcset')
+      const candidates = srcset
+        ?.split(',')
+        .map((candidate) => candidate.trim().split(/\s+/)[0])
+        .filter(Boolean)
+
+      if (!candidates?.length || candidates.some((source) => !isSafeImage(source, policy))) {
+        node.remove()
       }
     }
   }
