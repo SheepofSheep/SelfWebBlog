@@ -7,6 +7,7 @@ export function useHomeData() {
   const totalPosts = ref(0)
   const loading = ref(false)
   const error = ref('')
+  let controller = null
 
   const featuredPost = computed(() => posts.value[0] || null)
   const recentPosts = computed(() => posts.value.slice(1, 4))
@@ -19,18 +20,25 @@ export function useHomeData() {
   ])
 
   async function load() {
+    controller?.abort()
+    controller = new AbortController()
     loading.value = true
     error.value = ''
     try {
-      const data = await getProfile({ page: 1, size: 16 })
+      const data = await getProfile({ page: 1, size: 16, signal: controller.signal })
       blogInfo.value = data?.blogInfo || null
       posts.value = Array.isArray(data?.posts) ? data.posts : []
       totalPosts.value = data?.total ?? posts.value.length
     } catch (requestError) {
+      if (requestError?.name === 'CanceledError' || requestError?.name === 'AbortError') return
       error.value = requestError?.message || '文章暂时没有加载出来。'
     } finally {
       loading.value = false
     }
+  }
+
+  function dispose() {
+    controller?.abort()
   }
 
   return {
@@ -44,6 +52,7 @@ export function useHomeData() {
     feedPosts,
     categories,
     tags,
-    load
+    load,
+    dispose
   }
 }

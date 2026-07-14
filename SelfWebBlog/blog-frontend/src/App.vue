@@ -9,6 +9,7 @@ import { useAuthStore } from './stores/authStore'
 import loadingStore from './stores/loadingStore'
 import SiteHeader from './components/SiteHeader.vue'
 import ToastHost from './components/ToastHost.vue'
+import PointerTrail from './components/ui/PointerTrail.vue'
 
 NProgress.configure({ showSpinner: false, trickleSpeed: 120, ease: 'ease', speed: 220 })
 provideToast()
@@ -103,16 +104,16 @@ onUnmounted(() => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpir
 
 <template>
   <div :class="['app-shell', { 'login-shell': isLoginPage }]">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
     <SiteHeader
       v-if="!isLoginPage"
       :path="route.path"
       :user="user"
       :site-info="siteInfo"
-      @navigate="router.push"
       @logout="handleLogout"
     />
 
-    <main :class="['page-shell', { 'login-page-shell': isLoginPage }]">
+    <main id="main-content" :class="['page-shell', { 'login-page-shell': isLoginPage }]">
       <RouterView v-slot="{ Component, route: viewRoute }">
         <Transition name="page" mode="out-in">
           <KeepAlive :include="['HomePage', 'ProfilePage']">
@@ -123,20 +124,21 @@ onUnmounted(() => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpir
     </main>
 
     <ToastHost />
+    <PointerTrail />
   </div>
 </template>
 
 <style scoped>
 .app-shell {
   min-height: 100vh;
-  padding-top: 88px;
+  padding-top: 70px;
 }
 .login-shell {
   padding-top: 0;
 }
 .page-shell {
   width: 100%;
-  min-height: calc(100vh - 88px);
+  min-height: calc(100vh - 70px);
 }
 .login-page-shell {
   min-height: 100vh;
@@ -157,13 +159,13 @@ onUnmounted(() => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpir
 }
 @media (max-width: 820px) {
   .app-shell {
-    padding-top: 76px;
+    padding-top: 64px;
   }
   .login-shell {
     padding-top: 0;
   }
   .page-shell {
-    min-height: calc(100vh - 76px);
+    min-height: calc(100vh - 64px);
   }
 }
 </style>

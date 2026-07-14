@@ -1,0 +1,41 @@
+:where(button, input, textarea, select, a):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+button,
+input,
+textarea,
+select {
+  letter-spacing: 0;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.page-width {
+  width: min(var(--layout-max), calc(100% - 32px));
+  margin-inline: auto;
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 8px 12px;
+  transform: translateY(-160%);
+  border-radius: var(--radius-control);
+  background: var(--surface-solid);
+  color: var(--text-primary);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}

@@ -1,7 +1,9 @@
 <script setup>
 import { onBeforeUnmount, ref } from 'vue'
-import { Check, Monitor, Moon, Sparkles, Sun } from 'lucide-vue-next'
+import { Monitor, Moon, Sparkles, Sun } from 'lucide-vue-next'
 import { useAppearance } from '../composables/useAppearance'
+import IconButton from './ui/IconButton.vue'
+import SegmentedControl from './ui/SegmentedControl.vue'
 
 const open = ref(false)
 const root = ref(null)
@@ -15,7 +17,7 @@ const themeOptions = [
 const motionOptions = [
   { value: 'full', label: '完整' },
   { value: 'reduced', label: '精简' },
-  { value: 'system', label: '跟随系统' }
+  { value: 'off', label: '关闭' }
 ]
 
 function chooseTheme(value, event) {
@@ -32,50 +34,35 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
 
 <template>
   <div ref="root" class="appearance-control">
-    <button
+    <IconButton
       class="appearance-trigger"
-      type="button"
       :aria-expanded="open"
-      aria-haspopup="menu"
-      aria-label="外观设置"
-      title="外观设置"
+      label="外观设置"
       @click="open = !open"
     >
       <Sun v-if="effectiveTheme === 'light'" :size="18" />
       <Moon v-else :size="18" />
-    </button>
+    </IconButton>
 
     <Transition name="popover">
       <div v-if="open" class="appearance-menu" role="menu">
         <section>
           <p>主题</p>
-          <div class="appearance-segments">
-            <button
-              v-for="option in themeOptions"
-              :key="option.value"
-              type="button"
-              :class="{ active: theme === option.value }"
-              @click="chooseTheme(option.value, $event)"
-            >
-              <component :is="option.icon" :size="14" />
-              {{ option.label }}
-              <Check v-if="theme === option.value" :size="12" />
-            </button>
-          </div>
+          <SegmentedControl
+            :model-value="theme"
+            :options="themeOptions"
+            label="主题模式"
+            @update:model-value="chooseTheme($event, { clientX: innerWidth - 36, clientY: 36 })"
+          />
         </section>
         <section>
           <p><Sparkles :size="13" /> 动效</p>
-          <div class="appearance-segments compact">
-            <button
-              v-for="option in motionOptions"
-              :key="option.value"
-              type="button"
-              :class="{ active: motionMode === option.value }"
-              @click="setMotionMode(option.value)"
-            >
-              {{ option.label }}
-            </button>
-          </div>
+          <SegmentedControl
+            :model-value="motionMode"
+            :options="motionOptions"
+            label="动效级别"
+            @update:model-value="setMotionMode"
+          />
         </section>
       </div>
     </Transition>
@@ -86,21 +73,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
 .appearance-control {
   position: relative;
 }
-.appearance-trigger {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-main);
-  cursor: pointer;
-}
-.appearance-trigger:hover {
-  background: var(--surface-muted);
-  color: var(--primary-hover);
-}
 .appearance-menu {
   position: absolute;
   top: calc(100% + 12px);
@@ -109,9 +81,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
   width: min(310px, calc(100vw - 32px));
   padding: 14px;
   border: 1px solid var(--border-medium);
-  border-radius: 10px;
-  background: var(--surface-strong);
-  box-shadow: var(--shadow-lift);
+  border-radius: var(--radius-card);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-float);
 }
 .appearance-menu section + section {
   margin-top: 14px;
@@ -126,35 +98,6 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
   color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 800;
-}
-.appearance-segments {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  padding: 4px;
-  border-radius: 8px;
-  background: var(--surface-muted);
-}
-.appearance-segments button {
-  display: flex;
-  min-width: 0;
-  min-height: 38px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 7px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-.appearance-segments button.active {
-  background: var(--surface-strong);
-  color: var(--text-main);
-  box-shadow: 0 1px 4px rgba(20, 16, 10, 0.12);
 }
 .popover-enter-active,
 .popover-leave-active {

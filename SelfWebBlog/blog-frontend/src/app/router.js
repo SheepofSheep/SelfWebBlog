@@ -9,6 +9,7 @@ const LoginPage = () => import('../pages/LoginPage.vue')
 const WritePage = () => import('../pages/WritePage.vue')
 const AdminPage = () => import('../pages/ProfilePage.vue')
 const VisitorProfilePage = () => import('../pages/VisitorProfilePage.vue')
+const AboutPage = () => import('../pages/AboutPage.vue')
 const RoutePlaceholderPage = () => import('../pages/RoutePlaceholderPage.vue')
 
 export const router = createRouter({
@@ -45,8 +46,7 @@ export const router = createRouter({
     {
       path: '/about',
       name: 'about',
-      component: RoutePlaceholderPage,
-      props: { title: '关于 Gabriel', description: '个人资料与最近状态。' },
+      component: AboutPage,
       meta: { public: true }
     },
     { path: '/post/:id(\\d+)', name: 'post', component: PostPage, meta: { public: true } },

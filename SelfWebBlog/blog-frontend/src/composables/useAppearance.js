@@ -14,18 +14,26 @@ const theme = ref(
     'system'
   )
 )
-const motionMode = ref(
-  normalizePreference(localStorage.getItem('appearance.motion'), MOTION_MODES, 'system')
-)
 const prefersDark = ref(window.matchMedia('(prefers-color-scheme: dark)').matches)
 const prefersReduced = ref(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+const motionMode = ref(
+  normalizePreference(
+    localStorage.getItem('appearance.motion'),
+    MOTION_MODES,
+    prefersReduced.value ? 'reduced' : 'full'
+  )
+)
 const effectiveTheme = computed(() => resolveTheme(theme.value, prefersDark.value))
 const reducedMotion = computed(() => resolveReducedMotion(motionMode.value, prefersReduced.value))
+const effectiveMotion = computed(() => {
+  if (motionMode.value === 'off') return 'off'
+  return reducedMotion.value ? 'reduced' : 'full'
+})
 let initialized = false
 
 function applyAppearance() {
   document.documentElement.dataset.theme = effectiveTheme.value
-  document.documentElement.dataset.motion = reducedMotion.value ? 'reduced' : 'full'
+  document.documentElement.dataset.motion = effectiveMotion.value
   document.documentElement.style.colorScheme = effectiveTheme.value
 }
 
@@ -61,7 +69,7 @@ function setTheme(nextTheme, origin) {
 }
 
 function setMotionMode(nextMode) {
-  motionMode.value = normalizePreference(nextMode, MOTION_MODES, 'system')
+  motionMode.value = normalizePreference(nextMode, MOTION_MODES, 'full')
   localStorage.setItem('appearance.motion', motionMode.value)
   applyAppearance()
 }
@@ -71,6 +79,7 @@ export function useAppearance() {
     theme: readonly(theme),
     motionMode: readonly(motionMode),
     effectiveTheme,
+    effectiveMotion,
     reducedMotion,
     initializeAppearance,
     setTheme,
