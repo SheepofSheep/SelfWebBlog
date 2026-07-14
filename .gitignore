@@ -83,6 +83,10 @@ deployment/
 output/playwright/
 .gstack/
 
+# Optional local IP geolocation databases
+SelfWebBlog/src/main/resources/ip-data/*.xdb
+!SelfWebBlog/src/main/resources/ip-data/.gitkeep
+
 # Local dev scripts (machine-specific paths)
 start-dev.bat
 stop-dev.bat

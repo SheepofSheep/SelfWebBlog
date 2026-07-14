@@ -3,7 +3,7 @@ import axios from 'axios'
 export const AUTH_EXPIRED_EVENT = 'auth:expired'
 
 export const api = axios.create({
-  baseURL: '/',
+  baseURL: '/api',
   timeout: 15000,
   withCredentials: true
 })

@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 @RestController
-@RequestMapping("/tags")
+@RequestMapping({"/tags", "/api/tags"})
 public class TagController {
 
     private final TagMapper tagMapper;

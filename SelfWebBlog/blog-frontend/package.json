@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/composables/appearanceModel.test.js src/composables/draftStorage.test.js",
+    "test": "node --test src/**/*.test.js",
     "lint": "eslint . --ext .js,.vue --ignore-path .gitignore",
     "format": "prettier --write \"src/**/*.{js,vue,css}\" \"*.{js,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{js,vue,css}\" \"*.{js,json,md}\"",
@@ -19,7 +19,8 @@
     "lucide-vue-next": "^0.460.0",
     "marked": "^18.0.3",
     "nprogress": "^0.2.0",
-    "vue": "^3.5.30"
+    "vue": "^3.5.30",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.5",

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
-import { navigate } from '../router'
+import { useRouter } from 'vue-router'
 import { savePost, uploadImage, listTags, listCategories } from '../utils/api'
 import { useToast } from '../composables/toast'
 import { renderMarkdown } from '../utils/marked'
@@ -37,6 +37,9 @@ import {
   RefreshCw,
   XCircle
 } from 'lucide-vue-next'
+
+const router = useRouter()
+const navigate = (to) => router.push(to)
 
 const { push } = useToast()
 const refreshHome = inject('refreshHome', () => {})

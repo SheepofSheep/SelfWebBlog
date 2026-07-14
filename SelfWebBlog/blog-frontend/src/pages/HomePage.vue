@@ -1,10 +1,10 @@
 <script setup>
 import { computed, inject, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { PenLine } from 'lucide-vue-next'
 import { deletePost } from '../api'
 import { useHomeData } from '../composables/useHomeData'
 import { useToast } from '../composables/toast'
-import { navigate } from '../router'
 import ArticleFeed from '../components/articles/ArticleFeed.vue'
 import ArticleFilterBar from '../components/articles/ArticleFilterBar.vue'
 import AuthorStrip from '../components/articles/AuthorStrip.vue'
@@ -14,6 +14,8 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 defineOptions({ name: 'HomePage' })
 
+const router = useRouter()
+const navigate = (to) => router.push(to)
 const user = inject('user', null)
 const { push } = useToast()
 const {
@@ -35,7 +37,7 @@ const isAdmin = computed(() => user?.value?.role === 'ADMIN' || user?.role === '
 const confirmDialog = ref({ open: false, postId: null })
 
 function openPost(id) {
-  navigate(`/post?id=${encodeURIComponent(String(id))}`)
+  navigate(`/post/${encodeURIComponent(String(id))}`)
 }
 
 function openArchive() {

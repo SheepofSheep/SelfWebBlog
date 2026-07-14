@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
-import { useRoute, navigate } from '../router'
-// navigate used in template
+import { useRoute, useRouter } from 'vue-router'
 import { getPost, addComment, deleteComment, getComments, togglePinComment } from '../utils/api'
 import { showToast } from '../composables/toast'
 import { renderArticleMarkdown, renderCommentMarkdown } from '../utils/marked'
@@ -25,6 +24,10 @@ import {
 } from 'lucide-vue-next'
 import { formatTime } from '../utils/format'
 
+const route = useRoute()
+const router = useRouter()
+const navigate = (to) => router.push(to)
+
 function goBack() {
   window.history.back()
 }
@@ -47,8 +50,7 @@ function editPost() {
   navigate('/write')
 }
 
-const { query } = useRoute()
-const postId = computed(() => query.value.get('id'))
+const postId = computed(() => String(route.params.id || ''))
 const post = ref(null)
 const comments = ref([])
 const commentContent = ref('')

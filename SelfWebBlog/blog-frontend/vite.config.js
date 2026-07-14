@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
-      '^/(uploads|profile|posts|comments|upload|auth|admin|user|tags)': {
+      '^/(api|uploads|actuator)': {
         target: 'http://localhost:8080',
         changeOrigin: true
       }

@@ -32,7 +32,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/comments")
+@RequestMapping({"/comments", "/api/comments"})
 public class CommentController {
 
     private static final Logger log = LoggerFactory.getLogger(CommentController.class);

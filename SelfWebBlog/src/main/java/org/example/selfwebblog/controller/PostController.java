@@ -21,7 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 
 @RestController
-@RequestMapping("/posts")
+@RequestMapping({"/posts", "/api/posts"})
 public class PostController {
 
     private static final Logger log = LoggerFactory.getLogger(PostController.class);

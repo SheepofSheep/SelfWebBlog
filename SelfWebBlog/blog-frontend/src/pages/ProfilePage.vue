@@ -1,5 +1,6 @@
 <script setup>
 import { computed, inject, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   deletePost,
   getProfile,
@@ -12,13 +13,14 @@ import {
   deleteUser,
   listDrafts
 } from '../utils/api'
-import { navigate } from '../router'
 import { useToast } from '../composables/toast'
 import { toAbsoluteUrl } from '../utils/url'
 import { formatTime, toPlainText, getFirstImageUrl } from '../utils/format'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { Image, Settings, Edit3, Trash2, Camera, FileText, Users, FileClock } from 'lucide-vue-next'
 
+const router = useRouter()
+const navigate = (to) => router.push(to)
 const { push } = useToast()
 const user = inject('user', ref(null))
 const refreshHome = inject('refreshHome', null)
@@ -106,7 +108,7 @@ function goHome() {
   navigate('/')
 }
 function openPost(id) {
-  navigate(`/post?id=${encodeURIComponent(String(id))}`)
+  navigate(`/post/${encodeURIComponent(String(id))}`)
 }
 function openNicknameModal() {
   newNickname.value = blogInfo.value?.nickname || ''

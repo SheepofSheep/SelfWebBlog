@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, SearchX } from 'lucide-vue-next'
 import { listCategories, listTags, searchPosts } from '../api'
-import { navigate, useRoute } from '../router'
 import ArticleFilterBar from '../components/articles/ArticleFilterBar.vue'
 import ArchiveTimeline from '../components/articles/ArchiveTimeline.vue'
 
-const { query } = useRoute()
+const route = useRoute()
+const router = useRouter()
 const posts = ref([])
 const categories = ref([])
 const tags = ref([])
@@ -22,11 +23,11 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize))
 let debounceTimer
 
 function initializeFromQuery() {
-  keyword.value = query.value.get('keyword') || ''
-  category.value = query.value.get('category') || ''
-  tag.value = query.value.get('tag') || ''
-  sort.value = query.value.get('sort') || 'date'
-  currentPage.value = Math.max(1, Number(query.value.get('page') || 1))
+  keyword.value = String(route.query.keyword || '')
+  category.value = String(route.query.category || '')
+  tag.value = String(route.query.tag || '')
+  sort.value = String(route.query.sort || 'date')
+  currentPage.value = Math.max(1, Number(route.query.page || 1))
 }
 
 function archiveUrl() {
@@ -54,7 +55,7 @@ async function loadPosts({ resetPage = false } = {}) {
     posts.value = data.records || []
     total.value = data.total || 0
     const nextUrl = archiveUrl()
-    if ((window.location.hash.replace(/^#/, '') || '/') !== nextUrl) navigate(nextUrl)
+    if (route.fullPath !== nextUrl) await router.replace(nextUrl)
   } finally {
     loading.value = false
   }
@@ -126,7 +127,7 @@ onMounted(async () => {
     <ArchiveTimeline
       v-else-if="posts.length"
       :posts="posts"
-      @open="navigate(`/post?id=${encodeURIComponent(String($event))}`)"
+      @open="router.push(`/post/${encodeURIComponent(String($event))}`)"
     />
     <section v-else class="archive-empty">
       <SearchX :size="30" />

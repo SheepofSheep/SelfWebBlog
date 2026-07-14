@@ -44,7 +44,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping({"/auth", "/api/auth"})
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);

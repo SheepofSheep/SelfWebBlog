@@ -21,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/profile")
+@RequestMapping({"/profile", "/api/profile"})
 public class ProfileController {
 
     private final BlogInfoService blogInfoService;

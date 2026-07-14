@@ -17,7 +17,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 
 @RestController
-@RequestMapping("/upload")
+@RequestMapping({"/upload", "/api/upload"})
 public class UploadController {
 
     private static final Logger log = LoggerFactory.getLogger(UploadController.class);

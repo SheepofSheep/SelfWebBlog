@@ -10,7 +10,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/admin")
+@RequestMapping({"/admin", "/api/admin"})
 public class AdminController {
 
     private final UserService userService;

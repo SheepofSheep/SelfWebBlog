@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { navigate, useRoute } from '../router'
+import { useRoute, useRouter } from 'vue-router'
 import { login, register, getGithubAuthUrl } from '../utils/api'
 import { showToast } from '../composables/toast'
 import { Github } from 'lucide-vue-next'
@@ -8,7 +8,9 @@ import { Github } from 'lucide-vue-next'
 const tab = ref('login')
 const loading = ref(false)
 const imageKey = ref(0)
-const { query } = useRoute()
+const route = useRoute()
+const router = useRouter()
+const navigate = (to) => router.push(to)
 
 const loginUsername = ref('')
 const loginPassword = ref('')
@@ -34,7 +36,7 @@ function saveAuth(data) {
 }
 
 function goAfterLogin() {
-  navigate(query.value.get('redirect') || '/')
+  navigate(String(route.query.redirect || '/'))
 }
 
 async function handleLogin() {
