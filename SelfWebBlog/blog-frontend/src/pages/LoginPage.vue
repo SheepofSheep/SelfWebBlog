@@ -1,152 +1,114 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Github } from 'lucide-vue-next'
-import { adminLogin, getGithubAuthUrl, login, register } from '../api'
-import { showToast } from '../composables/toast'
-import { useAuthStore } from '../stores/authStore'
-import AuthShell from '../features/auth/components/AuthShell.vue'
-import LoginForm from '../features/auth/components/LoginForm.vue'
-import RegisterForm from '../features/auth/components/RegisterForm.vue'
-import AdminLoginDisclosure from '../features/auth/components/AdminLoginDisclosure.vue'
-
-const mode = ref('login')
-const loading = ref(false)
+import { Github, RefreshCw } from 'lucide-vue-next'
+import { api } from '@/api/client.js'
+import { oauthErrorMessage, safeRedirect } from '@/core/authNavigation.js'
+import { appStore, notify } from '@/stores/app.js'
 const route = useRoute()
 const router = useRouter()
-const { saveUser } = useAuthStore()
-const registerForm = ref(null)
-const modes = [
-  { value: 'login', label: '登录' },
-  { value: 'register', label: '注册' }
-]
-const imageSrc = computed(() =>
-  mode.value === 'login' ? '/images/login-illust.jpg' : '/images/register-illust.jpg'
+const mode = ref('login')
+const form = ref({ username: '', password: '', email: '', captchaAnswer: '' })
+const captcha = ref(null)
+const busy = ref(false)
+function finishLogin(user) {
+  appStore.user = user
+  const fallback = user?.role === 'ADMIN' ? '/admin' : '/me'
+  router.replace(safeRedirect(route.query.redirect, fallback))
+}
+function switchMode(next) {
+  mode.value = next
+  if (next === 'register') loadCaptcha()
+}
+async function loadCaptcha() {
+  if (mode.value === 'register') captcha.value = await api.captcha('register')
+}
+async function submit() {
+  busy.value = true
+  try {
+    const payload = { ...form.value, captchaId: captcha.value?.challengeId }
+    const data = mode.value === 'login' ? await api.login(payload) : await api.register(payload)
+    finishLogin(data.user)
+  } catch (e) {
+    notify(e.message)
+    loadCaptcha()
+  } finally {
+    busy.value = false
+  }
+}
+async function startGithub() {
+  busy.value = true
+  try {
+    location.assign(await api.githubLogin())
+  } catch (error) {
+    notify(error.message)
+    busy.value = false
+  }
+}
+watch(
+  () => appStore.ready,
+  (ready) => {
+    if (ready && appStore.user && !route.query.ticket) finishLogin(appStore.user)
+  }
 )
-
-function saveAuth(data) {
-  saveUser(data.user)
-}
-
-async function goAfterLogin() {
-  const redirect = String(route.query.redirect || '/')
-  await router.replace(redirect.startsWith('/') ? redirect : '/')
-}
-
-async function handleLogin(credentials) {
-  if (!credentials.username || !credentials.password) return
-  loading.value = true
-  try {
-    const data = await login(credentials.username, credentials.password)
-    saveAuth(data)
-    showToast('登录成功，欢迎回来。')
-    await goAfterLogin()
-  } catch (error) {
-    showToast(error?.message || '登录没有成功，请检查账号和密码。', 'error')
-  } finally {
-    loading.value = false
+onMounted(async () => {
+  if (route.query.error) {
+    notify(oauthErrorMessage(String(route.query.error)))
+    return router.replace({ path: '/login', query: { redirect: route.query.redirect } })
   }
-}
-
-async function handleRegister(payload) {
-  if (payload.username.length < 2 || payload.username.length > 20) {
-    showToast('用户名需要 2 到 20 个字符。', 'warning')
-    return
-  }
-  if (payload.password.length < 6) {
-    showToast('密码至少需要 6 个字符。', 'warning')
-    return
-  }
-  loading.value = true
-  try {
-    const data = await register(payload)
-    saveAuth(data)
-    showToast('账号已创建。')
-    await goAfterLogin()
-  } catch (error) {
-    showToast(error?.message || '注册没有成功，请稍后重试。', 'error')
-    registerForm.value?.refreshCaptcha()
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleAdminLogin(credentials) {
-  if (!credentials.username || !credentials.password) return
-  loading.value = true
-  try {
-    const data = await adminLogin(credentials.username, credentials.password)
-    saveAuth(data)
-    showToast('工作台登录成功。')
-    await router.replace('/admin')
-  } catch (error) {
-    showToast(error?.message || '管理员登录失败。', 'error')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleGithubLogin() {
-  try {
-    const url = await getGithubAuthUrl()
-    if (url) window.location.assign(url)
-  } catch {
-    showToast('GitHub 登录暂不可用，请使用账号密码登录。', 'warning')
-  }
-}
+  if (route.query.ticket) {
+    busy.value = true
+    try {
+      const data = await api.exchangeOAuth(String(route.query.ticket))
+      finishLogin(data.user)
+    } catch (error) {
+      notify(error.message)
+      router.replace('/login')
+    } finally {
+      busy.value = false
+    }
+  } else if (appStore.user) finishLogin(appStore.user)
+})
 </script>
-
 <template>
-  <AuthShell v-model:mode="mode" :modes="modes" :image-src="imageSrc" @home="router.push('/')">
-    <Transition name="form-switch" mode="out-in">
-      <LoginForm v-if="mode === 'login'" key="login" :loading="loading" @submit="handleLogin" />
-      <RegisterForm
-        v-else
-        ref="registerForm"
-        key="register"
-        :loading="loading"
-        @submit="handleRegister"
-      />
-    </Transition>
-
-    <template #footer>
-      <button class="github-login" type="button" :disabled="loading" @click="handleGithubLogin">
-        <Github :size="16" />使用 GitHub 登录
+  <div class="auth-page page">
+    <section class="auth-card glass">
+      <div class="auth-tabs">
+        <button :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</button
+        ><button :class="{ active: mode === 'register' }" @click="switchMode('register')">
+          注册
+        </button>
+      </div>
+      <form @submit.prevent="submit">
+        <label>用户名<input v-model="form.username" autocomplete="username" required /></label
+        ><label v-if="mode === 'register'"
+          >邮箱<input v-model="form.email" type="email" autocomplete="email" /></label
+        ><label
+          >密码<input
+            v-model="form.password"
+            type="password"
+            :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
+            required /></label
+        ><label v-if="mode === 'register'" class="captcha-field"
+          >验证码
+          <div>
+            <img v-if="captcha" :src="captcha.imageDataUrl" alt="验证码" /><button
+              type="button"
+              class="icon-button"
+              @click="loadCaptcha"
+            >
+              <RefreshCw :size="17" />
+            </button>
+          </div>
+          <input v-model="form.captchaAnswer" required /></label
+        ><button class="primary-button wide" :disabled="busy">
+          {{ mode === 'login' ? '登录' : '注册' }}
+        </button>
+      </form>
+      <div class="auth-divider"><span>或</span></div>
+      <button class="secondary-button wide" :disabled="busy" @click="startGithub">
+        <Github :size="18" />GitHub
       </button>
-      <AdminLoginDisclosure v-if="mode === 'login'" :loading="loading" @submit="handleAdminLogin" />
-    </template>
-  </AuthShell>
+    </section>
+  </div>
 </template>
-
-<style scoped>
-.github-login {
-  width: 100%;
-  min-height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.form-switch-enter-active,
-.form-switch-leave-active {
-  transition:
-    opacity var(--motion-normal-duration),
-    transform var(--motion-normal-duration) var(--motion-ease);
-}
-.form-switch-enter-from {
-  opacity: 0;
-  transform: translateX(12px);
-}
-.form-switch-leave-to {
-  opacity: 0;
-  transform: translateX(-12px);
-}
-</style>

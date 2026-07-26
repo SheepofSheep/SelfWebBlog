@@ -32,4 +32,15 @@ class SessionCookieServiceTest {
 
         assertThat(service.hasValidCsrf(request)).isTrue();
     }
+
+    @Test
+    void acceptsTheMatchingCsrfCookieWhenLegacyDuplicatePathsExist() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(
+                new Cookie(SessionCookieService.CSRF_COOKIE, "legacy-value"),
+                new Cookie(SessionCookieService.CSRF_COOKIE, "fresh-value"));
+        request.addHeader(SessionCookieService.CSRF_HEADER, "fresh-value");
+
+        assertThat(service.hasValidCsrf(request)).isTrue();
+    }
 }

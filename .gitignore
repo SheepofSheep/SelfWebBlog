@@ -82,6 +82,7 @@ deployment/
 .playwright-cli/
 output/playwright/
 .gstack/
+.superpowers/
 
 # Optional local IP geolocation databases
 SelfWebBlog/src/main/resources/ip-data/*.xdb

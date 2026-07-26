@@ -141,6 +141,63 @@ class PostControllerTest {
     }
 
     @Test
+    void publishesImageOnlyPostWithoutMetadata() throws Exception {
+        when(postService.save(any(Post.class))).thenReturn(true);
+
+        mockMvc.perform(post("/posts")
+                        .requestAttr("role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "",
+                                  "content": "![](/uploads/image.webp)",
+                                  "status": "PUBLISHED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(postService).save(any(Post.class));
+    }
+
+    @Test
+    void rejectsCompletelyEmptyPublishedPost() throws Exception {
+        mockMvc.perform(post("/posts")
+                        .requestAttr("role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "",
+                                  "content": "  # **  ",
+                                  "status": "PUBLISHED"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value("文章需要包含正文或媒体"));
+
+        verify(postService, never()).save(any(Post.class));
+    }
+
+    @Test
+    void rejectsRawCssInArticleBackgroundConfiguration() throws Exception {
+        mockMvc.perform(post("/posts")
+                        .requestAttr("role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content": "正文",
+                                  "status": "PUBLISHED",
+                                  "backgroundMode": "GRADIENT",
+                                  "backgroundValue": "linear-gradient(red, blue)"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value("文章背景配置不合法"));
+
+        verify(postService, never()).save(any(Post.class));
+    }
+
+    @Test
     void rejectsOversizedPageBeforeQueryingDatabase() throws Exception {
         mockMvc.perform(get("/posts").param("page", "1").param("size", "101"))
                 .andExpect(status().isBadRequest());

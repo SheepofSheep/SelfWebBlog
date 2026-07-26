@@ -17,6 +17,12 @@ class TagServiceTest {
     }
 
     @Test
+    void normalizesOneTagInputCollectionAndKeepsFirstSpelling() {
+        assertEquals(List.of("Vue", "生活 随笔"),
+                TagService.normalizeNames(List.of(" Vue ", "vue", "生活　随笔")));
+    }
+
+    @Test
     void createsReadableOrStableFallbackSlugs() {
         assertEquals("vue-3", TagService.slugFor("Vue 3"));
         assertTrue(TagService.slugFor("生活").matches("tag-[a-f0-9]{10}"));

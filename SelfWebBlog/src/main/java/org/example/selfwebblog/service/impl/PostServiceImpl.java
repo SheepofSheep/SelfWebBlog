@@ -36,7 +36,10 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
                 .ne(Post::getStatus, "DRAFT");
 
         if (keyword != null && !keyword.isBlank()) {
-            wrapper.and(w -> w.like(Post::getTitle, keyword).or().like(Post::getSummary, keyword));
+            wrapper.and(w -> w.like(Post::getTitle, keyword)
+                    .or().like(Post::getSummary, keyword)
+                    .or().like(Post::getContent, keyword)
+                    .or().like(Post::getTags, keyword));
         }
         if (category != null && !category.isBlank()) {
             wrapper.eq(Post::getCategory, category);

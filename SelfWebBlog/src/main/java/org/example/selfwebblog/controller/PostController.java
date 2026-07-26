@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.example.selfwebblog.admin.security.AdminOnly;
 import org.example.selfwebblog.config.PaginationPolicy;
 import org.example.selfwebblog.content.tag.TagService;
+import org.example.selfwebblog.content.post.PostContentPolicy;
 import org.example.selfwebblog.analytics.EngagementMapper;
 import org.example.selfwebblog.interaction.mapper.InteractionMapper;
 import org.example.selfwebblog.interaction.model.Interaction;
@@ -85,6 +86,10 @@ public class PostController {
             return Result.badRequest("文章状态不合法");
         }
         post.setStatus(normalizedStatus);
+        post.setTitle(value(post.getTitle()));
+        post.setContent(value(post.getContent()));
+        PostContentPolicy.requirePublishable(normalizedStatus, post.getContent());
+        normalizePresentation(post);
 
         if (post.getId() != null) {
             Post existing = postService.getById(post.getId());
@@ -181,7 +186,45 @@ public class PostController {
         if (incoming.getCategory() != null) existing.setCategory(incoming.getCategory());
         if (incoming.getTags() != null) existing.setTags(incoming.getTags());
         if (incoming.getImageUrl() != null) existing.setImageUrl(incoming.getImageUrl());
+        if (incoming.getBackgroundMode() != null) existing.setBackgroundMode(incoming.getBackgroundMode());
+        if (incoming.getBackgroundValue() != null) existing.setBackgroundValue(incoming.getBackgroundValue());
+        if (incoming.getBackgroundFocusX() != null) existing.setBackgroundFocusX(incoming.getBackgroundFocusX());
+        if (incoming.getBackgroundFocusY() != null) existing.setBackgroundFocusY(incoming.getBackgroundFocusY());
         existing.setStatus(incoming.getStatus());
+    }
+
+    private void normalizePresentation(Post post) {
+        String mode = value(post.getBackgroundMode()).trim().toUpperCase();
+        if (mode.isBlank()) mode = "COVER";
+        if (!List.of("COVER", "CUSTOM_IMAGE", "GRADIENT", "SOLID", "SITE_DEFAULT", "NONE").contains(mode)) {
+            throw new IllegalArgumentException("文章背景模式不合法");
+        }
+        String backgroundValue = value(post.getBackgroundValue()).trim();
+        if (!isValidBackgroundValue(mode, backgroundValue)) {
+            throw new IllegalArgumentException("文章背景配置不合法");
+        }
+        post.setBackgroundMode(mode);
+        post.setBackgroundValue(backgroundValue);
+        post.setBackgroundFocusX(clamp(post.getBackgroundFocusX(), 50));
+        post.setBackgroundFocusY(clamp(post.getBackgroundFocusY(), 50));
+    }
+
+    private boolean isValidBackgroundValue(String mode, String backgroundValue) {
+        return switch (mode) {
+            case "CUSTOM_IMAGE" -> backgroundValue.matches("(?i)^(?:https?://|/uploads/|/api/media/)[^\\s<>]+$");
+            case "GRADIENT" -> backgroundValue.matches("^(?:tide|mist|dusk|leaf|ember)$");
+            case "SOLID" -> backgroundValue.matches("^#[0-9a-fA-F]{6}$");
+            default -> backgroundValue.isBlank();
+        };
+    }
+
+    private int clamp(Integer value, int fallback) {
+        if (value == null) return fallback;
+        return Math.max(0, Math.min(100, value));
+    }
+
+    private String value(String value) {
+        return value == null ? "" : value;
     }
 
     private List<Long> normalizedIds(List<Long> ids) {

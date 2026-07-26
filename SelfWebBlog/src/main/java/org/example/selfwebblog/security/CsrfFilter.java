@@ -9,6 +9,8 @@ import org.example.selfwebblog.entity.Result;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +18,7 @@ import java.util.Set;
 
 @Component
 public class CsrfFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(CsrfFilter.class);
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
 
     private final SessionCookieService cookieService;
@@ -33,6 +36,12 @@ public class CsrfFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
         cookieService.ensureCsrfToken(request, response);
         if (!SAFE_METHODS.contains(request.getMethod()) && !cookieService.hasValidCsrf(request)) {
+            long cookieCount = request.getCookies() == null ? 0 : java.util.Arrays.stream(request.getCookies())
+                    .filter(cookie -> SessionCookieService.CSRF_COOKIE.equals(cookie.getName()))
+                    .count();
+            log.warn("拒绝缺少有效 CSRF 双重提交的请求 method={} path={} headerPresent={} cookieCount={}",
+                    request.getMethod(), request.getRequestURI(),
+                    request.getHeader(SessionCookieService.CSRF_HEADER) != null, cookieCount);
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

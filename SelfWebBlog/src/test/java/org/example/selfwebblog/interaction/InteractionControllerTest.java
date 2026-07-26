@@ -3,6 +3,9 @@ package org.example.selfwebblog.interaction;
 import org.example.selfwebblog.config.ResultHttpStatusAdvice;
 import org.example.selfwebblog.exception.GlobalExceptionHandler;
 import org.example.selfwebblog.interaction.dto.InteractionThreadResponse;
+import org.example.selfwebblog.interaction.dto.InteractionItemResponse;
+import org.example.selfwebblog.interaction.model.Interaction;
+import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.security.ClientIpResolver;
 import org.example.selfwebblog.service.CommentRateLimiter;
 import org.example.selfwebblog.service.UserService;
@@ -65,5 +68,29 @@ class InteractionControllerTest {
                                 {"targetType":"POST","targetId":7,"content":"hello"}
                                 """))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void authenticatedUserCanReplyWithContentOnly() throws Exception {
+        User actor = new User();
+        actor.setId(9L);
+        Interaction parent = new Interaction();
+        parent.setId(4L);
+        parent.setTargetType("POST");
+        parent.setTargetId(7L);
+        when(userService.getById(9L)).thenReturn(actor);
+        when(interactionService.requireInteraction(4L)).thenReturn(parent);
+        when(clientIpResolver.resolve(any())).thenReturn("127.0.0.1");
+        when(rateLimiter.tryAcquire("reply", 9L, "127.0.0.1")).thenReturn(true);
+        when(interactionService.create(any(), eq(actor), eq("127.0.0.1"), eq(false)))
+                .thenReturn(new InteractionItemResponse());
+
+        mockMvc.perform(post("/api/interactions/4/replies")
+                        .requestAttr("userId", 9L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"content":"回复正文"}
+                                """))
+                .andExpect(status().isOk());
     }
 }
