@@ -8,7 +8,7 @@ const routes = [
   { path: '/archive', name: 'archive', component: () => import('@/pages/ArchivePage.vue') },
   { path: '/tags', name: 'tags', component: () => import('@/pages/TagsPage.vue') },
   { path: '/tags/:slug', name: 'tag', component: () => import('@/pages/TagsPage.vue') },
-  { path: '/calendar', name: 'calendar', component: () => import('@/pages/CalendarPage.vue') },
+  { path: '/calendar', redirect: { path: '/', query: { calendar: 'open' } } },
   { path: '/guestbook', name: 'guestbook', component: () => import('@/pages/GuestbookPage.vue') },
   { path: '/about', name: 'about', component: () => import('@/pages/AboutPage.vue') },
   { path: '/post/:id', name: 'post', component: () => import('@/pages/PostPage.vue') },
@@ -26,7 +26,7 @@ const routes = [
     component: () => import('@/pages/AdminPage.vue'),
     meta: { immersive: true }
   },
-  { path: '/profile', redirect: '/admin' },
+  { path: '/profile', redirect: '/me' },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

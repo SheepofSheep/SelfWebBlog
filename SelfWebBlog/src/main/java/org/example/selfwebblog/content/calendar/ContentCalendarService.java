@@ -27,16 +27,17 @@ public class ContentCalendarService {
         LocalDateTime start = requested.atDay(1).atStartOfDay();
         LocalDateTime end = requested.plusMonths(1).atDay(1).atStartOfDay();
         List<CalendarPost> posts = jdbcTemplate.query("""
-                        SELECT id, title, summary, cover_url, category, create_time
+                        SELECT id, title, summary, cover_url, category, published_time
                         FROM post
-                        WHERE status = 'PUBLISHED' AND create_time >= ? AND create_time < ?
-                        ORDER BY create_time ASC
+                        WHERE status = 'PUBLISHED'
+                          AND date(published_time) >= ? AND date(published_time) < ?
+                        ORDER BY datetime(published_time) ASC, id ASC
                         """,
-                (result, row) -> mapPost(result), start, end);
+                (result, row) -> mapPost(result), start.toLocalDate(), end.toLocalDate());
 
         Map<LocalDate, List<CalendarPost>> grouped = new LinkedHashMap<>();
         for (CalendarPost post : posts) {
-            grouped.computeIfAbsent(post.createTime().toLocalDate(), ignored -> new ArrayList<>())
+            grouped.computeIfAbsent(post.publishedTime().toLocalDate(), ignored -> new ArrayList<>())
                     .add(post);
         }
         List<CalendarDay> days = grouped.entrySet().stream()
@@ -60,7 +61,7 @@ public class ContentCalendarService {
                 result.getString("summary"),
                 result.getString("cover_url"),
                 result.getString("category"),
-                LocalDateTime.parse(result.getString("create_time").replace(' ', 'T')));
+                LocalDateTime.parse(result.getString("published_time").replace(' ', 'T')));
     }
 
     public record MonthCalendar(String month, int postCount, List<CalendarDay> days) {
@@ -75,6 +76,6 @@ public class ContentCalendarService {
             String summary,
             String coverUrl,
             String category,
-            LocalDateTime createTime) {
+            LocalDateTime publishedTime) {
     }
 }

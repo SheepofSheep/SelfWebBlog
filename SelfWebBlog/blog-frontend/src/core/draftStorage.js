@@ -33,6 +33,15 @@ export function stripLocalMedia(content = '') {
     .replace(/<(?:img|video|audio)\b[^>]*\bsrc=["']blob:[^"']+["'][^>]*>/gi, '')
 }
 
+export function removeLocalMedia(content = '', localUrl = '') {
+  const url = String(localUrl)
+  if (!url) return String(content)
+  const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return String(content)
+    .replace(new RegExp(`!\\[[^\\]]*]\\(\\s*${escaped}\\s*\\)`, 'gi'), '')
+    .replaceAll(url, '')
+}
+
 export function hasUsefulDraft(value) {
   return Boolean(
     value?.title?.trim() ||

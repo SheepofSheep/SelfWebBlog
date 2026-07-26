@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.example.selfwebblog.entity.Post;
 import org.example.selfwebblog.mapper.PostMapper;
 import org.example.selfwebblog.service.PostService;
+import org.example.selfwebblog.content.post.PostStatusPolicy;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,25 +16,45 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     public Page<Post> listByPage(int page, int size) {
         Page<Post> p = new Page<>(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
-                .ne(Post::getStatus, "DRAFT")
-                .orderByDesc(Post::getCreateTime);
+                .eq(Post::getStatus, PostStatusPolicy.PUBLISHED)
+                .orderByDesc(Post::getPublishedTime)
+                .orderByDesc(Post::getId);
         return baseMapper.selectPage(p, wrapper);
     }
 
     @Override
     public Page<Post> listDrafts(int page, int size) {
-        Page<Post> p = new Page<>(page, size);
-        LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
-                .eq(Post::getStatus, "DRAFT")
-                .orderByDesc(Post::getUpdateTime);
-        return baseMapper.selectPage(p, wrapper);
+        return listForAdmin(PostStatusPolicy.DRAFT, null, page, size);
+    }
+
+    @Override
+    public Page<Post> listForAdmin(String status, String keyword, int page, int size) {
+        Page<Post> result = new Page<>(page, size);
+        LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<>();
+        String normalizedStatus = PostStatusPolicy.normalize(status);
+        if (!normalizedStatus.isBlank()) wrapper.eq(Post::getStatus, normalizedStatus);
+        if (keyword != null && !keyword.isBlank()) {
+            String query = keyword.trim();
+            wrapper.and(item -> item.like(Post::getTitle, query)
+                    .or().like(Post::getSummary, query)
+                    .or().like(Post::getContent, query)
+                    .or().like(Post::getCategory, query)
+                    .or().like(Post::getTags, query));
+        }
+        if (PostStatusPolicy.ARCHIVED.equals(normalizedStatus)) {
+            wrapper.orderByDesc(Post::getArchivedTime);
+        }
+        wrapper.orderByDesc(Post::getUpdateTime)
+                .orderByDesc(Post::getCreateTime)
+                .orderByDesc(Post::getId);
+        return baseMapper.selectPage(result, wrapper);
     }
 
     @Override
     public Page<Post> search(String keyword, String category, String tag, String sort, int page, int size) {
         Page<Post> p = new Page<>(page, size);
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
-                .ne(Post::getStatus, "DRAFT");
+                .eq(Post::getStatus, PostStatusPolicy.PUBLISHED);
 
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(Post::getTitle, keyword)
@@ -49,9 +70,9 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         }
 
         if ("title".equals(sort)) {
-            wrapper.orderByAsc(Post::getTitle);
+            wrapper.orderByAsc(Post::getTitle).orderByDesc(Post::getId);
         } else {
-            wrapper.orderByDesc(Post::getCreateTime);
+            wrapper.orderByDesc(Post::getPublishedTime).orderByDesc(Post::getId);
         }
 
         return baseMapper.selectPage(p, wrapper);
@@ -61,7 +82,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
     public java.util.List<String> allCategories() {
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .select(Post::getCategory)
-                .ne(Post::getStatus, "DRAFT")
+                .eq(Post::getStatus, PostStatusPolicy.PUBLISHED)
                 .isNotNull(Post::getCategory)
                 .ne(Post::getCategory, "")
                 .groupBy(Post::getCategory);

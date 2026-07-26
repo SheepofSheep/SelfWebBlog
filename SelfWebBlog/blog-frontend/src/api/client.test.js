@@ -64,3 +64,150 @@ test('profile updates and avatar uploads use the authenticated user endpoints', 
     ['/api/user/profile', '/api/user/avatar']
   )
 })
+
+test('public interaction threads request an explicit root page and size', async (context) => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path) => {
+    calls.push(path)
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: { items: [], total: 0, page: 2, size: 20 } })
+    }
+  }
+  context.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  await api.thread('POST', '2081309851788009474', 2, 20)
+
+  assert.deepEqual(calls, ['/api/interactions/POST/2081309851788009474?page=2&size=20'])
+})
+
+test('operations methods use the dedicated admin endpoints', async (context) => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options })
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: path === '/api/auth/csrf' ? { token: 'token' } : {} })
+    }
+  }
+  context.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  await api.adminPosts({ status: 'ARCHIVED', keyword: '夏天', page: 2, size: 20 })
+  await api.changePostStatus('7', 'PUBLISHED')
+  await api.batchPostStatus(['7', '8'], 'ARCHIVED')
+  await api.trends(30)
+  await api.scanAssets()
+  await api.assetReferences('9')
+  await api.deleteAsset('9')
+  await api.deleteAssets(['9', '10'])
+  await api.movePin('5', 'UP')
+
+  const sent = calls.filter((call) => call.path !== '/api/auth/csrf')
+  assert.deepEqual(
+    sent.map((call) => call.path),
+    [
+      '/api/posts/admin?status=ARCHIVED&keyword=%E5%A4%8F%E5%A4%A9&page=2&size=20',
+      '/api/posts/7/status',
+      '/api/posts/batch/status',
+      '/api/admin/dashboard/trend?days=30',
+      '/api/admin/assets/scan',
+      '/api/admin/assets/9/references',
+      '/api/admin/assets/9',
+      '/api/admin/assets/batch',
+      '/api/admin/interactions/5/pin-order'
+    ]
+  )
+  assert.deepEqual(JSON.parse(sent[1].options.body), { status: 'PUBLISHED' })
+  assert.deepEqual(JSON.parse(sent[2].options.body), { ids: ['7', '8'], status: 'ARCHIVED' })
+  assert.deepEqual(JSON.parse(sent[7].options.body), { ids: ['9', '10'] })
+  assert.deepEqual(JSON.parse(sent[8].options.body), { direction: 'UP' })
+})
+
+test('admin users sends paging and server-side identity filters', async (context) => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path) => {
+    calls.push(path)
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: { records: [], current: 2, pages: 3, total: 21 } })
+    }
+  }
+  context.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  await api.users({ keyword: ' 夏 天 ', role: 'USER', title: ' 贡献者 ', page: 2, size: 10 })
+
+  assert.deepEqual(calls, [
+    '/api/admin/users?page=2&size=10&keyword=%E5%A4%8F+%E5%A4%A9&role=USER&title=%E8%B4%A1%E7%8C%AE%E8%80%85'
+  ])
+})
+
+test('interaction moderation sends content filters and exact string ids for batch delete', async (context) => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options })
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: path === '/api/auth/csrf' ? { token: 'token' } : {} })
+    }
+  }
+  context.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  await api.adminInteractions({ contentType: 'STICKER', page: 2, size: 10 })
+  await api.batchDeleteInteractions(['9007199254740993', '9007199254740995'])
+
+  const sent = calls.filter((call) => call.path !== '/api/auth/csrf')
+  assert.equal(sent[0].path, '/api/admin/interactions?page=2&size=10&contentType=STICKER')
+  assert.equal(sent[1].path, '/api/admin/interactions/batch-delete')
+  assert.equal(sent[1].options.method, 'POST')
+  assert.deepEqual(JSON.parse(sent[1].options.body), {
+    ids: ['9007199254740993', '9007199254740995']
+  })
+})
+
+test('admin replies reuse the unified interaction creation contract without captcha fields', async (context) => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options })
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: path === '/api/auth/csrf' ? { token: 'token' } : {} })
+    }
+  }
+  context.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  await api.createInteraction({
+    targetType: 'POST',
+    targetId: '9007199254740993',
+    replyToId: '9007199254740995',
+    content: '管理员回复'
+  })
+
+  const sent = calls.find((call) => call.path === '/api/interactions')
+  assert.equal(sent.options.method, 'POST')
+  assert.deepEqual(JSON.parse(sent.options.body), {
+    targetType: 'POST',
+    targetId: '9007199254740993',
+    replyToId: '9007199254740995',
+    content: '管理员回复'
+  })
+})

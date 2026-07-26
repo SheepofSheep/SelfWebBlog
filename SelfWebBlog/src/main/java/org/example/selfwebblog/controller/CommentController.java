@@ -4,6 +4,7 @@ import org.example.selfwebblog.admin.security.AdminOnly;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
 import org.example.selfwebblog.config.PaginationPolicy;
+import org.example.selfwebblog.content.post.PostStatusPolicy;
 import org.example.selfwebblog.entity.Comment;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
@@ -15,7 +16,6 @@ import org.example.selfwebblog.service.BlogInfoService;
 import org.example.selfwebblog.interaction.InteractionService;
 import org.example.selfwebblog.interaction.dto.InteractionCreateRequest;
 import org.example.selfwebblog.security.ClientIpResolver;
-import org.example.selfwebblog.entity.BlogInfo;
 import org.example.selfwebblog.entity.Post;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,34 +73,33 @@ public class CommentController {
             @PathVariable Long postId,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
+        Post post = postService.getById(postId);
+        if (post == null || !PostStatusPolicy.isPublic(post.getStatus())) {
+            return Result.notFound("文章不存在或未发布");
+        }
         PaginationPolicy.PageRequest pagination = PaginationPolicy.require(pageNum, pageSize);
         Page<Comment> comments = commentService.getCommentsByPostId(
                 postId, pagination.page(), pagination.size());
-        // 博主评论同步当前头像
-        BlogInfo blogInfo = blogInfoService.getById(1);
-        String adminAvatar = blogInfo != null ? blogInfo.getAvatarUrl() : null;
         Map<Long, User> usersById = userService.listByIds(
                         comments.getRecords().stream()
-                                .filter(comment -> !"ADMIN".equals(comment.getRole()))
                                 .map(Comment::getUserId)
                                 .filter(java.util.Objects::nonNull)
                                 .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        // 评论展示信息使用当前资料，避免逐条查询数据库。
+        // 评论展示信息统一使用当前账户资料；账户已删除时保留评论快照。
         for (Comment c : comments.getRecords()) {
-            if ("ADMIN".equals(c.getRole())) {
-                if (adminAvatar != null && !adminAvatar.isEmpty()) {
-                    c.setAvatarUrl(adminAvatar);
-                }
-            } else if (c.getUserId() != null) {
+            if (c.getUserId() != null) {
                 User commentUser = usersById.get(c.getUserId());
                 if (commentUser != null) {
                     String name = (commentUser.getNickname() != null && !commentUser.getNickname().isBlank())
                             ? commentUser.getNickname() : commentUser.getUsername();
                     c.setNickname(name);
-                    c.setAvatarUrl(commentUser.getAvatarUrl() != null ? commentUser.getAvatarUrl() : "");
+                    c.setAvatarUrl(commentUser.getAvatarUrl());
+                    c.setRole(commentUser.getRole());
+                    c.setTitleName(commentUser.getTitleName());
+                    c.setTitleStyle(commentUser.getTitleStyle());
                 }
             }
         }
@@ -120,7 +119,7 @@ public class CommentController {
         }
 
         Post post = postService.getById(comment.getPostId());
-        if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
+        if (post == null || !PostStatusPolicy.isPublic(post.getStatus())) {
             return Result.notFound("文章不存在或未发布");
         }
         if (comment.getContent() != null && comment.getContent().trim().length() > MAX_COMMENT_LENGTH) {

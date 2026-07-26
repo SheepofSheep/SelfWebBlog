@@ -1,32 +1,45 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { ArrowRight } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowRight, RefreshCw } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
-import { buildMonthCells } from '@/core/calendarModel.js'
 import { appStore } from '@/stores/app.js'
 import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import CalendarWidget from '@/components/CalendarWidget.vue'
+import { createAdminRequestGate } from '@/core/adminModel.js'
 
 const posts = ref([])
 const tags = ref([])
-const calendarDays = ref([])
 const loading = ref(true)
-const today = new Date()
-const calendarCells = computed(() =>
-  buildMonthCells(today.getFullYear(), today.getMonth() + 1, calendarDays.value)
-)
+const postError = ref('')
+const requestGate = createAdminRequestGate()
+const route = useRoute()
+const router = useRouter()
 const featured = computed(() => posts.value[0])
-onMounted(async () => {
-  const [postData, tagData, calendarData] = await Promise.allSettled([
-    api.posts(1, 9),
-    api.tags(),
-    api.calendar(today.getFullYear(), today.getMonth() + 1)
-  ])
+const calendarOpen = computed(() => route.query.calendar === 'open')
+
+function closeCalendar() {
+  if (!calendarOpen.value) return
+  const query = { ...route.query }
+  delete query.calendar
+  router.replace({ path: route.path, query })
+}
+
+async function load() {
+  const ticket = requestGate.begin()
+  loading.value = true
+  postError.value = ''
+  const [postData, tagData] = await Promise.allSettled([api.posts(1, 9), api.tags()])
+  if (!requestGate.isCurrent(ticket)) return
   posts.value = postData.status === 'fulfilled' ? postData.value?.records || [] : []
   tags.value = tagData.status === 'fulfilled' ? tagData.value || [] : []
-  calendarDays.value = calendarData.status === 'fulfilled' ? calendarData.value?.days || [] : []
+  if (postData.status === 'rejected') postError.value = postData.reason?.message || '文章加载失败'
   loading.value = false
-})
+}
+
+onMounted(load)
+onBeforeUnmount(() => requestGate.begin())
 </script>
 
 <template>
@@ -53,25 +66,7 @@ onMounted(async () => {
               >
             </div>
           </section>
-          <RouterLink class="mini-calendar glass" to="/calendar" aria-label="打开内容日历">
-            <div class="section-heading">
-              <h2>日历</h2>
-              <span>{{ today.getFullYear() }} · {{ today.getMonth() + 1 }}</span>
-            </div>
-            <div class="mini-calendar-week" aria-hidden="true">
-              <span v-for="day in ['一', '二', '三', '四', '五', '六', '日']" :key="day">{{
-                day
-              }}</span>
-            </div>
-            <div class="mini-calendar-days">
-              <span
-                v-for="(cell, index) in calendarCells"
-                :key="index"
-                :class="{ empty: !cell, active: cell?.count }"
-                >{{ cell?.day }}</span
-              >
-            </div>
-          </RouterLink>
+          <CalendarWidget :initial-open="calendarOpen" @close="closeCalendar" />
         </aside>
       </section>
       <section class="section-block">
@@ -86,8 +81,10 @@ onMounted(async () => {
         </div>
       </section>
     </template>
-    <EmptyState v-else label="还没有发布文章"
-      ><RouterLink v-if="appStore.user?.role === 'ADMIN'" class="primary-button" to="/write"
+    <EmptyState v-else :label="postError || '还没有发布文章'"
+      ><button v-if="postError" class="secondary-button" type="button" @click="load">
+        <RefreshCw :size="16" />重试</button
+      ><RouterLink v-else-if="appStore.user?.role === 'ADMIN'" class="primary-button" to="/write"
         >写第一篇</RouterLink
       ></EmptyState
     >

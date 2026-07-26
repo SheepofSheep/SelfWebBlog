@@ -26,6 +26,7 @@ function remove(tag) {
       }}<button :aria-label="`删除 ${tag}`" @click="remove(tag)"><X :size="13" /></button></span
     ><input
       v-model="input"
+      maxlength="30"
       placeholder="输入后按回车"
       @keydown.enter.prevent="commit"
       @blur="commit"

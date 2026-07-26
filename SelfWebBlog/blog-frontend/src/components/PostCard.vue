@@ -1,20 +1,19 @@
 <script setup>
 import { computed } from 'vue'
 import { ArrowUpRight } from 'lucide-vue-next'
-import { formatDate, postTags, postTitle } from '@/core/format.js'
+import {
+  firstPostMediaUrl,
+  formatDate,
+  postPublicationTime,
+  postTags,
+  postTitle
+} from '@/core/format.js'
 
 const props = defineProps({ post: { type: Object, required: true }, featured: Boolean })
 const tags = computed(() => postTags(props.post))
 const displayTitle = computed(() => postTitle(props.post))
 const bodyImage = computed(() => {
-  const content = String(props.post.content || '')
-  return (
-    content.match(/!\[[^\]]*]\(((?:https?:\/\/|\/uploads\/|\/api\/media\/)[^)]+)\)/i)?.[1] ||
-    content.match(
-      /<img\b[^>]*\bsrc=["']((?:https?:\/\/|\/uploads\/|\/api\/media\/)[^"']+)["']/i
-    )?.[1] ||
-    ''
-  )
+  return firstPostMediaUrl(props.post.content)
 })
 const background = computed(() => {
   const p = props.post
@@ -53,7 +52,7 @@ const preset = computed(() =>
     <div class="post-card-scrim" />
     <div class="post-card-content">
       <div class="post-meta">
-        <span>{{ formatDate(post.createTime) }}</span
+        <span>{{ formatDate(postPublicationTime(post)) }}</span
         ><span v-if="post.category">{{ post.category }}</span>
       </div>
       <h2 v-if="displayTitle">{{ displayTitle }}</h2>

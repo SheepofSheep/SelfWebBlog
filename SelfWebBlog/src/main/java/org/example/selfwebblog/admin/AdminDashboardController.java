@@ -19,10 +19,15 @@ import java.util.List;
 public class AdminDashboardController {
     private final JdbcTemplate jdbcTemplate;
     private final SecurityAuditService auditService;
+    private final DashboardTrendService trendService;
 
-    public AdminDashboardController(JdbcTemplate jdbcTemplate, SecurityAuditService auditService) {
+    public AdminDashboardController(
+            JdbcTemplate jdbcTemplate,
+            SecurityAuditService auditService,
+            DashboardTrendService trendService) {
         this.jdbcTemplate = jdbcTemplate;
         this.auditService = auditService;
+        this.trendService = trendService;
     }
 
     @GetMapping("/overview")
@@ -54,6 +59,12 @@ public class AdminDashboardController {
     public Result<List<SecurityEvent>> securityEvents(
             @RequestParam(defaultValue = "30") int limit) {
         return Result.success(auditService.recent(limit));
+    }
+
+    @GetMapping("/trend")
+    public Result<DashboardTrendService.DashboardTrend> trend(
+            @RequestParam(defaultValue = "14") int days) {
+        return Result.success(trendService.load(days));
     }
 
     private LocalDateTime parse(String value) {

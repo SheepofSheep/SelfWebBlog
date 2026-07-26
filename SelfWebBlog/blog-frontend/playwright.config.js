@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   fullyParallel: true,
+  workers: 6,
   forbidOnly: true,
   retries: 0,
   reporter: [['list'], ['html', { outputFolder: '../output/playwright/report', open: 'never' }]],

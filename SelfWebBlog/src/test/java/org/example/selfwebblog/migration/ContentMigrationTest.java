@@ -77,6 +77,45 @@ class ContentMigrationTest {
             }
             assertTrue(hasIndex(statement, "post", "idx_post_status_create_time"));
             assertTrue(hasIndex(statement, "comment", "idx_comment_status_create_time"));
+            assertTrue(hasColumn(statement, "post", "archived_time"));
+            assertTrue(hasIndex(statement, "post", "idx_post_status_archived_time"));
+            assertTrue(hasColumn(statement, "post", "published_time"));
+            assertTrue(hasIndex(statement, "post", "idx_post_status_published_time"));
+            assertEquals(1, scalar(statement,
+                    "SELECT COUNT(*) FROM post WHERE id = 91 AND published_time = create_time"));
+            assertEquals(0, scalar(statement, "SELECT COUNT(*) FROM site_link"));
+        }
+    }
+
+    @Test
+    void migratesKnownSocialLinksIntoOrderedSiteLinks() throws Exception {
+        String jdbcUrl = "jdbc:sqlite:" + tempDir.resolve("site-links-v10.db");
+        Flyway.configure().dataSource(jdbcUrl, null, null).target("10").load().migrate();
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO blog_info (id, nickname, social_links)
+                    VALUES (1, '站点', '{"github":"https://github.com/example","email":"hello@example.com"}')
+                    """);
+        }
+
+        Flyway.configure().dataSource(jdbcUrl, null, null).load().migrate();
+
+        try (Connection connection = DriverManager.getConnection(jdbcUrl);
+             Statement statement = connection.createStatement()) {
+            assertEquals(2, scalar(statement, "SELECT COUNT(*) FROM site_link"));
+            try (ResultSet links = statement.executeQuery("""
+                    SELECT label, url, sort_order FROM site_link ORDER BY sort_order
+                    """)) {
+                assertTrue(links.next());
+                assertEquals("GitHub", links.getString("label"));
+                assertEquals("https://github.com/example", links.getString("url"));
+                assertEquals(0, links.getInt("sort_order"));
+                assertTrue(links.next());
+                assertEquals("邮箱", links.getString("label"));
+                assertEquals("mailto:hello@example.com", links.getString("url"));
+                assertEquals(1, links.getInt("sort_order"));
+            }
         }
     }
 
@@ -99,6 +138,15 @@ class ContentMigrationTest {
         try (ResultSet indexes = statement.executeQuery("PRAGMA index_list('" + table + "')")) {
             while (indexes.next()) {
                 if (name.equals(indexes.getString("name"))) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasColumn(Statement statement, String table, String name) throws Exception {
+        try (ResultSet columns = statement.executeQuery("PRAGMA table_info('" + table + "')")) {
+            while (columns.next()) {
+                if (name.equals(columns.getString("name"))) return true;
             }
         }
         return false;

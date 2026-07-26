@@ -2,16 +2,13 @@ package org.example.selfwebblog.controller;
 
 import org.example.selfwebblog.admin.security.AdminOnly;
 import org.example.selfwebblog.entity.Result;
-import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.BlogInfoService;
-import org.example.selfwebblog.service.UserService;
 import org.example.selfwebblog.service.upload.StoredUpload;
 import org.example.selfwebblog.service.upload.UploadStorageService;
 import org.example.selfwebblog.service.upload.UploadTarget;
 import org.example.selfwebblog.upload.asset.ImageAssetResponse;
 import org.example.selfwebblog.upload.asset.ImageAssetService;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,23 +24,17 @@ public class UploadController {
     private static final Logger log = LoggerFactory.getLogger(UploadController.class);
 
     private final BlogInfoService blogInfoService;
-    private final UserService userService;
     private final UploadStorageService uploadStorageService;
     private final ImageAssetService imageAssetService;
-    private final String adminUsername;
 
     public UploadController(
         BlogInfoService blogInfoService,
-        UserService userService,
         UploadStorageService uploadStorageService,
-        ImageAssetService imageAssetService,
-        @Value("${auth.admin.username:admin}") String adminUsername
+        ImageAssetService imageAssetService
     ) {
         this.blogInfoService = blogInfoService;
-        this.userService = userService;
         this.uploadStorageService = uploadStorageService;
         this.imageAssetService = imageAssetService;
-        this.adminUsername = adminUsername;
     }
 
     @PostMapping("/image")
@@ -72,12 +63,6 @@ public class UploadController {
         if (result.getCode() == 200) {
             String avatarUrl = result.getData();
             blogInfoService.updateAvatar(avatarUrl);
-            // 同步更新 admin 用户的头像，保持 /auth/me 和评论区一致
-            User adminUser = userService.getByUsername(adminUsername);
-            if (adminUser != null) {
-                adminUser.setAvatarUrl(avatarUrl);
-                userService.updateById(adminUser);
-            }
         }
         return result;
     }

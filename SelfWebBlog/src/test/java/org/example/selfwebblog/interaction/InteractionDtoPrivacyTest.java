@@ -22,9 +22,9 @@ class InteractionDtoPrivacyTest {
     @Test
     void adminInteractionIdsRemainExactInJavascriptClients() throws Exception {
         AdminInteractionResponse response = new AdminInteractionResponse(
-                9007199254740993L, "POST", 9007199254740995L, null, null,
+                9007199254740993L, "POST", 9007199254740995L, "source", null, null, null,
                 "content", 9007199254740997L, "name", "", "USER", "", "default",
-                "PUBLISHED", "unknown", 0, false, null);
+                "PUBLISHED", "unknown", 0, false, null, null, null, 0, java.util.List.of());
 
         String json = new ObjectMapper().registerModule(new JavaTimeModule()).writeValueAsString(response);
 

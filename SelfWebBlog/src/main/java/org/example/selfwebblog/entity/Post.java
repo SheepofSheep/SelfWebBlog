@@ -30,7 +30,7 @@ public class Post {
 
     private String tags;
 
-    private String status; // DRAFT / PUBLISHED
+    private String status; // DRAFT / PUBLISHED / ARCHIVED
     private Integer likeCount;
     private Integer viewCount;
 
@@ -45,4 +45,8 @@ public class Post {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    private LocalDateTime publishedTime;
+
+    private LocalDateTime archivedTime;
 }

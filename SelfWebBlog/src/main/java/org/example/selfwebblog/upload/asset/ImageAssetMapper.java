@@ -43,6 +43,55 @@ public interface ImageAssetMapper {
     @Select("SELECT * FROM image_asset ORDER BY create_time DESC LIMIT #{limit}")
     List<ImageAsset> listAll(@Param("limit") int limit);
 
+    @Select("SELECT * FROM image_asset ORDER BY create_time DESC, id DESC")
+    List<ImageAsset> listAllAssets();
+
+    @Select("""
+            <script>
+            SELECT COUNT(*) FROM image_asset
+            <where>
+              <if test="status != null and status != ''">
+                AND reference_status = #{status}
+              </if>
+              <if test="purpose != null and purpose != ''">
+                AND purpose = #{purpose}
+              </if>
+              <if test="keyword != null and keyword != ''">
+                AND (LOWER(original_path) LIKE '%' || LOWER(#{keyword}) || '%'
+                  OR LOWER(content_hash) LIKE '%' || LOWER(#{keyword}) || '%')
+              </if>
+            </where>
+            </script>
+            """)
+    long countForAdmin(@Param("status") String status,
+                       @Param("purpose") String purpose,
+                       @Param("keyword") String keyword);
+
+    @Select("""
+            <script>
+            SELECT * FROM image_asset
+            <where>
+              <if test="status != null and status != ''">
+                AND reference_status = #{status}
+              </if>
+              <if test="purpose != null and purpose != ''">
+                AND purpose = #{purpose}
+              </if>
+              <if test="keyword != null and keyword != ''">
+                AND (LOWER(original_path) LIKE '%' || LOWER(#{keyword}) || '%'
+                  OR LOWER(content_hash) LIKE '%' || LOWER(#{keyword}) || '%')
+              </if>
+            </where>
+            ORDER BY create_time DESC, id DESC
+            LIMIT #{size} OFFSET #{offset}
+            </script>
+            """)
+    List<ImageAsset> listForAdmin(@Param("status") String status,
+                                  @Param("purpose") String purpose,
+                                  @Param("keyword") String keyword,
+                                  @Param("offset") long offset,
+                                  @Param("size") int size);
+
     @Select("SELECT * FROM image_asset WHERE id = #{id}")
     ImageAsset findById(@Param("id") Long id);
 

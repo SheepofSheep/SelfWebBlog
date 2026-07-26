@@ -17,3 +17,16 @@ export function normalizeTags(values = []) {
 export function commitTag(tags, input) {
   return { tags: normalizeTags([...tags, input]), input: '' }
 }
+
+export function prepareTagCreation(tags = [], input = '') {
+  const [normalized = ''] = normalizeTags([input])
+  if (!normalized) return { name: '', existing: null, shouldCreate: false }
+  const key = normalized.toLocaleLowerCase()
+  const existing = tags.find((tag) => {
+    const [name = ''] = normalizeTags([tag?.name])
+    return name.toLocaleLowerCase() === key
+  })
+  return existing
+    ? { name: existing.name, existing, shouldCreate: false }
+    : { name: normalized, existing: null, shouldCreate: true }
+}

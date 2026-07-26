@@ -1,0 +1,66 @@
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+html.theme-changing,
+html.theme-changing body,
+html.theme-changing body::before,
+html.theme-changing body::after,
+html.theme-changing .glass,
+html.theme-changing button,
+html.theme-changing input,
+html.theme-changing textarea,
+html.theme-changing select {
+  transition:
+    color 240ms ease,
+    border-color 240ms ease,
+    background-color 240ms ease,
+    box-shadow 240ms ease !important;
+}
+
+html[data-motion='reduced'] .pointer-trail {
+  display: none;
+}
+
+html[data-motion='reduced'] .dialog-fade-enter-active,
+html[data-motion='reduced'] .dialog-fade-leave-active,
+html[data-motion='reduced'] .emoji-pop-enter-active,
+html[data-motion='reduced'] .emoji-pop-leave-active {
+  transition: none !important;
+}
+
+.title-blue {
+  color: #2979de;
+  background: rgb(41 121 222 / 11%);
+}
+
+.title-green {
+  color: #25815c;
+  background: rgb(37 129 92 / 11%);
+}
+
+.title-gold {
+  color: #a66c12;
+  background: rgb(188 127 31 / 12%);
+}
+
+.title-rose {
+  color: #bb4770;
+  background: rgb(187 71 112 / 11%);
+}
+
+.title-default {
+  color: var(--muted);
+  background: var(--accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}

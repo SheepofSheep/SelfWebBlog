@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -18,10 +19,13 @@ public class SiteProfileService {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final SiteLinkService linkService;
 
-    public SiteProfileService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public SiteProfileService(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper,
+                              SiteLinkService linkService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.linkService = linkService;
     }
 
     public SiteProfile get() {
@@ -39,7 +43,8 @@ public class SiteProfileService {
                 value(result.getString("current_status")),
                 parseDateTime(result.getString("status_updated_time")),
                 value(result.getString("about_markdown")),
-                parseSocialLinks(result.getString("social_links"))));
+                parseSocialLinks(result.getString("social_links")),
+                linkService.listEnabled()));
     }
 
     @Transactional
@@ -140,7 +145,8 @@ public class SiteProfileService {
             String currentStatus,
             LocalDateTime statusUpdatedTime,
             String aboutMarkdown,
-            Map<String, String> socialLinks) {
+            Map<String, String> socialLinks,
+            List<SiteLink> links) {
     }
 
     public record SiteSettingsRequest(
