@@ -23,6 +23,7 @@ Thumbs.db
 *.log
 *.out.log
 *.err.log
+.dev-runtime/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -87,7 +88,3 @@ output/playwright/
 # Optional local IP geolocation databases
 SelfWebBlog/src/main/resources/ip-data/*.xdb
 !SelfWebBlog/src/main/resources/ip-data/.gitkeep
-
-# Local dev scripts (machine-specific paths)
-start-dev.bat
-stop-dev.bat
