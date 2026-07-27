@@ -589,6 +589,64 @@ async function canvasHorizontalInkRun(page, { x, y, width, height }) {
   )
 }
 
+test('Spops identity and filing footer replace the old browser branding', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Site identity runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page)
+
+  await page.goto('/')
+  await expect(page).toHaveTitle('Spops')
+
+  const footer = page.getByRole('contentinfo', { name: '站点备案信息' })
+  const filing = footer.getByRole('link', { name: '晋ICP备2026007967-1号' })
+  await expect(footer).toBeVisible()
+  await expect(filing).toHaveAttribute('href', 'https://beian.miit.gov.cn/')
+  await expect(filing).toHaveAttribute('target', '_blank')
+
+  const favicon = await page.request.get('/favicon.svg')
+  expect(favicon.ok()).toBe(true)
+  const faviconSource = await favicon.text()
+  expect(faviconSource).toContain('id="spops-mark"')
+  expect(faviconSource).not.toContain('#863bff')
+
+  await expectNoOverflow(page)
+  expectCleanRun(failures, mocks)
+})
+
+test('admin sidebar stays one clipped surface over a high contrast background', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Sidebar surface runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, {
+    id: '1',
+    username: 'root',
+    nickname: '管理者',
+    role: 'ADMIN'
+  })
+
+  await page.goto('/admin')
+  await page.locator('.app-shell').evaluate((shell) => {
+    shell.classList.add('has-site-background')
+    shell.style.setProperty(
+      '--site-background-image',
+      'linear-gradient(#eff7ff 0 32%, #85a9d6 32% 36%, #fff2d6 36% 68%, #89b5df 68%)'
+    )
+  })
+
+  const sidebar = page.locator('.admin-sidebar')
+  await expect(sidebar).toHaveCSS('overflow', 'hidden')
+  const sidebarBackground = await sidebar.evaluate(
+    (element) => getComputedStyle(element).backgroundImage
+  )
+  expect(sidebarBackground).toContain('linear-gradient')
+  await expect(page.getByRole('contentinfo', { name: '站点备案信息' })).toHaveCount(0)
+  await expectNoOverflow(page)
+  expectCleanRun(failures, mocks)
+})
+
 test('home, search and responsive layout use real data contracts', async ({ page }) => {
   const failures = observeRuntime(page)
   const mocks = await mockApi(page)
