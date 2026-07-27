@@ -22,7 +22,7 @@ html.theme-changing select {
     box-shadow 240ms ease !important;
 }
 
-html[data-motion='reduced'] .pointer-trail {
+html[data-motion='reduced'] .pointer-effects-canvas {
   display: none;
 }
 

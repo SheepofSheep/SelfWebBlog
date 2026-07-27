@@ -525,6 +525,70 @@ function expectCleanRun(failures, mocks) {
   expect(mocks.unhandled).toEqual([])
 }
 
+async function canvasRegionHasInk(page, { x, y, width = 180, height = 180 }) {
+  return page.locator('canvas.pointer-effects-canvas').evaluate(
+    (canvas, region) => {
+      const scale = canvas.width / Math.max(1, canvas.clientWidth)
+      const startX = Math.max(0, Math.floor(region.x * scale))
+      const startY = Math.max(0, Math.floor(region.y * scale))
+      const sampleWidth = Math.max(
+        1,
+        Math.min(canvas.width - startX, Math.floor(region.width * scale))
+      )
+      const sampleHeight = Math.max(
+        1,
+        Math.min(canvas.height - startY, Math.floor(region.height * scale))
+      )
+      const data = canvas
+        .getContext('2d')
+        .getImageData(startX, startY, sampleWidth, sampleHeight).data
+      for (let index = 3; index < data.length; index += 4) {
+        if (data[index] > 0) return true
+      }
+      return false
+    },
+    { x, y, width, height }
+  )
+}
+
+async function canvasHorizontalInkRun(page, { x, y, width, height }) {
+  return page.locator('canvas.pointer-effects-canvas').evaluate(
+    (canvas, region) => {
+      const scale = canvas.width / Math.max(1, canvas.clientWidth)
+      const startX = Math.max(0, Math.floor(region.x * scale))
+      const startY = Math.max(0, Math.floor(region.y * scale))
+      const sampleWidth = Math.max(
+        1,
+        Math.min(canvas.width - startX, Math.floor(region.width * scale))
+      )
+      const sampleHeight = Math.max(
+        1,
+        Math.min(canvas.height - startY, Math.floor(region.height * scale))
+      )
+      const data = canvas
+        .getContext('2d')
+        .getImageData(startX, startY, sampleWidth, sampleHeight).data
+      let run = 0
+      let longest = 0
+
+      for (let column = 0; column < sampleWidth; column += 1) {
+        let hasInk = false
+        for (let row = 0; row < sampleHeight; row += 1) {
+          if (data[(row * sampleWidth + column) * 4 + 3] > 2) {
+            hasInk = true
+            break
+          }
+        }
+        run = hasInk ? run + 1 : 0
+        longest = Math.max(longest, run)
+      }
+
+      return longest / scale
+    },
+    { x, y, width, height }
+  )
+}
+
 test('home, search and responsive layout use real data contracts', async ({ page }) => {
   const failures = observeRuntime(page)
   const mocks = await mockApi(page)
@@ -570,9 +634,7 @@ test('theme transition and legacy links remain functional', async ({ page }) => 
   await expect(page.getByRole('dialog', { name: '外观设置' })).toBeVisible()
   await page.getByRole('button', { name: '暗色' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await expect
-    .poll(() => page.evaluate(() => window.__themeAnimationCalls.length))
-    .toBe(1)
+  await expect.poll(() => page.evaluate(() => window.__themeAnimationCalls.length)).toBe(1)
   expect(await page.evaluate(() => window.__themeAnimationCalls[0])).toMatchObject({
     pseudoElement: '::view-transition-new(root)',
     duration: 520,
@@ -580,15 +642,151 @@ test('theme transition and legacy links remain functional', async ({ page }) => 
   })
   await page.getByRole('button', { name: '亮色' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
-  await expect
-    .poll(() => page.evaluate(() => window.__themeAnimationCalls.length))
-    .toBe(2)
+  await expect.poll(() => page.evaluate(() => window.__themeAnimationCalls.length)).toBe(2)
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: '外观设置' })).toBeHidden()
   await expect(appearanceTrigger).toBeFocused()
   await page.goto('/#/post?id=2081309851788009474')
   await expect(page).toHaveURL(/\/post\/2081309851788009474$/)
   expectCleanRun(failures, mocks)
+})
+
+test('fluid pointer canvas draws a ribbon and click ripple without blocking controls', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Pointer rendering runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page)
+  await page.goto('/')
+  await page.bringToFront()
+  await expect.poll(() => page.evaluate(() => document.hasFocus())).toBe(true)
+
+  const canvas = page.locator('canvas.pointer-effects-canvas')
+  await expect(canvas).toHaveCount(1)
+  await expect(page.locator('.pointer-trail i')).toHaveCount(0)
+  await expect(canvas).toHaveCSS('pointer-events', 'none')
+
+  const trailRegion = { x: 170, y: 150, width: 430, height: 330 }
+  await page.mouse.move(220, 210)
+  await page.mouse.move(520, 390, { steps: 12 })
+  await expect
+    .poll(() => canvasHorizontalInkRun(page, trailRegion), {
+      timeout: 1500,
+      intervals: [10, 20, 40, 80]
+    })
+    .toBeGreaterThan(40)
+  await expect.poll(() => canvasRegionHasInk(page, trailRegion), { timeout: 1500 }).toBe(false)
+
+  const quietRegion = { x: 0, y: 300, width: 190, height: 390 }
+  await page.mouse.move(90, 600)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1500 }).toBe(false)
+  await page.mouse.click(90, 600, { button: 'right' })
+  await page.waitForTimeout(120)
+  expect(await canvasRegionHasInk(page, quietRegion)).toBe(false)
+
+  await page.mouse.down()
+  await page.mouse.move(130, 640, { steps: 4 })
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1500 }).toBe(false)
+  await page.mouse.up()
+  await page.waitForTimeout(120)
+  expect(await canvasRegionHasInk(page, quietRegion)).toBe(false)
+
+  await page.evaluate(() => {
+    const target = document.elementFromPoint(130, 640) || document.body
+    const pointer = {
+      bubbles: true,
+      pointerId: 43,
+      pointerType: 'mouse',
+      isPrimary: true,
+      clientX: 130,
+      clientY: 640
+    }
+    target.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, button: 0, buttons: 1 }))
+    target.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, button: 2, buttons: 3 }))
+    target.dispatchEvent(new PointerEvent('pointerup', { ...pointer, button: 2, buttons: 1 }))
+    target.dispatchEvent(new PointerEvent('pointerup', { ...pointer, button: 0, buttons: 0 }))
+  })
+  await page.waitForTimeout(120)
+  expect(await canvasRegionHasInk(page, quietRegion)).toBe(false)
+
+  await page.mouse.move(90, 420)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1500 }).toBe(false)
+  await page.mouse.click(90, 420)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
+  await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1200 }).toBe(false)
+
+  const appearanceTrigger = page.getByRole('button', { name: '外观' })
+  await appearanceTrigger.click()
+  await expect(page.getByRole('dialog', { name: '外观设置' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('link', { name: '可验证的文章' }).first().click()
+  await expect(page).toHaveURL(/\/post\/2081309851788009474$/)
+  await page.waitForTimeout(60)
+  expect(await canvasRegionHasInk(page, { x: 0, y: 0, width: 1440, height: 1000 })).toBe(false)
+  expectCleanRun(failures, mocks)
+})
+
+test('fluid pointer canvas stays disabled when the system requests reduced motion', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Reduced pointer rendering runs once on desktop')
+  const failures = observeRuntime(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const mocks = await mockApi(page)
+  await page.goto('/')
+
+  const canvas = page.locator('canvas.pointer-effects-canvas')
+  await expect(canvas).toHaveCount(1)
+  await expect(canvas).toHaveCSS('display', 'none')
+  await page.mouse.move(260, 240)
+  await page.mouse.move(520, 390, { steps: 8 })
+  await page.mouse.click(520, 390)
+  await page.waitForTimeout(120)
+  expect(
+    await canvas.evaluate((element) => {
+      const data = element.getContext('2d').getImageData(0, 0, element.width, element.height).data
+      for (let index = 3; index < data.length; index += 4) {
+        if (data[index] > 0) return true
+      }
+      return false
+    })
+  ).toBe(false)
+  expectCleanRun(failures, mocks)
+})
+
+test.describe('touch pointer environment', () => {
+  test.use({ hasTouch: true })
+
+  test('fluid pointer canvas stays disabled on touch devices', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile', 'Touch rendering is verified on mobile')
+    const failures = observeRuntime(page)
+    const mocks = await mockApi(page)
+    await page.goto('/')
+
+    const canvas = page.locator('canvas.pointer-effects-canvas')
+    await expect(canvas).toHaveCount(1)
+    await expect(canvas).toHaveCSS('display', 'none')
+    expect(
+      await page.evaluate(
+        () => matchMedia('(pointer: coarse)').matches || matchMedia('(hover: none)').matches
+      )
+    ).toBe(true)
+    await page.touchscreen.tap(180, 260)
+    await page.waitForTimeout(120)
+    expect(
+      await canvas.evaluate((element) => {
+        const data = element.getContext('2d').getImageData(0, 0, element.width, element.height).data
+        for (let index = 3; index < data.length; index += 4) {
+          if (data[index] > 0) return true
+        }
+        return false
+      })
+    ).toBe(false)
+    expectCleanRun(failures, mocks)
+  })
 })
 
 test('reader exposes navigation, sharing and comment surfaces', async ({ page }) => {

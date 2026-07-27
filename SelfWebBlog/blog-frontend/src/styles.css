@@ -1504,24 +1504,15 @@ img {
   border-radius: var(--radius-xl);
   text-align: center;
 }
-.pointer-trail {
+.pointer-effects-canvas {
   position: fixed;
-  z-index: 999;
+  z-index: 50;
   inset: 0;
-  overflow: hidden;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  contain: strict;
   pointer-events: none;
-}
-.pointer-trail i {
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent);
-  transform-origin: center;
-  transition: opacity 0.25s ease;
 }
 .toast {
   position: fixed;
@@ -1827,7 +1818,13 @@ img {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .pointer-trail {
+  .pointer-effects-canvas {
+    display: none;
+  }
+}
+
+@media (pointer: coarse), (hover: none) {
+  .pointer-effects-canvas {
     display: none;
   }
 }
