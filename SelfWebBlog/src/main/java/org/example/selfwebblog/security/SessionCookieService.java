@@ -60,12 +60,16 @@ public class SessionCookieService {
     }
 
     public boolean hasValidCsrf(HttpServletRequest request) {
-        String cookie = readCookie(request, CSRF_COOKIE);
         String header = request.getHeader(CSRF_HEADER);
-        if (cookie == null || header == null) return false;
-        return MessageDigest.isEqual(
-                cookie.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                header.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        if (header == null || request.getCookies() == null) return false;
+        byte[] expected = header.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        for (Cookie cookie : request.getCookies()) {
+            if (CSRF_COOKIE.equals(cookie.getName()) && MessageDigest.isEqual(
+                    cookie.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8), expected)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String readSessionToken(HttpServletRequest request) {

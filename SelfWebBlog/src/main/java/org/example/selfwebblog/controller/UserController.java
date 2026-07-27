@@ -22,6 +22,8 @@ import java.time.Duration;
 public class UserController {
 
     private static final Logger log = LoggerFactory.getLogger(UserController.class);
+    private static final int MAX_NICKNAME_LENGTH = 30;
+    private static final int MAX_AVATAR_URL_LENGTH = 1000;
 
     private final UserService userService;
     private final UploadStorageService uploadStorageService;
@@ -45,12 +47,21 @@ public class UserController {
         if (user == null) return Result.notFound("用户不存在");
 
         if (body.containsKey("nickname")) {
-            String nickname = body.get("nickname").trim();
-            if (nickname.length() > 30) return Result.badRequest("昵称不能超过30个字符");
+            String rawNickname = body.get("nickname");
+            if (rawNickname == null) return Result.badRequest("昵称不能为空");
+            String nickname = rawNickname.trim();
+            if (nickname.isBlank()) return Result.badRequest("昵称不能为空");
+            if (nickname.length() > MAX_NICKNAME_LENGTH) return Result.badRequest("昵称不能超过30个字符");
             user.setNickname(nickname);
         }
         if (body.containsKey("avatarUrl")) {
-            user.setAvatarUrl(body.get("avatarUrl").trim());
+            String rawAvatarUrl = body.get("avatarUrl");
+            if (rawAvatarUrl == null) return Result.badRequest("头像地址不能为空");
+            String avatarUrl = rawAvatarUrl.trim();
+            if (avatarUrl.length() > MAX_AVATAR_URL_LENGTH || !isSafeAvatarUrl(avatarUrl)) {
+                return Result.badRequest("头像地址无效");
+            }
+            user.setAvatarUrl(avatarUrl);
         }
 
         userService.updateById(user);
@@ -61,6 +72,12 @@ public class UserController {
             "nickname", user.getNickname() != null ? user.getNickname() : "",
             "avatarUrl", user.getAvatarUrl() != null ? user.getAvatarUrl() : ""
         ));
+    }
+
+    private boolean isSafeAvatarUrl(String avatarUrl) {
+        if (avatarUrl.isBlank()) return true;
+        return avatarUrl.matches("^/uploads/avatars/[A-Za-z0-9._-]+$")
+                || avatarUrl.matches("^https://[^\\s<>]+$");
     }
 
     // ==================== 上传头像 ====================

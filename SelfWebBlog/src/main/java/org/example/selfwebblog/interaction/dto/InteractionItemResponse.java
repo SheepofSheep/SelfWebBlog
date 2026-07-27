@@ -19,6 +19,7 @@ public class InteractionItemResponse {
     private Long rootId;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long replyToId;
+    private String replyToNickname;
     private String content;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
@@ -32,6 +33,8 @@ public class InteractionItemResponse {
     private int likeCount;
     private boolean liked;
     private boolean pinned;
+    private Integer pinOrder;
+    private LocalDateTime pinnedAt;
     private LocalDateTime editedTime;
     private LocalDateTime createTime;
     private List<InteractionItemResponse> replies = new ArrayList<>();

@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,9 +43,14 @@ public class TagService {
 
     @Transactional
     public void replacePostTags(Long postId, String rawTags) {
+        replacePostTags(postId, parseNames(rawTags));
+    }
+
+    @Transactional
+    public void replacePostTags(Long postId, Collection<String> rawTags) {
         if (postId == null) return;
         postTagMapper.deleteRelationsForPost(postId);
-        for (String name : parseNames(rawTags)) {
+        for (String name : normalizeNames(rawTags)) {
             Tag tag = findOrCreate(name);
             postTagMapper.insertRelation(postId, tag.getId());
         }
@@ -95,9 +101,14 @@ public class TagService {
     }
 
     public static List<String> parseNames(String rawTags) {
+        if (rawTags == null) return List.of();
+        return normalizeNames(List.of(rawTags.split("[,，\\n]+")));
+    }
+
+    public static List<String> normalizeNames(Collection<String> rawTags) {
         Map<String, String> unique = new LinkedHashMap<>();
         if (rawTags == null) return List.of();
-        for (String raw : rawTags.split("[,，\\n]+")) {
+        for (String raw : rawTags) {
             if (raw == null || raw.isBlank()) continue;
             String name = normalizeName(raw);
             unique.putIfAbsent(name.toLowerCase(Locale.ROOT), name);
@@ -128,7 +139,9 @@ public class TagService {
         if (existing != null) return existing;
         String slug = uniqueSlug(name, null);
         postTagMapper.insertTag(name, slug, LocalDateTime.now());
-        return postTagMapper.findByName(name);
+        Tag created = postTagMapper.findByName(name);
+        if (created == null) throw new IllegalStateException("标签保存失败");
+        return created;
     }
 
     private String uniqueSlug(String name, Long currentId) {

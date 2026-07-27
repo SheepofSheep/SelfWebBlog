@@ -7,6 +7,7 @@ dist-ssr/
 **/dist-ssr/
 *.jar
 *.war
+*.class
 
 # Dependencies
 node_modules/
@@ -15,6 +16,9 @@ node_modules/
 # IDE / OS
 .idea/
 .vscode/
+.settings/
+.project
+.classpath
 *.iml
 .DS_Store
 Thumbs.db
@@ -23,11 +27,16 @@ Thumbs.db
 *.log
 *.out.log
 *.err.log
+.dev-runtime/
+.runtime/
+**/.runtime/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 logs/
+hs_err_pid*.log
+replay_pid*.log
 *.tmp
 *.temp
 *.pid
@@ -36,8 +45,18 @@ logs/
 *~
 .cache/
 .vite/
+.eslintcache
+.pnpm-store/
 coverage/
 **/coverage/
+output/
+**/output/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+blob-report/
+**/blob-report/
 
 # Environment and local secrets
 .env
@@ -46,6 +65,12 @@ coverage/
 !**/.env.example
 github-credentials.md
 **/github-credentials.md
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
 
 # Local runtime data
 uploads/
@@ -53,6 +78,7 @@ uploads/
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
 
@@ -61,14 +87,9 @@ uploads/
 *.bak
 *.backup
 
-# Template files
-**/blog-frontend/README.md
-
-# Deployment bundles / local release staging
+# Generated release archives / local release staging
 release/
 releases/
-deploy/
-deployment/
 *.zip
 *.tar
 *.tar.gz
@@ -80,13 +101,9 @@ deployment/
 # Playwright（E2E 截图/快照）
 .playwright-mcp/
 .playwright-cli/
-output/playwright/
 .gstack/
+.superpowers/
 
 # Optional local IP geolocation databases
 SelfWebBlog/src/main/resources/ip-data/*.xdb
 !SelfWebBlog/src/main/resources/ip-data/.gitkeep
-
-# Local dev scripts (machine-specific paths)
-start-dev.bat
-stop-dev.bat

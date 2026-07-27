@@ -17,10 +17,13 @@ import org.example.selfwebblog.interaction.security.IpCipher;
 import org.example.selfwebblog.interaction.security.IpRegionResolver;
 import org.example.selfwebblog.interaction.security.VisitorIdentityService;
 import org.example.selfwebblog.service.PostService;
+import org.example.selfwebblog.service.UserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -41,6 +44,7 @@ public class InteractionService {
     private final IpCipher ipCipher;
     private final VisitorIdentityService visitorIdentityService;
     private final IpRegionResolver ipRegionResolver;
+    private final UserService userService;
 
     public InteractionService(
             InteractionMapper interactionMapper,
@@ -50,7 +54,8 @@ public class InteractionService {
             GuestTrustService guestTrustService,
             IpCipher ipCipher,
             VisitorIdentityService visitorIdentityService,
-            IpRegionResolver ipRegionResolver) {
+            IpRegionResolver ipRegionResolver,
+            UserService userService) {
         this.interactionMapper = interactionMapper;
         this.likeMapper = likeMapper;
         this.postService = postService;
@@ -59,6 +64,7 @@ public class InteractionService {
         this.ipCipher = ipCipher;
         this.visitorIdentityService = visitorIdentityService;
         this.ipRegionResolver = ipRegionResolver;
+        this.userService = userService;
     }
 
     @Transactional
@@ -69,6 +75,7 @@ public class InteractionService {
             boolean rateSuspicious) {
         String targetType = normalizeTargetType(request.getTargetType());
         long targetId = request.getTargetId();
+        interactionMapper.acquireWriteLock();
         validateTarget(targetType, targetId, actor);
 
         Interaction parent = null;
@@ -76,6 +83,7 @@ public class InteractionService {
             requireAuthenticatedReply(actor, request.getReplyToId());
             parent = requireInteraction(request.getReplyToId());
             requireSameTarget(parent, targetType, targetId);
+            requirePublishedReplyParent(parent, targetType, targetId);
         }
 
         String normalizedIp = ipAddress == null || ipAddress.isBlank() ? "unknown" : ipAddress.trim();
@@ -105,7 +113,12 @@ public class InteractionService {
         }
 
         interactionMapper.insert(interaction);
-        return toResponse(interaction, false);
+        InteractionItemResponse response = toResponse(interaction, false);
+        if (parent != null) {
+            ProfileProjection target = projectProfiles(List.of(parent)).get(parent.getId());
+            response.setReplyToNickname(target == null ? "已删除用户" : target.nickname());
+        }
+        return response;
     }
 
     public InteractionThreadResponse getThread(
@@ -120,7 +133,9 @@ public class InteractionService {
         LambdaQueryWrapper<Interaction> rootsQuery = targetQuery(targetType, targetId, includeModeration)
                 .isNull(Interaction::getRootId)
                 .orderByDesc(Interaction::getPinned)
-                .orderByDesc(Interaction::getCreateTime);
+                .orderByAsc(Interaction::getPinOrder)
+                .orderByDesc(Interaction::getCreateTime)
+                .orderByDesc(Interaction::getId);
         Page<Interaction> roots = interactionMapper.selectPage(new Page<>(page, size), rootsQuery);
         if (roots.getRecords().isEmpty()) {
             return new InteractionThreadResponse(List.of(), roots.getTotal(), page, size);
@@ -129,18 +144,27 @@ public class InteractionService {
         List<Long> rootIds = roots.getRecords().stream().map(Interaction::getId).toList();
         LambdaQueryWrapper<Interaction> repliesQuery = new LambdaQueryWrapper<Interaction>()
                 .in(Interaction::getRootId, rootIds)
-                .orderByAsc(Interaction::getCreateTime);
+                .orderByAsc(Interaction::getCreateTime)
+                .orderByAsc(Interaction::getId);
         if (!includeModeration) repliesQuery.eq(Interaction::getStatus, "PUBLISHED");
         List<Interaction> replies = interactionMapper.selectList(repliesQuery);
 
         Set<Long> likedIds = likedCommentIds(viewerId, roots.getRecords(), replies);
+        List<Interaction> projectionSources = withReplyTargets(
+                roots.getRecords(), replies, includeModeration);
+        Map<Long, ProfileProjection> profiles = projectProfiles(projectionSources);
         Map<Long, List<InteractionItemResponse>> repliesByRoot = new HashMap<>();
         for (Interaction reply : replies) {
             repliesByRoot.computeIfAbsent(reply.getRootId(), ignored -> new ArrayList<>())
-                    .add(toResponse(reply, likedIds.contains(reply.getId())));
+                    .add(toResponse(
+                            reply,
+                            likedIds.contains(reply.getId()),
+                            profiles.get(reply.getId()),
+                            replyTargetNickname(reply, profiles, includeModeration)));
         }
         List<InteractionItemResponse> items = roots.getRecords().stream().map(root -> {
-            InteractionItemResponse response = toResponse(root, likedIds.contains(root.getId()));
+            InteractionItemResponse response = toResponse(
+                    root, likedIds.contains(root.getId()), profiles.get(root.getId()), null);
             response.setReplies(repliesByRoot.getOrDefault(root.getId(), List.of()));
             return response;
         }).toList();
@@ -148,13 +172,198 @@ public class InteractionService {
     }
 
     public Page<AdminInteractionResponse> listForModeration(String status, int page, int size) {
+        return listForModeration(status, null, null, null, page, size);
+    }
+
+    public Page<AdminInteractionResponse> listForModeration(
+            String status,
+            String targetType,
+            Boolean pinned,
+            String keyword,
+            int page,
+            int size) {
+        return listForModeration(status, targetType, pinned, null, keyword, page, size);
+    }
+
+    public Page<AdminInteractionResponse> listForModeration(
+            String status,
+            String targetType,
+            Boolean pinned,
+            String contentType,
+            String keyword,
+            int page,
+            int size) {
         LambdaQueryWrapper<Interaction> query = new LambdaQueryWrapper<Interaction>()
-                .orderByDesc(Interaction::getCreateTime);
-        if (status != null && !status.isBlank()) query.eq(Interaction::getStatus, status.toUpperCase(Locale.ROOT));
+                .isNull(Interaction::getRootId)
+                .orderByDesc(Interaction::getPinned)
+                .orderByAsc(Interaction::getPinOrder)
+                .orderByDesc(Interaction::getCreateTime)
+                .orderByDesc(Interaction::getId);
+        String normalizedStatus = status == null || status.isBlank()
+                ? null
+                : status.trim().toUpperCase(Locale.ROOT);
+        String normalizedContentType = normalizeContentType(contentType);
+        String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        if (targetType != null && !targetType.isBlank()) {
+            query.eq(Interaction::getTargetType, normalizeTargetType(targetType));
+        }
+        if (pinned != null) query.eq(Interaction::getPinned, pinned ? 1 : 0);
+        if (normalizedStatus != null || normalizedContentType != null || normalizedKeyword != null) {
+            query.and(thread -> {
+                applyModerationCandidateFilters(
+                        thread, normalizedStatus, normalizedContentType, normalizedKeyword);
+                List<Object> replyParameters = new ArrayList<>();
+                thread.or().exists(buildReplyCandidateSql(
+                        normalizedStatus,
+                        normalizedContentType,
+                        normalizedKeyword,
+                        replyParameters),
+                        replyParameters.toArray());
+            });
+        }
         Page<Interaction> entities = interactionMapper.selectPage(new Page<>(page, size), query);
-        Page<AdminInteractionResponse> result = new Page<>(page, size, entities.getTotal());
-        result.setRecords(entities.getRecords().stream().map(this::toAdminResponse).toList());
+        Page<AdminInteractionResponse> result = new Page<>(
+                entities.getCurrent(), entities.getSize(), entities.getTotal());
+        if (entities.getRecords().isEmpty()) {
+            result.setRecords(List.of());
+            return result;
+        }
+
+        List<Long> rootIds = entities.getRecords().stream().map(Interaction::getId).toList();
+        List<Interaction> replies = interactionMapper.selectList(new LambdaQueryWrapper<Interaction>()
+                .in(Interaction::getRootId, rootIds)
+                .orderByAsc(Interaction::getCreateTime)
+                .orderByAsc(Interaction::getId));
+        if (replies == null) replies = List.of();
+
+        List<Interaction> projectionSources = withReplyTargets(entities.getRecords(), replies, true);
+        Map<Long, ProfileProjection> profiles = projectProfiles(projectionSources);
+        Map<InteractionTarget, String> sourceTitles = projectSourceTitles(projectionSources);
+        Map<Long, List<AdminInteractionResponse>> repliesByRoot = new HashMap<>();
+        for (Interaction reply : replies) {
+            repliesByRoot.computeIfAbsent(reply.getRootId(), ignored -> new ArrayList<>())
+                    .add(toAdminResponse(
+                            reply,
+                            profiles.get(reply.getId()),
+                            replyTargetNickname(reply, profiles, true),
+                            sourceTitle(reply, sourceTitles),
+                            0,
+                            List.of()));
+        }
+        result.setRecords(entities.getRecords().stream()
+                .map(root -> {
+                    List<AdminInteractionResponse> rootReplies =
+                            repliesByRoot.getOrDefault(root.getId(), List.of());
+                    return toAdminResponse(
+                            root,
+                            profiles.get(root.getId()),
+                            null,
+                            sourceTitle(root, sourceTitles),
+                            rootReplies.size(),
+                            rootReplies);
+                })
+                .toList());
         return result;
+    }
+
+    private void applyContentTypeFilter(
+            LambdaQueryWrapper<Interaction> query,
+            String rawContentType) {
+        String contentType = normalizeContentType(rawContentType);
+        if (contentType == null) return;
+        if ("STICKER".equals(contentType)) {
+            query.and(content -> content
+                    .like(Interaction::getContent, "[sticker:")
+                    .or()
+                    .like(Interaction::getContent, "](/images/emojis/"));
+            return;
+        }
+        if ("TEXT".equals(contentType)) {
+            query.notLike(Interaction::getContent, "[sticker:")
+                    .notLike(Interaction::getContent, "](/images/emojis/");
+            return;
+        }
+        throw new IllegalArgumentException("不支持的评论内容类型");
+    }
+
+    private String normalizeContentType(String rawContentType) {
+        if (rawContentType == null || rawContentType.isBlank()) return null;
+        String contentType = rawContentType.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("STICKER", "TEXT").contains(contentType)) {
+            throw new IllegalArgumentException("不支持的评论内容类型");
+        }
+        return contentType;
+    }
+
+    private void applyModerationCandidateFilters(
+            LambdaQueryWrapper<Interaction> query,
+            String status,
+            String contentType,
+            String keyword) {
+        if (status != null) query.eq(Interaction::getStatus, status);
+        applyContentTypeFilter(query, contentType);
+        if (keyword == null) return;
+        String pattern = "%" + keyword + "%";
+        query.and(candidate -> candidate
+                .like(Interaction::getContent, keyword)
+                .or().like(Interaction::getNickname, keyword)
+                .or().like(Interaction::getGuestName, keyword)
+                .or().like(Interaction::getTitleName, keyword)
+                .or().exists("""
+                        SELECT 1 FROM user AS current_profile
+                        WHERE current_profile.id = comment.user_id
+                          AND (
+                            current_profile.nickname LIKE {0}
+                            OR current_profile.title_name LIKE {0}
+                          )
+                        """, pattern));
+    }
+
+    private String buildReplyCandidateSql(
+            String status,
+            String contentType,
+            String keyword,
+            List<Object> parameters) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT 1
+                FROM comment AS reply_filter
+                LEFT JOIN user AS reply_profile ON reply_profile.id = reply_filter.user_id
+                WHERE reply_filter.root_id = comment.id
+                """);
+        if (status != null) {
+            sql.append(" AND reply_filter.status = ")
+                    .append(addSqlParameter(parameters, status));
+        }
+        if ("STICKER".equals(contentType)) {
+            sql.append(" AND (reply_filter.content LIKE ")
+                    .append(addSqlParameter(parameters, "%[sticker:%"))
+                    .append(" OR reply_filter.content LIKE ")
+                    .append(addSqlParameter(parameters, "%](/images/emojis/%"))
+                    .append(')');
+        } else if ("TEXT".equals(contentType)) {
+            sql.append(" AND reply_filter.content NOT LIKE ")
+                    .append(addSqlParameter(parameters, "%[sticker:%"))
+                    .append(" AND reply_filter.content NOT LIKE ")
+                    .append(addSqlParameter(parameters, "%](/images/emojis/%"));
+        }
+        if (keyword != null) {
+            String pattern = "%" + keyword + "%";
+            String placeholder = addSqlParameter(parameters, pattern);
+            sql.append(" AND (reply_filter.content LIKE ").append(placeholder)
+                    .append(" OR reply_filter.nickname LIKE ").append(placeholder)
+                    .append(" OR reply_filter.guest_name LIKE ").append(placeholder)
+                    .append(" OR reply_filter.title_name LIKE ").append(placeholder)
+                    .append(" OR reply_profile.nickname LIKE ").append(placeholder)
+                    .append(" OR reply_profile.title_name LIKE ").append(placeholder)
+                    .append(')');
+        }
+        return sql.toString();
+    }
+
+    private String addSqlParameter(List<Object> parameters, Object value) {
+        int index = parameters.size();
+        parameters.add(value);
+        return "{" + index + "}";
     }
 
     public String revealIp(Long id) {
@@ -165,13 +374,18 @@ public class InteractionService {
 
     @Transactional
     public InteractionItemResponse moderate(Long id, String nextStatus) {
+        interactionMapper.acquireWriteLock();
         Interaction interaction = requireInteraction(id);
         String normalized = nextStatus == null ? "" : nextStatus.toUpperCase(Locale.ROOT);
         if (!InteractionPolicy.canTransition(interaction.getStatus(), normalized)) {
             throw new IllegalArgumentException("不允许的审核状态变更");
         }
+        boolean clearPin = Integer.valueOf(1).equals(interaction.getPinned())
+                && !"PUBLISHED".equals(normalized);
         interaction.setStatus(normalized);
+        if (clearPin) clearPin(interaction);
         interactionMapper.updateById(interaction);
+        if (clearPin) compactPinned(interaction.getTargetType(), interaction.getTargetId());
         return toResponse(interaction, false);
     }
 
@@ -184,12 +398,14 @@ public class InteractionService {
                 .filter(id -> id != null && id > 0)
                 .toList();
         if (normalized.isEmpty()) throw new IllegalArgumentException("至少选择一条互动");
+        interactionMapper.acquireWriteLock();
         for (Long id : normalized) moderate(id, nextStatus);
         return normalized.size();
     }
 
     @Transactional
     public InteractionItemResponse setPinned(Long id, boolean pinned) {
+        interactionMapper.acquirePinMutationLock(id);
         Interaction interaction = requireInteraction(id);
         if (interaction.getRootId() != null) {
             throw new IllegalArgumentException("仅顶层互动可以置顶");
@@ -197,17 +413,128 @@ public class InteractionService {
         if (!"PUBLISHED".equals(interaction.getStatus())) {
             throw new IllegalArgumentException("仅已发布互动可以置顶");
         }
-        interaction.setPinned(pinned ? 1 : 0);
+        boolean currentlyPinned = Integer.valueOf(1).equals(interaction.getPinned());
+        if (currentlyPinned == pinned && (!pinned || interaction.getPinOrder() != null)) {
+            return projectedResponse(interaction, false);
+        }
+        if (pinned) {
+            List<Interaction> existing = compactPinned(interaction.getTargetType(), interaction.getTargetId());
+            interaction.setPinned(1);
+            interaction.setPinOrder(existing.size());
+            interaction.setPinnedAt(LocalDateTime.now());
+        } else {
+            clearPin(interaction);
+        }
         interactionMapper.updateById(interaction);
-        return toResponse(interaction, false);
+        if (!pinned) compactPinned(interaction.getTargetType(), interaction.getTargetId());
+        return projectedResponse(interaction, false);
+    }
+
+    @Transactional
+    public InteractionItemResponse movePinOrder(Long id, String rawDirection) {
+        String direction = rawDirection == null ? "" : rawDirection.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("UP", "DOWN").contains(direction)) {
+            throw new IllegalArgumentException("置顶移动方向无效");
+        }
+        interactionMapper.acquirePinMutationLock(id);
+        Interaction interaction = requireInteraction(id);
+        if (interaction.getRootId() != null || !Integer.valueOf(1).equals(interaction.getPinned())) {
+            throw new IllegalArgumentException("仅置顶的顶层互动可以排序");
+        }
+        List<Interaction> ordered = compactPinned(interaction.getTargetType(), interaction.getTargetId());
+        int index = -1;
+        for (int current = 0; current < ordered.size(); current++) {
+            if (Objects.equals(ordered.get(current).getId(), id)) {
+                index = current;
+                break;
+            }
+        }
+        if (index < 0) throw new IllegalArgumentException("置顶互动不存在");
+        int neighbourIndex = "UP".equals(direction) ? index - 1 : index + 1;
+        Interaction target = ordered.get(index);
+        if (neighbourIndex >= 0 && neighbourIndex < ordered.size()) {
+            Interaction neighbour = ordered.get(neighbourIndex);
+            int targetOrder = target.getPinOrder();
+            int neighbourOrder = neighbour.getPinOrder();
+            target.setPinOrder(-1);
+            requirePinOrderUpdate(target);
+            neighbour.setPinOrder(targetOrder);
+            requirePinOrderUpdate(neighbour);
+            target.setPinOrder(neighbourOrder);
+            requirePinOrderUpdate(target);
+        }
+        return projectedResponse(target, false);
+    }
+
+    private void requirePinOrderUpdate(Interaction interaction) {
+        if (interactionMapper.updateById(interaction) != 1) {
+            throw new IllegalStateException("置顶顺序更新失败");
+        }
     }
 
     @Transactional
     public void softDelete(Long id) {
+        interactionMapper.acquireWriteLock();
         Interaction interaction = requireInteraction(id);
+        requireDeletable(interaction);
+        boolean clearPin = Integer.valueOf(1).equals(interaction.getPinned());
         interaction.setStatus("DELETED");
-        interaction.setPinned(0);
+        clearPin(interaction);
         interactionMapper.updateById(interaction);
+        if (clearPin) compactPinned(interaction.getTargetType(), interaction.getTargetId());
+    }
+
+    @Transactional
+    public int softDeleteBatch(List<Long> ids) {
+        List<Long> normalized = normalizeBatchIds(ids);
+        interactionMapper.acquireWriteLock();
+        List<Interaction> selected = interactionMapper.selectBatchIds(normalized);
+        if (selected == null) selected = List.of();
+        Map<Long, Interaction> byId = selected.stream()
+                .filter(interaction -> interaction.getId() != null)
+                .collect(Collectors.toMap(
+                        Interaction::getId,
+                        interaction -> interaction,
+                        (first, ignored) -> first));
+        if (!byId.keySet().containsAll(normalized)) {
+            throw new IllegalArgumentException("所选评论包含不存在的记录");
+        }
+        List<Interaction> ordered = normalized.stream()
+                .map(byId::get)
+                .toList();
+        ordered.forEach(this::requireDeletable);
+
+        Set<InteractionTarget> pinsToCompact = new LinkedHashSet<>();
+        for (Interaction interaction : ordered) {
+            if (Integer.valueOf(1).equals(interaction.getPinned())) {
+                pinsToCompact.add(new InteractionTarget(
+                        interaction.getTargetType(), interaction.getTargetId()));
+            }
+            interaction.setStatus("DELETED");
+            clearPin(interaction);
+            if (interactionMapper.updateById(interaction) != 1) {
+                throw new IllegalStateException("评论删除失败");
+            }
+        }
+        pinsToCompact.forEach(target -> compactPinned(target.type(), target.id()));
+        return ordered.size();
+    }
+
+    private List<Long> normalizeBatchIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty() || ids.size() > 100) {
+            throw new IllegalArgumentException("单次可删除 1 到 100 条互动");
+        }
+        if (ids.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new IllegalArgumentException("评论 ID 无效");
+        }
+        return new ArrayList<>(new LinkedHashSet<>(ids));
+    }
+
+    private void requireDeletable(Interaction interaction) {
+        if (interaction == null || !Set.of("PENDING", "PUBLISHED", "HIDDEN", "SPAM")
+                .contains(interaction.getStatus())) {
+            throw new IllegalArgumentException("当前评论状态不可删除");
+        }
     }
 
     public Interaction requireInteraction(Long id) {
@@ -231,12 +558,27 @@ public class InteractionService {
         }
     }
 
+    private void requirePublishedReplyParent(
+            Interaction parent,
+            String targetType,
+            Long targetId) {
+        if (!"PUBLISHED".equals(parent.getStatus())) {
+            throw new IllegalArgumentException("只能回复已发布评论");
+        }
+        if (parent.getRootId() == null) return;
+        Interaction root = requireInteraction(parent.getRootId());
+        requireSameTarget(root, targetType, targetId);
+        if (root.getRootId() != null || !"PUBLISHED".equals(root.getStatus())) {
+            throw new IllegalArgumentException("只能回复已发布评论");
+        }
+    }
+
     private void validateTarget(String targetType, Long targetId, User actor) {
         if (targetId == null || targetId <= 0) throw new IllegalArgumentException("目标不存在");
         if ("POST".equals(targetType)) {
             if (actor == null) throw new IllegalArgumentException("文章评论需要登录");
             Post post = postService.getById(targetId);
-            if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
+            if (post == null || !"PUBLISHED".equals(post.getStatus())) {
                 throw new IllegalArgumentException("文章不存在或未发布");
             }
         } else if (targetId != 1L) {
@@ -248,7 +590,7 @@ public class InteractionService {
         if (targetId == null || targetId <= 0) throw new IllegalArgumentException("目标不存在");
         if ("POST".equals(targetType)) {
             Post post = postService.getById(targetId);
-            if (post == null || "DRAFT".equalsIgnoreCase(post.getStatus())) {
+            if (post == null || !"PUBLISHED".equals(post.getStatus())) {
                 throw new IllegalArgumentException("文章不存在或未发布");
             }
         } else if (targetId != 1L) {
@@ -327,44 +669,224 @@ public class InteractionService {
     }
 
     private InteractionItemResponse toResponse(Interaction interaction, boolean liked) {
+        return toResponse(interaction, liked, snapshotProfile(interaction), null);
+    }
+
+    private InteractionItemResponse projectedResponse(Interaction interaction, boolean liked) {
+        ProfileProjection profile = projectProfiles(List.of(interaction)).get(interaction.getId());
+        return toResponse(interaction, liked, profile, null);
+    }
+
+    private InteractionItemResponse toResponse(
+            Interaction interaction,
+            boolean liked,
+            ProfileProjection profile,
+            String replyToNickname) {
         InteractionItemResponse response = new InteractionItemResponse();
         response.setId(interaction.getId());
         response.setTargetType(interaction.getTargetType());
         response.setTargetId(interaction.getTargetId());
         response.setRootId(interaction.getRootId());
         response.setReplyToId(interaction.getReplyToId());
+        response.setReplyToNickname(replyToNickname);
         response.setContent(interaction.getContent());
         response.setUserId(interaction.getUserId());
-        response.setNickname(interaction.getNickname());
-        response.setAvatarUrl(interaction.getAvatarUrl());
-        response.setRole(interaction.getRole());
-        response.setTitleName(interaction.getTitleName());
-        response.setTitleStyle(interaction.getTitleStyle());
+        ProfileProjection display = profile == null ? snapshotProfile(interaction) : profile;
+        response.setNickname(display.nickname());
+        response.setAvatarUrl(display.avatarUrl());
+        response.setRole(display.role());
+        response.setTitleName(display.titleName());
+        response.setTitleStyle(display.titleStyle());
         response.setIpRegion(interaction.getIpRegion());
         response.setStatus(interaction.getStatus());
         response.setLikeCount(interaction.getLikeCount() == null ? 0 : interaction.getLikeCount());
         response.setLiked(liked);
         response.setPinned(Integer.valueOf(1).equals(interaction.getPinned()));
+        response.setPinOrder(interaction.getPinOrder());
+        response.setPinnedAt(interaction.getPinnedAt());
         response.setEditedTime(interaction.getEditedTime());
         response.setCreateTime(interaction.getCreateTime());
         return response;
     }
 
-    private AdminInteractionResponse toAdminResponse(Interaction interaction) {
+    private AdminInteractionResponse toAdminResponse(
+            Interaction interaction,
+            ProfileProjection profile,
+            String replyToNickname,
+            String sourceTitle,
+            int replyCount,
+            List<AdminInteractionResponse> replies) {
+        ProfileProjection display = profile == null ? snapshotProfile(interaction) : profile;
         return new AdminInteractionResponse(
                 interaction.getId(),
                 interaction.getTargetType(),
                 interaction.getTargetId(),
+                sourceTitle,
                 interaction.getRootId(),
                 interaction.getReplyToId(),
+                replyToNickname,
                 interaction.getContent(),
                 interaction.getUserId(),
-                interaction.getNickname(),
-                interaction.getRole(),
+                display.nickname(),
+                display.avatarUrl(),
+                display.role(),
+                display.titleName(),
+                display.titleStyle(),
                 interaction.getStatus(),
                 interaction.getIpRegion(),
                 interaction.getLikeCount() == null ? 0 : interaction.getLikeCount(),
                 Integer.valueOf(1).equals(interaction.getPinned()),
-                interaction.getCreateTime());
+                interaction.getPinOrder(),
+                interaction.getPinnedAt(),
+                interaction.getCreateTime(),
+                replyCount,
+                List.copyOf(replies));
+    }
+
+    private Map<InteractionTarget, String> projectSourceTitles(Collection<Interaction> interactions) {
+        if (interactions == null || interactions.isEmpty()) return Map.of();
+        Set<Long> postIds = interactions.stream()
+                .filter(interaction -> "POST".equals(interaction.getTargetType()))
+                .map(Interaction::getTargetId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<Post> posts = postIds.isEmpty() ? List.of() : postService.listByIds(postIds);
+        if (posts == null) posts = List.of();
+        Map<InteractionTarget, String> result = new HashMap<>();
+        for (Post post : posts) {
+            result.put(new InteractionTarget("POST", post.getId()), value(post.getTitle()));
+        }
+        interactions.stream()
+                .filter(interaction -> "GUESTBOOK".equals(interaction.getTargetType()))
+                .forEach(interaction -> result.put(
+                        new InteractionTarget("GUESTBOOK", interaction.getTargetId()), "留言板"));
+        return result;
+    }
+
+    private String sourceTitle(
+            Interaction interaction,
+            Map<InteractionTarget, String> sourceTitles) {
+        return sourceTitles.getOrDefault(
+                new InteractionTarget(interaction.getTargetType(), interaction.getTargetId()),
+                "POST".equals(interaction.getTargetType()) ? "已删除文章" : "留言板");
+    }
+
+    private List<Interaction> withReplyTargets(
+            Collection<Interaction> primary,
+            Collection<Interaction> additional,
+            boolean includeModeration) {
+        List<Interaction> result = new ArrayList<>();
+        if (primary != null) result.addAll(primary);
+        if (additional != null) result.addAll(additional);
+        Set<Long> present = result.stream()
+                .map(Interaction::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> missing = result.stream()
+                .map(Interaction::getReplyToId)
+                .filter(Objects::nonNull)
+                .filter(id -> !present.contains(id))
+                .collect(Collectors.toSet());
+        if (!missing.isEmpty()) {
+            List<Interaction> targets = interactionMapper.selectBatchIds(missing);
+            if (targets != null) {
+                targets.stream()
+                        .filter(target -> includeModeration || "PUBLISHED".equals(target.getStatus()))
+                        .forEach(result::add);
+            }
+        }
+        return result;
+    }
+
+    private Map<Long, ProfileProjection> projectProfiles(Collection<Interaction> interactions) {
+        if (interactions == null || interactions.isEmpty()) return Map.of();
+        Set<Long> userIds = interactions.stream()
+                .map(Interaction::getUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<User> users = userIds.isEmpty() ? List.of() : userService.listByIds(userIds);
+        if (users == null) users = List.of();
+        Map<Long, User> usersById = users.stream()
+                .collect(Collectors.toMap(User::getId, user -> user, (first, ignored) -> first));
+        Map<Long, ProfileProjection> result = new HashMap<>();
+        for (Interaction interaction : interactions) {
+            if (interaction.getId() == null) continue;
+            User current = interaction.getUserId() == null ? null : usersById.get(interaction.getUserId());
+            result.put(interaction.getId(), current == null
+                    ? snapshotProfile(interaction)
+                    : currentProfile(current));
+        }
+        return result;
+    }
+
+    private ProfileProjection currentProfile(User user) {
+        String nickname = user.getNickname() == null || user.getNickname().isBlank()
+                ? user.getUsername()
+                : user.getNickname();
+        return new ProfileProjection(
+                value(nickname),
+                value(user.getAvatarUrl()),
+                value(user.getRole()),
+                value(user.getTitleName()),
+                user.getTitleStyle() == null || user.getTitleStyle().isBlank()
+                        ? "default"
+                        : user.getTitleStyle());
+    }
+
+    private ProfileProjection snapshotProfile(Interaction interaction) {
+        return new ProfileProjection(
+                value(interaction.getNickname()),
+                value(interaction.getAvatarUrl()),
+                value(interaction.getRole()),
+                value(interaction.getTitleName()),
+                interaction.getTitleStyle() == null || interaction.getTitleStyle().isBlank()
+                        ? "default"
+                        : interaction.getTitleStyle());
+    }
+
+    private String replyTargetNickname(
+            Interaction interaction,
+            Map<Long, ProfileProjection> profiles,
+            boolean includeModeration) {
+        if (interaction.getReplyToId() == null) return null;
+        ProfileProjection target = profiles.get(interaction.getReplyToId());
+        if (target == null || target.nickname().isBlank()) {
+            return includeModeration ? "已删除用户" : "评论不可见";
+        }
+        return target.nickname();
+    }
+
+    private List<Interaction> compactPinned(String targetType, Long targetId) {
+        List<Interaction> pinned = interactionMapper.listPinnedRoots(targetType, targetId);
+        if (pinned == null) return new ArrayList<>();
+        for (int index = 0; index < pinned.size(); index++) {
+            Interaction item = pinned.get(index);
+            if (!Objects.equals(item.getPinOrder(), index)) {
+                item.setPinOrder(index);
+                interactionMapper.updateById(item);
+            }
+        }
+        return pinned;
+    }
+
+    private void clearPin(Interaction interaction) {
+        interaction.setPinned(0);
+        interaction.setPinOrder(null);
+        interaction.setPinnedAt(null);
+    }
+
+    private String value(String value) {
+        return value == null ? "" : value;
+    }
+
+    private record ProfileProjection(
+            String nickname,
+            String avatarUrl,
+            String role,
+            String titleName,
+            String titleStyle) {
+    }
+
+    private record InteractionTarget(String type, Long id) {
     }
 }

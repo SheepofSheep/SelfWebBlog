@@ -35,12 +35,16 @@ public class AdminInteractionController {
     @GetMapping
     public Result<Page<AdminInteractionResponse>> list(
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) Boolean pinned,
+            @RequestParam(required = false) String contentType,
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
         PaginationPolicy.PageRequest pagination = PaginationPolicy.require(page, size);
         return Result.success(interactionService.listForModeration(
-                status, pagination.page(), pagination.size()));
+                status, targetType, pinned, contentType, keyword, pagination.page(), pagination.size()));
     }
 
     @PutMapping("/{id}/status")
@@ -67,11 +71,25 @@ public class AdminInteractionController {
         return Result.success(interactionService.setPinned(id, Boolean.TRUE.equals(body.get("pinned"))));
     }
 
+    @PutMapping("/{id}/pin-order")
+    @AdminOnly(action = "INTERACTION_PIN_ORDER")
+    public Result<InteractionItemResponse> movePinOrder(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        return Result.success(interactionService.movePinOrder(id, body.get("direction")));
+    }
+
     @DeleteMapping("/{id}")
     @AdminOnly(action = "INTERACTION_DELETE")
     public Result<String> delete(@PathVariable Long id) {
         interactionService.softDelete(id);
         return Result.success("互动已删除");
+    }
+
+    @PostMapping("/batch-delete")
+    @AdminOnly(action = "INTERACTION_BATCH_DELETE")
+    public Result<Integer> deleteBatch(@RequestBody BatchIdsRequest body) {
+        return Result.success(interactionService.softDeleteBatch(body == null ? null : body.ids()));
     }
 
     @PostMapping("/{id}/ip")
@@ -81,4 +99,6 @@ public class AdminInteractionController {
     }
 
     public record BatchModerationRequest(List<Long> ids, String status) {}
+
+    public record BatchIdsRequest(List<Long> ids) {}
 }

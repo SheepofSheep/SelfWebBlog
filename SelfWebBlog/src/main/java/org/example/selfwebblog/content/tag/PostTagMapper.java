@@ -20,11 +20,11 @@ public interface PostTagMapper {
     @Select("SELECT * FROM tag WHERE lower(slug) = lower(#{slug}) LIMIT 1")
     Tag findBySlug(@Param("slug") String slug);
 
-    @Insert("INSERT INTO tag(name, slug, create_time) VALUES (#{name}, #{slug}, #{createTime})")
+    @Insert("INSERT OR IGNORE INTO tag(name, slug, create_time) VALUES (#{name}, #{slug}, #{createTime})")
     int insertTag(@Param("name") String name, @Param("slug") String slug,
                   @Param("createTime") LocalDateTime createTime);
 
-    @Insert("INSERT INTO post_tag(post_id, tag_id) VALUES (#{postId}, #{tagId})")
+    @Insert("INSERT OR IGNORE INTO post_tag(post_id, tag_id) VALUES (#{postId}, #{tagId})")
     int insertRelation(@Param("postId") Long postId, @Param("tagId") Long tagId);
 
     @Delete("DELETE FROM post_tag WHERE post_id = #{postId}")
@@ -36,7 +36,7 @@ public interface PostTagMapper {
     @Select("""
             SELECT t.id, t.name, t.slug,
                    COUNT(CASE WHEN p.status = 'PUBLISHED' THEN 1 END) AS postCount,
-                   MAX(CASE WHEN p.status = 'PUBLISHED' THEN p.update_time END) AS latestPostTime
+                   MAX(CASE WHEN p.status = 'PUBLISHED' THEN p.published_time END) AS latestPostTime
             FROM tag t
             LEFT JOIN post_tag pt ON pt.tag_id = t.id
             LEFT JOIN post p ON p.id = pt.post_id
@@ -50,7 +50,7 @@ public interface PostTagMapper {
             JOIN post_tag pt ON pt.post_id = p.id
             JOIN tag t ON t.id = pt.tag_id
             WHERE lower(t.slug) = lower(#{slug}) AND p.status = 'PUBLISHED'
-            ORDER BY p.create_time DESC
+            ORDER BY p.published_time DESC, p.id DESC
             """)
     List<Post> listPublishedPosts(@Param("slug") String slug);
 

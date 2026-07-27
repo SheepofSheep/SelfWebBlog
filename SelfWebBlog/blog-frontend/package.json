@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "test": "node --test src/**/*.test.js",
     "test:e2e": "playwright test",
-    "lint": "eslint . --ext .js,.vue --ignore-path .gitignore",
+    "lint": "eslint . --ext .js,.vue --ignore-path .gitignore --max-warnings=0",
     "format": "prettier --write \"src/**/*.{js,vue,css}\" \"*.{js,json,md}\"",
     "format:check": "prettier --check \"src/**/*.{js,vue,css}\" \"*.{js,json,md}\"",
-    "check": "pnpm test && pnpm lint && pnpm build"
+    "check": "pnpm test && pnpm lint && pnpm format:check && pnpm build",
+    "check:all": "pnpm check && pnpm test:e2e"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

@@ -1,92 +1,248 @@
 <script setup>
-import { computed, defineAsyncComponent, provide, reactive } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import AdminShell from '../features/admin/components/AdminShell.vue'
-import ConfirmDialog from '../components/ConfirmDialog.vue'
-import '../features/admin/admin.css'
+import {
+  BarChart3,
+  FileText,
+  Home,
+  Image,
+  LogOut,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Settings,
+  ShieldCheck,
+  SunMoon,
+  Tags,
+  Users
+} from 'lucide-vue-next'
+import { api } from '@/api/client.js'
+import { appStore, notify } from '@/stores/app.js'
+import AppAvatar from '@/components/AppAvatar.vue'
+import AppearanceControl from '@/components/AppearanceControl.vue'
+import OverviewPanel from '@/features/admin/OverviewPanel.vue'
+import ContentPanel from '@/features/admin/ContentPanel.vue'
+import InteractionsPanel from '@/features/admin/InteractionsPanel.vue'
+import TagsPanel from '@/features/admin/TagsPanel.vue'
+import MediaPanel from '@/features/admin/MediaPanel.vue'
+import UsersPanel from '@/features/admin/UsersPanel.vue'
+import SitePanel from '@/features/admin/SitePanel.vue'
+import SecurityPanel from '@/features/admin/SecurityPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
-const allowed = new Set([
-  'overview',
-  'content',
-  'interactions',
-  'library',
-  'users',
-  'site',
-  'security'
-])
-const panels = {
-  overview: defineAsyncComponent(
-    () => import('../features/admin/components/AdminOverviewPanel.vue')
-  ),
-  content: defineAsyncComponent(() => import('../features/admin/components/AdminContentPanel.vue')),
-  interactions: defineAsyncComponent(
-    () => import('../features/admin/components/AdminInteractionsPanel.vue')
-  ),
-  library: defineAsyncComponent(() => import('../features/admin/components/AdminLibraryPanel.vue')),
-  users: defineAsyncComponent(() => import('../features/admin/components/AdminUsersPanel.vue')),
-  site: defineAsyncComponent(() => import('../features/admin/components/AdminSitePanel.vue')),
-  security: defineAsyncComponent(
-    () => import('../features/admin/components/AdminSecurityPanel.vue')
-  )
-}
-const section = computed({
-  get: () => (allowed.has(String(route.query.section)) ? String(route.query.section) : 'overview'),
-  set: (value) =>
-    router.replace({ query: { ...route.query, section: value === 'overview' ? undefined : value } })
-})
-const panel = computed(() => panels[section.value])
-const dialog = reactive({
-  open: false,
-  title: '',
-  message: '',
-  confirmText: '',
-  requiredText: '',
-  resolve: null
-})
+const appearanceOpen = ref(false)
+const appearanceTrigger = ref(null)
+const tabs = [
+  { key: 'overview', label: '概览', icon: BarChart3, component: OverviewPanel },
+  { key: 'content', label: '文章', icon: FileText, component: ContentPanel },
+  { key: 'interactions', label: '评论', icon: MessageSquare, component: InteractionsPanel },
+  { key: 'tags', label: '标签', icon: Tags, component: TagsPanel },
+  { key: 'assets', label: '媒体', icon: Image, component: MediaPanel },
+  { key: 'users', label: '用户', icon: Users, component: UsersPanel },
+  { key: 'site', label: '站点', icon: Settings, component: SitePanel },
+  { key: 'security', label: '安全', icon: ShieldCheck, component: SecurityPanel }
+]
+const activeTab = computed(() => tabs.find((tab) => tab.key === route.query.tab) || tabs[0])
 
-function confirmAction(options) {
-  if (dialog.resolve) dialog.resolve(false)
-  Object.assign(dialog, {
-    open: true,
-    title: options.title,
-    message: options.message,
-    confirmText: options.confirmText || '确认',
-    requiredText: options.requiredText || '',
-    resolve: null
-  })
-  return new Promise((resolve) => {
-    dialog.resolve = resolve
-  })
-}
-function finishConfirm(value) {
-  dialog.open = false
-  const resolve = dialog.resolve
-  dialog.resolve = null
-  resolve?.(value)
+function select(key) {
+  router.replace({ query: { ...route.query, tab: key } })
 }
 
-provide('adminConfirm', confirmAction)
+async function logout() {
+  try {
+    await api.logout()
+    appStore.user = null
+    router.push('/')
+  } catch (error) {
+    notify(error.message)
+  }
+}
+
+watch(
+  () => appStore.ready,
+  (ready) => {
+    if (!ready) return
+    if (appStore.user?.role !== 'ADMIN') {
+      router.replace({ path: '/login', query: { redirect: route.fullPath } })
+      return
+    }
+    if (!tabs.some((tab) => tab.key === route.query.tab)) select('overview')
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <div class="admin-page">
-    <AdminShell v-model:section="section" @write="router.push('/write')">
-      <Suspense>
-        <component :is="panel" @navigate="section = $event" />
-        <template #fallback><div class="admin-loading">正在打开管理模块</div></template>
-      </Suspense>
-    </AdminShell>
-    <ConfirmDialog
-      v-model="dialog.open"
-      :title="dialog.title"
-      :message="dialog.message"
-      :confirm-text="dialog.confirmText"
-      :required-text="dialog.requiredText"
-      cancel-text="取消"
-      @confirm="finishConfirm(true)"
-      @cancel="finishConfirm(false)"
-    />
+    <aside class="admin-sidebar glass">
+      <RouterLink class="admin-brand" to="/" aria-label="返回博客首页">
+        <AppAvatar
+          :src="appStore.site?.avatarUrl"
+          :name="appStore.site?.nickname || '博客'"
+          :size="38"
+          rounded
+        />
+        <span>{{ appStore.site?.nickname || '博客' }}</span>
+      </RouterLink>
+
+      <nav aria-label="管理功能">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          type="button"
+          :class="{ active: activeTab.key === tab.key }"
+          :aria-current="activeTab.key === tab.key ? 'page' : undefined"
+          :title="tab.label"
+          @click="select(tab.key)"
+        >
+          <component :is="tab.icon" :size="18" />
+          <span>{{ tab.label }}</span>
+        </button>
+      </nav>
+
+      <div class="admin-mobile-actions" aria-label="账户操作">
+        <RouterLink class="icon-button" to="/" aria-label="返回博客首页">
+          <Home :size="17" />
+        </RouterLink>
+        <RouterLink class="icon-button" to="/me" aria-label="修改昵称与头像">
+          <Pencil :size="16" />
+        </RouterLink>
+        <button class="icon-button" type="button" aria-label="退出登录" @click="logout">
+          <LogOut :size="17" />
+        </button>
+      </div>
+
+      <div class="admin-user">
+        <AppAvatar
+          :src="appStore.user?.avatarUrl"
+          :name="appStore.user?.nickname || appStore.user?.username"
+          :size="38"
+          rounded
+        />
+        <div>
+          <strong>{{ appStore.user?.nickname || appStore.user?.username }}</strong>
+          <small>管理员</small>
+        </div>
+        <RouterLink class="icon-button" to="/me" aria-label="修改昵称与头像">
+          <Pencil :size="16" />
+        </RouterLink>
+        <button class="icon-button" type="button" aria-label="退出登录" @click="logout">
+          <LogOut :size="17" />
+        </button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-top">
+        <div>
+          <span class="eyebrow">ADMIN</span>
+          <h1>{{ activeTab.label }}</h1>
+        </div>
+        <div class="admin-top-actions">
+          <div class="admin-appearance">
+            <button
+              ref="appearanceTrigger"
+              class="icon-button glass"
+              type="button"
+              aria-label="外观"
+              :aria-expanded="appearanceOpen"
+              aria-haspopup="dialog"
+              @click="appearanceOpen = !appearanceOpen"
+            >
+              <SunMoon :size="18" />
+            </button>
+            <AppearanceControl
+              v-if="appearanceOpen"
+              :trigger="appearanceTrigger"
+              @close="appearanceOpen = false"
+            />
+          </div>
+          <RouterLink v-if="activeTab.key === 'content'" class="primary-button" to="/write">
+            <Plus :size="17" />新文章
+          </RouterLink>
+        </div>
+      </header>
+      <component :is="activeTab.component" :key="activeTab.key" />
+    </main>
   </div>
 </template>
+
+<style scoped>
+.admin-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 7px;
+  font-weight: 800;
+}
+.admin-brand > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-user > :deep(.app-avatar) {
+  flex: 0 0 auto;
+}
+.admin-mobile-actions {
+  display: none;
+}
+.admin-top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.admin-appearance {
+  position: relative;
+}
+.admin-appearance :deep(.appearance-popover) {
+  z-index: 80;
+  top: 46px;
+  right: 0;
+}
+.admin-top-actions .primary-button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+}
+@media (max-width: 980px) {
+  .admin-brand > span,
+  .admin-sidebar nav button span,
+  .admin-user > div,
+  .admin-user > :deep(.app-avatar) {
+    display: none;
+  }
+  .admin-brand {
+    justify-content: center;
+  }
+  .admin-user {
+    flex-direction: column;
+    padding: 6px;
+  }
+}
+@media (max-width: 720px) {
+  .admin-brand,
+  .admin-user {
+    display: none;
+  }
+  .admin-top {
+    align-items: flex-start;
+  }
+  .admin-sidebar nav {
+    min-width: 0;
+  }
+  .admin-mobile-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 2px;
+    margin-left: 4px;
+    padding-left: 5px;
+    border-left: 1px solid var(--line);
+  }
+  .admin-mobile-actions .icon-button {
+    width: 38px;
+    height: 38px;
+  }
+}
+</style>

@@ -2,6 +2,7 @@ package org.example.selfwebblog.interaction.model;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -27,6 +28,10 @@ public class Interaction {
     private String avatarUrl;
     private String role;
     private Integer pinned;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Integer pinOrder;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private LocalDateTime pinnedAt;
     private String titleName;
     private String titleStyle;
     private String status;

@@ -1,6 +1,8 @@
 package org.example.selfwebblog.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.selfwebblog.admin.security.AdminOnly;
+import org.example.selfwebblog.config.PaginationPolicy;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.UserService;
@@ -14,6 +16,8 @@ import java.util.stream.Collectors;
 @RequestMapping({"/admin", "/api/admin"})
 @AdminOnly
 public class AdminController {
+    private static final int MAX_TITLE_LENGTH = 20;
+    private static final Set<String> TITLE_STYLES = Set.of("default", "blue", "green", "gold", "rose");
 
     private final UserService userService;
 
@@ -24,8 +28,17 @@ public class AdminController {
     // ==================== 用户列表（含 IP 重复检测） ====================
 
     @GetMapping("/users")
-    public Result<?> listUsers(HttpServletRequest request) {
+    public Result<?> listUsers(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String title,
+            HttpServletRequest request) {
 
+        PaginationPolicy.PageRequest pagination = PaginationPolicy.require(page, size);
+        Page<User> userPage = userService.listForAdmin(
+                keyword, role, title, pagination.page(), pagination.size());
         List<User> users = userService.list();
 
         // 按 IP 分组，找出同一 IP 注册多账号的情况
@@ -38,10 +51,11 @@ public class AdminController {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
 
-        List<Map<String, Object>> result = users.stream().map(u -> {
+        List<Map<String, Object>> result = userPage.getRecords().stream().map(u -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", String.valueOf(u.getId()));
             m.put("username", u.getUsername());
+            m.put("nickname", u.getNickname());
             m.put("email", u.getEmail());
             m.put("avatarUrl", u.getAvatarUrl());
             m.put("role", u.getRole());
@@ -64,7 +78,11 @@ public class AdminController {
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("users", result);
-        data.put("total", users.size());
+        data.put("records", result);
+        data.put("total", userPage.getTotal());
+        data.put("current", userPage.getCurrent());
+        data.put("size", userPage.getSize());
+        data.put("pages", userPage.getPages());
         data.put("duplicateIpCount", duplicateIps.size());
         return Result.success(data);
     }
@@ -78,11 +96,20 @@ public class AdminController {
         User user = userService.getById(id);
         if (user == null) return Result.notFound("用户不存在");
 
-        String titleName = body.get("titleName");
-        String titleStyle = body.get("titleStyle");
+        String titleName = body.get("titleName") == null ? "" : body.get("titleName").trim();
+        if (titleName.length() > MAX_TITLE_LENGTH) {
+            return Result.badRequest("用户称号不能超过20个字符");
+        }
+        String titleStyle = body.get("titleStyle") == null || body.get("titleStyle").isBlank()
+                ? "default"
+                : body.get("titleStyle").trim().toLowerCase(Locale.ROOT);
+        if (!TITLE_STYLES.contains(titleStyle)) {
+            return Result.badRequest("用户称号样式不合法");
+        }
+        if (titleName.isBlank()) titleStyle = "default";
 
-        user.setTitleName(titleName != null ? titleName.trim() : "");
-        user.setTitleStyle(titleStyle != null && !titleStyle.isBlank() ? titleStyle : "default");
+        user.setTitleName(titleName);
+        user.setTitleStyle(titleStyle);
         userService.updateById(user);
 
         return Result.success(Map.of(

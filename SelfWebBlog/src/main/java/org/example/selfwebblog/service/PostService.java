@@ -11,6 +11,8 @@ public interface PostService extends IService<Post> {
 
     Page<Post> listDrafts(int page, int size);
 
+    Page<Post> listForAdmin(String status, String keyword, int page, int size);
+
     Page<Post> search(String keyword, String category, String tag, String sort, int page, int size);
 
     List<String> allCategories();

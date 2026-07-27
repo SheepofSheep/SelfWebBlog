@@ -43,4 +43,18 @@ class PostViewServiceTest {
         verify(mapper, never()).insertDailyView(org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
     }
+
+    @Test
+    void archivedViewsAreIgnored() {
+        EngagementMapper mapper = mock(EngagementMapper.class);
+        PostService postService = mock(PostService.class);
+        Post post = new Post();
+        post.setStatus("ARCHIVED");
+        when(postService.getById(8L)).thenReturn(post);
+        PostViewService service = new PostViewService(mapper, postService);
+
+        assertFalse(service.record(8L, "visitor", LocalDate.now()));
+        verify(mapper, never()).insertDailyView(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
 }
