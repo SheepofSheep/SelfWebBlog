@@ -126,7 +126,13 @@ img {
 }
 
 .app-shell {
+  display: flex;
   min-height: 100vh;
+  flex-direction: column;
+}
+.app-shell > main {
+  flex: 1 0 auto;
+  width: 100%;
 }
 .app-shell.has-site-background {
   background-image:
@@ -1441,8 +1447,18 @@ img {
   display: grid;
   grid-template-rows: auto 1fr auto;
   height: calc(100vh - 28px);
+  overflow: hidden;
   padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, white);
   border-radius: 26px;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg) 72%, var(--glass-strong)),
+    color-mix(in srgb, var(--bg-deep) 68%, var(--glass-strong))
+  );
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(34px) saturate(112%);
+  -webkit-backdrop-filter: blur(34px) saturate(112%);
 }
 .admin-sidebar .brand {
   padding: 8px;

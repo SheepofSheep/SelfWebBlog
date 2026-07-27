@@ -6,8 +6,17 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="description" content="" />
     <meta property="og:type" content="website" />
-    <script>document.documentElement.dataset.theme=(localStorage.getItem('appearance')==='dark'||(localStorage.getItem('appearance')!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches))?'dark':'light'</script>
-    <title>博客</title>
+    <meta name="application-name" content="Spops" />
+    <meta name="apple-mobile-web-app-title" content="Spops" />
+    <script>
+      document.documentElement.dataset.theme =
+        localStorage.getItem('appearance') === 'dark' ||
+        (localStorage.getItem('appearance') !== 'light' &&
+          matchMedia('(prefers-color-scheme:dark)').matches)
+          ? 'dark'
+          : 'light'
+    </script>
+    <title>Spops</title>
   </head>
   <body>
     <div id="app"></div>

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterView } from 'vue-router'
 import { useRoute } from 'vue-router'
 import SiteHeader from '@/components/SiteHeader.vue'
+import SiteFooter from '@/components/SiteFooter.vue'
 import PointerTrail from '@/components/PointerTrail.vue'
 import { appStore } from '@/stores/app.js'
 import { siteBackgroundImage } from '@/core/siteAppearance.js'
@@ -27,6 +28,7 @@ const shellStyle = computed(() =>
         /></Transition>
       </RouterView>
     </main>
+    <SiteFooter v-if="!immersive" />
     <PointerTrail />
     <Transition name="toast"
       ><div v-if="appStore.toast" class="toast" role="status">{{ appStore.toast }}</div></Transition
