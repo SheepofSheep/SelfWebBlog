@@ -548,6 +548,21 @@ test('home, search and responsive layout use real data contracts', async ({ page
 
 test('theme transition and legacy links remain functional', async ({ page }) => {
   const failures = observeRuntime(page)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.addInitScript(() => {
+    window.__themeAnimationCalls = []
+    const animate = Element.prototype.animate
+    Element.prototype.animate = function instrumentThemeAnimation(keyframes, options) {
+      if (options?.pseudoElement === '::view-transition-new(root)') {
+        window.__themeAnimationCalls.push({
+          pseudoElement: options.pseudoElement,
+          duration: options.duration,
+          clipPath: Array.isArray(keyframes?.clipPath) ? [...keyframes.clipPath] : []
+        })
+      }
+      return animate.call(this, keyframes, options)
+    }
+  })
   const mocks = await mockApi(page)
   await page.goto('/')
   const appearanceTrigger = page.getByRole('button', { name: '外观' })
@@ -555,6 +570,19 @@ test('theme transition and legacy links remain functional', async ({ page }) => 
   await expect(page.getByRole('dialog', { name: '外观设置' })).toBeVisible()
   await page.getByRole('button', { name: '暗色' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect
+    .poll(() => page.evaluate(() => window.__themeAnimationCalls.length))
+    .toBe(1)
+  expect(await page.evaluate(() => window.__themeAnimationCalls[0])).toMatchObject({
+    pseudoElement: '::view-transition-new(root)',
+    duration: 520,
+    clipPath: expect.arrayContaining([expect.stringMatching(/^circle\(0 at /)])
+  })
+  await page.getByRole('button', { name: '亮色' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect
+    .poll(() => page.evaluate(() => window.__themeAnimationCalls.length))
+    .toBe(2)
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: '外观设置' })).toBeHidden()
   await expect(appearanceTrigger).toBeFocused()

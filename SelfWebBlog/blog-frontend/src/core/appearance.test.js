@@ -24,7 +24,7 @@ test('latest appearance ticket prevents an older transition from committing late
   assert.deepEqual(values, ['light'])
 })
 
-test('saved reduced motion disables theme expansion independently of system motion', () => {
+test('saved motion preference is authoritative over system motion', () => {
   assert.equal(
     shouldAnimateAppearance({
       savedMotion: 'reduced',
@@ -33,6 +33,15 @@ test('saved reduced motion disables theme expansion independently of system moti
       hasOrigin: true
     }),
     false
+  )
+  assert.equal(
+    shouldAnimateAppearance({
+      savedMotion: 'full',
+      systemReduced: true,
+      hasViewTransition: true,
+      hasOrigin: true
+    }),
+    true
   )
   assert.equal(
     shouldAnimateAppearance({

@@ -20,15 +20,18 @@ export function createLatestAppearanceCommitter(commit) {
   }
 }
 
+function appearanceMotionEnabled(savedMotion, systemReduced) {
+  return savedMotion === 'full' || (savedMotion !== 'reduced' && systemReduced === false)
+}
+
 export function shouldAnimateAppearance({
   savedMotion,
   systemReduced,
   hasViewTransition,
   hasOrigin
 }) {
-  return (
-    savedMotion !== 'reduced' && !systemReduced && Boolean(hasViewTransition) && Boolean(hasOrigin)
-  )
+  const motionEnabled = appearanceMotionEnabled(savedMotion, systemReduced)
+  return motionEnabled && Boolean(hasViewTransition) && Boolean(hasOrigin)
 }
 
 let appearanceController
@@ -66,7 +69,7 @@ export function installAppearance() {
     activeAnimation?.cancel?.()
     window.clearTimeout(fallbackTimer)
     if (!canExpand) {
-      const shouldFallback = savedMotion !== 'reduced' && !systemReduced && Boolean(origin)
+      const shouldFallback = appearanceMotionEnabled(savedMotion, systemReduced) && Boolean(origin)
       if (shouldFallback) document.documentElement.classList.add('theme-changing')
       ticket.commit()
       if (shouldFallback) {
