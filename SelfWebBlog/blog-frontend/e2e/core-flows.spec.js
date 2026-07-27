@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 const ok = (data) => ({ code: 200, msg: 'ok', data })
 const pixel = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+const backgroundPath = '/uploads/site-background.webp'
 const posts = [
   {
     id: '2081309851788009474',
@@ -136,10 +137,17 @@ async function mockApi(page, user = null) {
         sortOrder: 0
       }
     ],
+    failBackgroundUpload: false,
     calls: [],
     unhandled: []
   }
 
+  await page.route(/^https?:\/\/[^/]+\/uploads\//, async (route) => {
+    await route.fulfill({
+      contentType: 'image/gif',
+      body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64')
+    })
+  })
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -418,6 +426,27 @@ async function mockApi(page, user = null) {
     }
     if (/^\/api\/admin\/users\/[^/]+$/.test(path) && method === 'DELETE')
       return route.fulfill({ json: ok(null) })
+
+    if (path === '/api/upload/image' && method === 'POST') {
+      if (state.failBackgroundUpload)
+        return route.fulfill({ json: { code: 400, msg: '背景上传失败', data: null } })
+      return route.fulfill({
+        json: ok({
+          id: 'site-background',
+          originalUrl: backgroundPath,
+          smallWebpUrl: backgroundPath,
+          largeWebpUrl: backgroundPath,
+          width: 1,
+          height: 1,
+          byteSize: 35,
+          purpose: 'ARTICLE',
+          referenceStatus: 'ORPHANED',
+          uploaderId: '1',
+          referenceCount: 0,
+          createTime: '2026-07-27T00:00:00'
+        })
+      })
+    }
 
     if (path === '/api/admin/site/links/order' && method === 'PUT') {
       const order = body.ids.map(String)
@@ -1149,6 +1178,82 @@ test('admin interactions, title dialog, media and site links use their new contr
     )
   ).toBe(true)
   await expectNoOverflow(page)
+  expectCleanRun(failures, mocks)
+})
+
+test('site background upload fills the address and persists only when saved', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Site background upload runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, {
+    id: '1',
+    username: 'root',
+    nickname: '管理者',
+    role: 'ADMIN'
+  })
+
+  await page.goto('/admin?tab=site')
+  const input = page.getByLabel('选择背景图片')
+  await expect(input).toHaveAttribute('tabindex', '-1')
+  await input.setInputFiles({
+    name: 'background.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('image')
+  })
+  await expect(page.getByLabel('背景地址')).toHaveValue(backgroundPath)
+  await expect(page.getByRole('img', { name: '站点背景预览' })).toBeVisible()
+  await expect(page.locator('.app-shell')).not.toHaveClass(/has-site-background/)
+  expect(mocks.calls.some((call) => call.path === '/api/admin/site' && call.method === 'PUT')).toBe(
+    false
+  )
+
+  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await expect
+    .poll(() =>
+      mocks.calls.some(
+        (call) =>
+          call.path === '/api/admin/site' &&
+          call.method === 'PUT' &&
+          call.body?.bgUrl === backgroundPath
+      )
+    )
+    .toBe(true)
+  await expect(page.locator('.app-shell')).toHaveClass(/has-site-background/)
+  expectCleanRun(failures, mocks)
+})
+
+test('failed site background upload preserves the old address and can retry the same file', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Site background retry runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, {
+    id: '1',
+    username: 'root',
+    nickname: '管理者',
+    role: 'ADMIN'
+  })
+  mocks.failBackgroundUpload = true
+
+  await page.goto('/admin?tab=site')
+  const address = page.getByLabel('背景地址')
+  const input = page.getByLabel('选择背景图片')
+  await address.fill('/uploads/existing.webp')
+  const file = {
+    name: 'background.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('image')
+  }
+  await input.setInputFiles(file)
+  await expect(address).toHaveValue('/uploads/existing.webp')
+  await expect(input).toHaveValue('')
+  await expect(page.getByRole('status')).toContainText('背景上传失败')
+  await expect(page.getByRole('button', { name: '上传背景' })).toBeEnabled()
+
+  mocks.failBackgroundUpload = false
+  await input.setInputFiles(file)
+  await expect(address).toHaveValue(backgroundPath)
   expectCleanRun(failures, mocks)
 })
 

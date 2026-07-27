@@ -65,6 +65,37 @@ test('profile updates and avatar uploads use the authenticated user endpoints', 
   )
 })
 
+test('site background uploads use the managed image endpoint', async (context) => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options })
+    const data =
+      path === '/api/auth/csrf' ? { token: 'fresh-token' } : { originalUrl: '/uploads/bg.webp' }
+    return {
+      ok: true,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data })
+    }
+  }
+  context.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  const file = new Blob(['image'], { type: 'image/png' })
+  const result = await api.uploadSiteBackground(file)
+  const requestCall = calls.find((call) => call.path === '/api/upload/image')
+  const uploadedFile = requestCall.options.body.get('file')
+
+  assert.equal(result.originalUrl, '/uploads/bg.webp')
+  assert.equal(requestCall.options.method, 'POST')
+  assert.equal(requestCall.options.body instanceof FormData, true)
+  assert.equal(uploadedFile.size, file.size)
+  assert.equal(uploadedFile.type, file.type)
+  assert.equal(await uploadedFile.text(), 'image')
+  assert.equal(new Headers(requestCall.options.headers).has('content-type'), false)
+})
+
 test('public interaction threads request an explicit root page and size', async (context) => {
   const originalFetch = globalThis.fetch
   const calls = []

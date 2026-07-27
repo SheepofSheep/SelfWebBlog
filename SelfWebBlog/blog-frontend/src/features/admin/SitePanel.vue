@@ -27,14 +27,19 @@ const profileError = ref('')
 const linksError = ref('')
 const busy = ref(false)
 const avatarInput = ref(null)
+const backgroundInput = ref(null)
+const backgroundUploading = ref(false)
 const editing = ref(null)
 const removing = ref(null)
 const linkDraft = reactive({ label: '', url: '', iconKey: 'link', enabled: true })
 const today = new Date().toLocaleDateString('en-CA')
 const profileGate = createAdminRequestGate()
 const linksGate = createAdminRequestGate()
+const backgroundUploadGate = createAdminRequestGate()
 const loading = computed(() => profileLoading.value || linksLoading.value)
-const profileLocked = computed(() => profileLoading.value || busy.value || !profileReady.value)
+const profileLocked = computed(
+  () => profileLoading.value || busy.value || backgroundUploading.value || !profileReady.value
+)
 const linksLocked = computed(() => linksLoading.value || busy.value || !linksReady.value)
 
 function syncPublicSite(profile = null, rows) {
@@ -130,6 +135,29 @@ async function uploadAvatar(event) {
     notify(error.message)
   } finally {
     busy.value = false
+  }
+}
+
+async function uploadBackground(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || profileLocked.value) return
+  const ticket = backgroundUploadGate.begin()
+  backgroundUploading.value = true
+  try {
+    const asset = await api.uploadSiteBackground(file)
+    if (!backgroundUploadGate.isCurrent(ticket)) return
+    if (!asset?.originalUrl) throw new Error('上传结果缺少原图地址')
+    site.bgUrl = asset.originalUrl
+    notify('背景已上传，保存后生效')
+  } catch (error) {
+    if (backgroundUploadGate.isCurrent(ticket)) {
+      notify(error?.message || '背景上传失败')
+    }
+  } finally {
+    backgroundUploadGate.runIfCurrent(ticket, () => {
+      backgroundUploading.value = false
+    })
   }
 }
 
@@ -236,6 +264,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   profileGate.begin()
   linksGate.begin()
+  backgroundUploadGate.begin()
 })
 </script>
 
@@ -274,6 +303,7 @@ onBeforeUnmount(() => {
               class="visually-hidden"
               type="file"
               accept="image/*"
+              tabindex="-1"
               @change="uploadAvatar"
             />
           </div>
@@ -285,7 +315,32 @@ onBeforeUnmount(() => {
           >当前近况<textarea v-model="site.currentStatus" rows="3" maxlength="300" />
         </label>
         <label>头像地址<input v-model="site.avatarUrl" maxlength="1000" /></label>
-        <label>背景地址<input v-model="site.bgUrl" maxlength="1000" /></label>
+        <div class="site-form-field background-field">
+          <div class="field-title">
+            <label for="site-background-url">背景地址</label>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="profileLocked"
+              @click="backgroundInput.click()"
+            >
+              <Upload :size="15" />{{ backgroundUploading ? '上传中…' : '上传背景' }}
+            </button>
+          </div>
+          <input id="site-background-url" v-model="site.bgUrl" maxlength="1000" />
+          <div v-if="site.bgUrl" class="background-preview">
+            <img :src="site.bgUrl" alt="站点背景预览" />
+          </div>
+          <input
+            ref="backgroundInput"
+            class="visually-hidden"
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            aria-label="选择背景图片"
+            tabindex="-1"
+            @change="uploadBackground"
+          />
+        </div>
         <label class="full"
           >关于正文<textarea v-model="site.aboutMarkdown" rows="12" maxlength="20000" />
         </label>
@@ -458,11 +513,28 @@ onBeforeUnmount(() => {
   border: 0;
 }
 .site-form-grid label,
+.site-form-field,
 .dialog-field {
   display: grid;
   gap: 7px;
   color: var(--muted);
   font-size: 12px;
+}
+.field-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.field-title label {
+  display: block;
+}
+.field-title button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 10px;
+  white-space: nowrap;
 }
 .site-form-grid input,
 .site-form-grid textarea,
@@ -478,6 +550,18 @@ onBeforeUnmount(() => {
 }
 .site-form-grid .full {
   grid-column: 1 / -1;
+}
+.background-preview {
+  overflow: hidden;
+  aspect-ratio: 16 / 5;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--accent-soft);
+}
+.background-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .avatar-editor {
   display: flex;

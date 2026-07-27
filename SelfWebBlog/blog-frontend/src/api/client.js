@@ -84,6 +84,11 @@ export const api = {
     data.append('file', file)
     return request('/api/upload/avatar', { method: 'POST', body: data })
   },
+  uploadSiteBackground: (file) => {
+    const data = new FormData()
+    data.append('file', file)
+    return request('/api/upload/image', { method: 'POST', body: data })
+  },
   thread: (type, id, page = 1, size = 20) =>
     request(`/api/interactions/${type}/${id}?page=${page}&size=${size}`),
   comment: (payload) =>
