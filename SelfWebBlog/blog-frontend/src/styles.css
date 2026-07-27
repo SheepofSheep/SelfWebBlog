@@ -1465,9 +1465,11 @@ img {
 }
 .admin-sidebar nav {
   display: grid;
+  min-height: 0;
   align-content: start;
   gap: 4px;
   margin-top: 28px;
+  overflow-y: auto;
 }
 .admin-sidebar nav button {
   display: flex;

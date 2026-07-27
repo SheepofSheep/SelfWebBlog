@@ -598,6 +598,11 @@ test('Spops identity and filing footer replace the old browser branding', async 
 
   await page.goto('/')
   await expect(page).toHaveTitle('Spops')
+  await expect(page.locator('meta[name="application-name"]')).toHaveAttribute('content', 'Spops')
+  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute(
+    'content',
+    'Spops'
+  )
 
   const footer = page.getByRole('contentinfo', { name: '站点备案信息' })
   const filing = footer.getByRole('link', { name: '晋ICP备2026007967-1号' })
@@ -643,6 +648,10 @@ test('admin sidebar stays one clipped surface over a high contrast background', 
   )
   expect(sidebarBackground).toContain('linear-gradient')
   await expect(page.getByRole('contentinfo', { name: '站点备案信息' })).toHaveCount(0)
+
+  await page.setViewportSize({ width: 900, height: 500 })
+  await expect(page.locator('.admin-sidebar nav')).toHaveCSS('overflow-y', 'auto')
+  await expect(page.locator('.admin-user')).toBeInViewport({ ratio: 1 })
   await expectNoOverflow(page)
   expectCleanRun(failures, mocks)
 })
