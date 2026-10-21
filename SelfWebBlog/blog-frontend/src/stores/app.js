@@ -1,7 +1,13 @@
 import { reactive } from 'vue'
 import { api } from '@/api/client.js'
 
-export const appStore = reactive({ user: null, site: null, ready: false, toast: '' })
+export const appStore = reactive({
+  user: null,
+  site: null,
+  ready: false,
+  toast: '',
+  navigationExpanded: false
+})
 
 export async function bootstrap() {
   const [user, site] = await Promise.allSettled([api.session(), api.site()])

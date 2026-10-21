@@ -115,6 +115,7 @@ export const api = {
         ? {
             status: '',
             targetType: '',
+            targetId: '',
             pinned: '',
             contentType: '',
             keyword: '',
@@ -125,6 +126,7 @@ export const api = {
         : {
             status: options,
             targetType: '',
+            targetId: '',
             pinned: '',
             contentType: '',
             keyword: '',
@@ -134,11 +136,13 @@ export const api = {
     const params = new URLSearchParams({ page: String(value.page), size: String(value.size) })
     if (value.status) params.set('status', value.status)
     if (value.targetType) params.set('targetType', value.targetType)
+    if (value.targetId) params.set('targetId', String(value.targetId))
     if (value.pinned !== '') params.set('pinned', String(value.pinned))
     if (value.contentType) params.set('contentType', value.contentType)
     if (value.keyword) params.set('keyword', value.keyword)
     return request(`/api/admin/interactions?${params}`)
   },
+  interactionSources: () => request('/api/admin/interactions/sources'),
   moderate: (id, status) =>
     request(`/api/admin/interactions/${id}/status`, {
       method: 'PUT',

@@ -1,0 +1,517 @@
+.editor-page {
+  min-height: 100dvh;
+  padding: 0 22px 24px;
+}
+.editor-header {
+  position: sticky;
+  top: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: auto minmax(90px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 76px;
+  margin: 0 -22px;
+  padding: 12px 22px;
+  border-radius: 0 0 24px 24px;
+  background-color: var(--chrome);
+}
+.editor-heading {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 550;
+}
+.editor-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.editor-actions .icon-button {
+  width: 40px;
+  height: 40px;
+}
+.editor-draft-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 8px 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.editor-draft-status span {
+  opacity: 0.85;
+}
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 310px;
+  gap: 18px;
+  align-items: start;
+}
+.editor-grid.without-preview {
+  grid-template-columns: minmax(0, 1fr) 310px;
+}
+.editor-grid.without-settings {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.editor-grid.without-preview.without-settings {
+  grid-template-columns: 1fr;
+}
+.editor-pane,
+.preview-pane,
+.settings-pane {
+  min-width: 0;
+  border-radius: 24px;
+}
+.editor-pane,
+.preview-pane {
+  display: flex;
+  flex-direction: column;
+  height: max(640px, calc(100dvh - 160px));
+  overflow: hidden;
+}
+.pane-heading {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex: none;
+  min-height: 56px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.pane-heading strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+.pane-heading span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.editor-upload-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.markdown-editor {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.format-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.format-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+.format-group + .format-group {
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+.format-toolbar button,
+.format-toolbar select,
+.format-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 32px;
+  height: 34px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 12px;
+}
+.format-toolbar select {
+  border: 1px solid var(--line);
+  padding-right: 4px;
+  background: var(--field);
+}
+.format-toolbar button:hover,
+.format-upload:hover {
+  background: rgb(255 255 255 / 17%);
+}
+.format-upload {
+  position: relative;
+  cursor: pointer;
+}
+.format-upload input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.format-upload:focus-within {
+  outline: 2px solid var(--accent);
+}
+.markdown-editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.markdown-editor-host .cm-editor {
+  height: 100%;
+  color: var(--ink);
+  background: transparent;
+  font-size: 15px;
+}
+.markdown-editor-host .cm-scroller {
+  overflow: auto;
+  font-family: var(--font);
+  line-height: 1.9;
+}
+.markdown-editor-host .cm-content {
+  padding: 24px 8px;
+  caret-color: var(--ink);
+}
+.markdown-editor-host .cm-line {
+  padding: 0 12px;
+}
+.markdown-editor-host .cm-line span {
+  color: inherit;
+}
+.markdown-editor-host .cm-gutters {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  font-size: 11px;
+}
+.markdown-editor-host .cm-activeLine,
+.markdown-editor-host .cm-activeLineGutter {
+  background: rgb(239 255 255 / 7%);
+}
+.markdown-editor-host .cm-editor.cm-focused {
+  outline: none;
+}
+.markdown-editor-host .cm-placeholder {
+  color: var(--muted);
+}
+.markdown-editor-host .cm-cursor {
+  border-left-color: var(--ink);
+}
+.aurora-app .markdown-editor-host .cm-editor .cm-selectionBackground {
+  background: var(--selection);
+}
+.aurora-app .markdown-editor-host .cm-editor.cm-focused .cm-selectionBackground {
+  background: var(--selection);
+}
+.markdown-editor-host .cm-content::selection,
+.markdown-editor-host .cm-content ::selection {
+  color: var(--ink);
+  background: var(--selection);
+}
+.markdown-editor-host .cm-search {
+  background: var(--glass-strong);
+  color: var(--ink);
+}
+.editor-count {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}
+.preview-pane {
+  color: var(--ink);
+  background: var(--glass);
+}
+.preview-pane .pane-heading {
+  padding-inline: 26px;
+}
+.preview-document {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 26px;
+}
+.editor-preview-title {
+  margin: 0 0 26px;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.settings-pane {
+  position: sticky;
+  top: 92px;
+  max-height: calc(100dvh - 116px);
+  overflow: auto;
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+}
+.settings-pane > h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 550;
+}
+.settings-pane > label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.settings-pane > label > input,
+.settings-pane > label > select {
+  width: 100%;
+}
+.editor-meta {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.editor-meta > summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 550;
+}
+.editor-page .article-details {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  padding: 0;
+  margin-top: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.editor-page .article-details-heading {
+  display: none;
+}
+.editor-page .article-title-field input {
+  padding: 10px 0;
+  font-size: 22px;
+  font-weight: 550;
+}
+.editor-page .article-summary-field {
+  margin-top: 18px;
+}
+.editor-page .article-summary-field textarea {
+  min-height: 80px;
+  font-size: 13px;
+  background: var(--field);
+}
+.editor-page .article-cover-dropzone {
+  height: 145px;
+  aspect-ratio: auto;
+  background: var(--field);
+}
+.editor-page .article-cover-placeholder {
+  padding: 14px;
+  gap: 4px;
+}
+.editor-page .article-cover-placeholder > svg {
+  width: 22px;
+  height: 22px;
+}
+.editor-page .article-cover-placeholder > strong {
+  font-size: 13px;
+}
+.editor-page .article-cover-placeholder > span {
+  font-size: 11px;
+}
+.editor-page .article-cover-heading > span {
+  font-size: 12px;
+}
+.editor-page .article-cover-heading small {
+  display: none;
+}
+.editor-page .article-cover-address input {
+  background: var(--field);
+}
+.editor-load-state {
+  display: grid;
+  width: min(560px, 100%);
+  gap: 18px;
+  min-height: 260px;
+  margin: 15vh auto;
+  padding: 30px;
+  place-content: center;
+  text-align: center;
+}
+.editor-load-state > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+.focus-writing .settings-pane,
+.focus-writing .preview-pane {
+  display: none;
+}
+.focus-writing .editor-grid {
+  display: block;
+  max-width: 1000px;
+  margin-inline: auto;
+}
+.focus-writing .editor-pane {
+  height: calc(100dvh - 160px);
+  min-height: 560px;
+}
+.focus-writing .markdown-editor-host .cm-content {
+  padding: 40px 24px;
+}
+@media (max-width: 1200px) {
+  .editor-grid {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+  .editor-grid .preview-pane {
+    grid-column: 1;
+    height: auto;
+    min-height: 300px;
+  }
+  .editor-grid .settings-pane {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .editor-grid.without-settings {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .editor-grid.without-settings .preview-pane {
+    grid-column: 2;
+    height: max(640px, calc(100dvh - 160px));
+  }
+  .editor-grid.without-preview {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+}
+@media (max-width: 720px) {
+  .editor-page {
+    padding: 0 12px 24px;
+  }
+  .editor-header {
+    gap: 6px;
+    min-height: 68px;
+    margin: 0 -12px;
+    padding: 10px 12px;
+    border-radius: 0 0 20px 20px;
+  }
+  .editor-heading {
+    font-size: 15px;
+  }
+  .editor-actions {
+    gap: 4px;
+  }
+  .editor-actions .icon-button {
+    width: 30px;
+    height: 36px;
+    min-width: 30px;
+    min-height: 36px;
+  }
+  .editor-actions .primary-button,
+  .editor-actions .secondary-button {
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 10px;
+  }
+  .editor-save-label {
+    display: none;
+  }
+  .editor-draft-status {
+    margin: 14px 4px;
+    font-size: 11px;
+  }
+  .editor-draft-status span {
+    display: none;
+  }
+  .editor-grid,
+  .editor-grid.without-preview,
+  .editor-grid.without-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .editor-pane {
+    width: 100%;
+    height: 70dvh;
+    min-height: 520px;
+  }
+  .preview-pane,
+  .editor-grid.without-settings .preview-pane {
+    width: 100%;
+    min-height: 300px;
+    max-height: 70dvh;
+    height: auto;
+  }
+  .settings-pane {
+    position: relative;
+    top: auto;
+    width: 100%;
+    max-height: 46dvh;
+    overflow-y: auto;
+    order: -1;
+    padding: 18px;
+  }
+  .settings-pane > h2 {
+    display: none;
+  }
+  .editor-meta {
+    border: 0;
+    padding: 0;
+  }
+  .editor-page .article-details {
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 16px;
+  }
+  .editor-page .article-cover-dropzone {
+    height: 120px;
+  }
+  .editor-page .article-cover-placeholder > span,
+  .editor-page .article-cover-placeholder > small,
+  .editor-page .article-cover-placeholder > strong {
+    display: none;
+  }
+  .editor-page .article-cover-heading {
+    margin-bottom: 8px;
+  }
+  .editor-page .article-summary-field {
+    margin-top: 12px;
+  }
+  .editor-page .article-title-field input {
+    font-size: 20px;
+  }
+  .editor-page .article-summary-field textarea {
+    min-height: 64px;
+    padding: 8px;
+    font-size: 12px;
+  }
+  .format-toolbar button,
+  .format-toolbar select,
+  .format-upload {
+    min-width: 34px;
+    height: 38px;
+  }
+  .format-toolbar {
+    padding: 9px;
+  }
+  .pane-heading {
+    min-height: 48px;
+    padding: 12px 18px;
+  }
+  .pane-heading span {
+    font-size: 10px;
+  }
+  .preview-document {
+    padding: 22px;
+  }
+  .editor-count > span:last-child {
+    display: none;
+  }
+}

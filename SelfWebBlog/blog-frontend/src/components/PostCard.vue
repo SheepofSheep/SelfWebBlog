@@ -46,22 +46,30 @@ const preset = computed(() =>
 <template>
   <RouterLink
     :to="`/post/${post.id}`"
-    :class="['post-card', 'glass', { featured }, preset]"
-    :style="background"
+    :class="[
+      'post-card',
+      'glass',
+      { featured, 'has-art': background.backgroundImage || background.backgroundColor || preset }
+    ]"
   >
-    <div class="post-card-scrim" />
+    <div
+      v-if="background.backgroundImage || background.backgroundColor || preset"
+      :class="['post-art', preset]"
+      :style="background"
+      aria-hidden="true"
+    />
     <div class="post-card-content">
       <div class="post-meta">
-        <span>{{ formatDate(postPublicationTime(post)) }}</span
+        <time>{{ formatDate(postPublicationTime(post)) }}</time
         ><span v-if="post.category">{{ post.category }}</span>
       </div>
-      <h2 v-if="displayTitle">{{ displayTitle }}</h2>
+      <h2>{{ displayTitle }}</h2>
       <p v-if="post.summary">{{ post.summary }}</p>
       <div class="post-card-foot">
         <div class="tag-row">
           <span v-for="tag in tags.slice(0, 3)" :key="tag">{{ tag }}</span>
         </div>
-        <ArrowUpRight :size="20" />
+        <span class="post-read">阅读 <ArrowUpRight :size="18" /></span>
       </div>
     </div>
   </RouterLink>

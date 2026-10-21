@@ -24,11 +24,20 @@ public class UploadStorageService {
     }
 
     public StoredUpload storeImage(MultipartFile file, UploadTarget target) throws IOException {
+        return storeImage(file, target, "");
+    }
+
+    public StoredUpload storeAvatar(MultipartFile file, Long ownerId) throws IOException {
+        if (ownerId == null || ownerId <= 0) throw new IllegalArgumentException("头像上传者无效");
+        return storeImage(file, UploadTarget.AVATAR, ownerId + "-");
+    }
+
+    private StoredUpload storeImage(MultipartFile file, UploadTarget target, String ownerPrefix) throws IOException {
         ImageValidation validation = imageValidator.validate(file);
         Path targetDirectory = resolveTargetDirectory(target);
         Files.createDirectories(targetDirectory);
 
-        String filename = UUID.randomUUID() + "." + validation.extension();
+        String filename = ownerPrefix + UUID.randomUUID() + "." + validation.extension();
         Path destination = targetDirectory.resolve(filename).normalize();
         if (!destination.startsWith(uploadRoot)) {
             throw new IOException("上传目录不安全");
@@ -38,10 +47,22 @@ public class UploadStorageService {
         return new StoredUpload(filename, target.urlPrefix() + filename, validation.extension(), validation.size());
     }
 
-    public void deleteManagedAvatar(String url) {
-        if (url == null || !url.startsWith(UploadTarget.AVATAR.urlPrefix())) return;
+    public void deleteOwnedAvatar(String url, Long ownerId) {
+        if (ownerId == null || ownerId <= 0 || url == null
+                || !url.startsWith(UploadTarget.AVATAR.urlPrefix())) return;
         String filename = url.substring(UploadTarget.AVATAR.urlPrefix().length());
         if (filename.isBlank() || filename.contains("/") || filename.contains("\\")) return;
+        String prefix = ownerId + "-";
+        // Legacy UUID-only files have no ownership proof and must not be deleted here.
+        if (!filename.startsWith(prefix)) return;
+        int extension = filename.lastIndexOf('.');
+        if (extension <= prefix.length()) return;
+        String identifier = filename.substring(prefix.length(), extension);
+        try {
+            if (!UUID.fromString(identifier).toString().equalsIgnoreCase(identifier)) return;
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
         Path avatarRoot = uploadRoot.resolve(UploadTarget.AVATAR.subdirectory()).normalize();
         Path candidate = avatarRoot.resolve(filename).normalize();
         if (!candidate.startsWith(avatarRoot)) return;

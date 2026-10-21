@@ -11,10 +11,12 @@ import java.util.List;
 
 @Mapper
 public interface ImageAssetMapper {
+    @Update("UPDATE image_asset SET id = id WHERE 1 = 0")
+    void acquireWriteLock();
+
     @Select("""
             SELECT * FROM image_asset
             WHERE uploader_id = #{uploaderId} AND content_hash = #{hash} AND purpose = #{purpose}
-              AND reference_status = 'ACTIVE'
             LIMIT 1
             """)
     ImageAsset findReusable(@Param("uploaderId") Long uploaderId,
@@ -31,6 +33,15 @@ public interface ImageAssetMapper {
             )
             """)
     int insertAsset(ImageAsset asset);
+
+    @Update("""
+            UPDATE image_asset SET original_path = #{originalPath},
+              small_webp_path = #{smallWebpPath}, large_webp_path = #{largeWebpPath},
+              original_mime = #{originalMime}, width = #{width}, height = #{height},
+              byte_size = #{byteSize}, reference_status = 'ACTIVE', update_time = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int restoreAsset(ImageAsset asset);
 
     @Select("""
             SELECT * FROM image_asset

@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Eye, ImagePlus, PanelRight, RefreshCw, RotateCcw, Save, Send, X } from 'lucide-vue-next'
+import { Eye, Maximize2, PanelRight, RefreshCw, RotateCcw, Save, Send, X } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { canPublish } from '@/core/publishPolicy.js'
 import { postTags } from '@/core/format.js'
@@ -19,18 +19,24 @@ import {
 import { appStore, notify } from '@/stores/app.js'
 import MarkdownBody from '@/components/MarkdownBody.vue'
 import TagInput from '@/components/TagInput.vue'
+import ArticleDetails from '@/components/ArticleDetails.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 const route = useRoute()
 const router = useRouter()
 const preview = ref(true)
 const settings = ref(true)
+const focused = ref(false)
 const textarea = ref()
 const uploads = ref([])
+const coverUploading = ref(false)
 const uploadControllers = new Set()
 const busy = ref(false)
 const initialLoading = ref(true)
 const loadError = ref('')
 const draftReady = ref(false)
 const draftDirty = ref(false)
+const draftStatus = ref('编辑内容将自动保存到本地')
+const draftStorageError = ref('')
 const editingArchived = ref(false)
 const editingPublished = ref(false)
 let draftTimer
@@ -51,10 +57,15 @@ const post = reactive({
   backgroundFocusY: 50
 })
 const publishable = computed(
-  () => canPublish(post.content) && !uploads.value.some((item) => item.status === 'uploading')
+  () =>
+    canPublish(post.content) &&
+    !coverUploading.value &&
+    !uploads.value.some((item) => item.status === 'uploading')
 )
-const pendingUploads = computed(() =>
-  uploads.value.some((item) => ['uploading', 'failed'].includes(item.status))
+const pendingUploads = computed(
+  () =>
+    coverUploading.value ||
+    uploads.value.some((item) => ['uploading', 'failed'].includes(item.status))
 )
 const storageKey = computed(() => draftKey(route.params.id))
 function persistLocalDraft() {
@@ -65,15 +76,22 @@ function persistLocalDraft() {
     tags: [...post.tags],
     savedAt: Date.now()
   }
-  if (hasUsefulDraft(draft)) writeDraft(localStorage, storageKey.value, draft)
-  else removeDraft(localStorage, storageKey.value)
-  draftDirty.value = false
+  try {
+    if (hasUsefulDraft(draft)) writeDraft(localStorage, storageKey.value, draft)
+    else removeDraft(localStorage, storageKey.value)
+    draftDirty.value = false
+    draftStorageError.value = ''
+    draftStatus.value = '本地草稿已保存'
+  } catch {
+    draftStorageError.value = '本地草稿保存失败，请及时点击保存或按 Ctrl / ⌘ + S 保存到服务器'
+  }
 }
 watch(
   post,
   () => {
     if (!draftReady.value) return
     draftDirty.value = true
+    draftStatus.value = '正在保存本地草稿…'
     clearTimeout(draftTimer)
     draftTimer = setTimeout(persistLocalDraft, 450)
   },
@@ -95,14 +113,8 @@ watch(
   }
 )
 function insert(text) {
-  const el = textarea.value
-  const start = el?.selectionStart ?? post.content.length
-  const end = el?.selectionEnd ?? start
-  post.content = post.content.slice(0, start) + text + post.content.slice(end)
-  requestAnimationFrame(() => {
-    el?.focus()
-    el?.setSelectionRange(start + text.length, start + text.length)
-  })
+  if (textarea.value) textarea.value.insert(text)
+  else post.content += text
 }
 async function uploadEntry(entry) {
   const controller = new AbortController()
@@ -111,6 +123,7 @@ async function uploadEntry(entry) {
   uploadControllers.add(controller)
   try {
     const asset = await api.upload(entry.file, { signal: controller.signal })
+    if (controller.signal.aborted) return
     post.content = post.content.replaceAll(entry.localUrl, asset.originalUrl || asset.largeWebpUrl)
     entry.status = 'done'
     entry.url = asset.originalUrl
@@ -142,11 +155,6 @@ async function addFiles(files) {
   await Promise.allSettled(entries.map(uploadEntry))
 }
 
-function selectFiles(event) {
-  const files = event.target.files
-  event.target.value = ''
-  addFiles(files)
-}
 async function retryUpload(entry) {
   await uploadEntry(entry)
 }
@@ -156,16 +164,13 @@ function removeUpload(entry) {
   URL.revokeObjectURL(entry.localUrl)
   uploads.value = uploads.value.filter((item) => item !== entry)
 }
-function onPaste(event) {
-  const files = [...event.clipboardData.files]
-  if (files.length) {
-    event.preventDefault()
-    addFiles(files)
+function savePayload(status) {
+  return {
+    ...post,
+    content: stripLocalMedia(post.content),
+    tags: post.tags.join(', '),
+    status
   }
-}
-function onDrop(event) {
-  event.preventDefault()
-  addFiles(event.dataTransfer.files)
 }
 async function save(status) {
   if (busy.value || initialLoading.value || loadError.value || (route.params.id && !post.id)) return
@@ -175,18 +180,26 @@ async function save(status) {
   const wasPublished = editingPublished.value
   busy.value = true
   try {
-    await api.savePost({
-      ...post,
-      content: stripLocalMedia(post.content),
-      tags: post.tags.join(', '),
-      status
-    })
-    clearTimeout(draftTimer)
-    draftDirty.value = false
-    removeDraft(localStorage, storageKey.value)
+    const submitted = savePayload(status)
+    await api.savePost(submitted)
     post.status = status
     editingArchived.value = status === 'ARCHIVED'
     editingPublished.value = status === 'PUBLISHED'
+    // Let the deep watcher observe the acknowledged status before marking it clean.
+    await nextTick()
+    clearTimeout(draftTimer)
+    if (JSON.stringify(savePayload(status)) === JSON.stringify(submitted)) {
+      draftDirty.value = false
+      draftStatus.value = '文章已保存到服务器'
+      try {
+        removeDraft(localStorage, storageKey.value)
+        draftStorageError.value = ''
+      } catch {
+        draftStorageError.value = '文章已保存到服务器，但本地草稿清理失败'
+      }
+    } else {
+      persistLocalDraft()
+    }
     notify(
       status === 'ARCHIVED'
         ? '归档内容已保存'
@@ -210,7 +223,11 @@ async function loadEditor() {
   initialLoading.value = true
   loadError.value = ''
   draftReady.value = false
-  migrateLegacyDraft(localStorage)
+  try {
+    migrateLegacyDraft(localStorage)
+  } catch {
+    draftStorageError.value = '本地草稿存储不可用，请及时保存到服务器'
+  }
   if (appStore.ready && appStore.user?.role !== 'ADMIN')
     return router.replace({ path: '/login', query: { redirect: route.fullPath } })
   try {
@@ -250,11 +267,18 @@ async function loadEditor() {
   }
 }
 
+function saveShortcut(event) {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return
+  event.preventDefault()
+  save(editingArchived.value ? 'ARCHIVED' : editingPublished.value ? 'PUBLISHED' : 'DRAFT')
+}
 onMounted(() => {
+  window.addEventListener('keydown', saveShortcut)
   loadEditor()
 })
 onBeforeUnmount(() => {
   loadTicket += 1
+  window.removeEventListener('keydown', saveShortcut)
   if (beforeUnloadAttached) window.removeEventListener('beforeunload', persistLocalDraft)
   clearTimeout(draftTimer)
   persistLocalDraft()
@@ -263,7 +287,7 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <div class="editor-page">
+  <div class="editor-page" :class="{ 'focus-writing': focused }">
     <div v-if="initialLoading" class="editor-load-state glass" aria-live="polite">加载中</div>
     <div v-else-if="loadError" class="editor-load-state glass" role="alert">
       <strong>无法打开这篇文章</strong>
@@ -277,9 +301,19 @@ onBeforeUnmount(() => {
     </div>
     <template v-else>
       <header class="editor-header glass">
-        <RouterLink to="/admin" class="icon-button" aria-label="关闭"><X /></RouterLink
-        ><input v-model="post.title" class="editor-title" placeholder="标题（可选）" />
+        <RouterLink to="/admin" class="icon-button" aria-label="关闭"><X /></RouterLink>
+        <h1 class="editor-heading">{{ post.id ? '编辑文章' : '写作空间' }}</h1>
         <div class="editor-actions">
+          <button
+            class="icon-button"
+            type="button"
+            :aria-label="focused ? '退出专注写作' : '专注写作'"
+            :aria-pressed="focused"
+            title="专注写作"
+            @click="focused = !focused"
+          >
+            <Maximize2 :size="18" />
+          </button>
           <button
             class="icon-button"
             :class="{ active: preview }"
@@ -316,21 +350,23 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </header>
+      <p
+        class="editor-draft-status"
+        :class="{ 'error-text': draftStorageError }"
+        aria-live="polite"
+      >
+        {{ draftStorageError || draftStatus
+        }}<span v-if="!draftStorageError"> · Ctrl / ⌘ + S 保存</span>
+      </p>
       <div
         class="editor-grid"
         :class="{ 'without-preview': !preview, 'without-settings': !settings }"
       >
-        <section class="editor-pane">
-          <div class="editor-toolbar">
-            <label class="secondary-button"
-              ><ImagePlus :size="17" />图片<input
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                @change="selectFiles" /></label
-            ><span v-if="uploads.some((item) => item.status === 'uploading')">图片上传中</span
-            ><span
+        <section class="editor-pane glass">
+          <header class="pane-heading"><strong>正文编辑</strong><span>Markdown</span></header>
+          <div v-if="uploads.some((item) => item.status !== 'done')" class="editor-upload-status">
+            <span v-if="uploads.some((item) => item.status === 'uploading')">图片上传中</span>
+            <span
               v-for="item in uploads.filter((value) => value.status === 'failed')"
               :key="item.localUrl"
               class="error-text"
@@ -339,24 +375,34 @@ onBeforeUnmount(() => {
               <button type="button" @click="removeUpload(item)">移除</button></span
             >
           </div>
-          <textarea
-            ref="textarea"
-            v-model="post.content"
-            aria-label="文章正文"
-            placeholder="正文（可粘贴或拖入图片）"
-            @paste="onPaste"
-            @drop="onDrop"
-            @dragover.prevent
-          />
+          <MarkdownEditor ref="textarea" v-model="post.content" @files="addFiles" />
         </section>
-        <section v-if="preview" class="preview-pane">
-          <MarkdownBody :content="post.content" allow-local-media />
+        <section v-if="preview" class="preview-pane glass">
+          <header class="pane-heading">
+            <strong>阅读预览</strong><span>与你的读者看到的一样</span>
+          </header>
+          <div class="preview-document">
+            <h1 v-if="post.title" class="editor-preview-title">{{ post.title }}</h1>
+            <MarkdownBody :content="post.content" allow-local-media />
+          </div>
         </section>
         <aside v-if="settings" class="settings-pane glass">
-          <h2>文章设置</h2>
-          <label>摘要<textarea v-model="post.summary" rows="3" /></label
-          ><label>封面地址<input v-model="post.coverUrl" /></label
-          ><label>分类<input v-model="post.category" /></label
+          <h2>发布设置</h2>
+          <details class="editor-meta" open>
+            <summary>
+              标题、摘要与封面 <span>{{ post.title || '未命名文章' }}</span>
+            </summary>
+            <ArticleDetails
+              v-model:title="post.title"
+              v-model:summary="post.summary"
+              v-model:cover-url="post.coverUrl"
+              compact
+              :disabled="busy"
+              @uploading-change="coverUploading = $event"
+            />
+          </details>
+
+          <label>分类<input v-model="post.category" /></label
           ><label>标签<TagInput v-model="post.tags" /></label
           ><label
             >卡片背景<select v-model="post.backgroundMode">

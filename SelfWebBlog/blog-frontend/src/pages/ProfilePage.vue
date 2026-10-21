@@ -1,6 +1,6 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Camera, LogOut, Save } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { appStore, notify } from '@/stores/app.js'
@@ -10,6 +10,9 @@ const route = useRoute()
 const nickname = ref('')
 const saving = ref(false)
 const avatarBusy = ref(false)
+const loggingOut = ref(false)
+const busy = computed(() => saving.value || avatarBusy.value || loggingOut.value)
+const nicknameChanged = computed(() => nickname.value.trim() !== (appStore.user?.nickname || ''))
 watch(
   () => appStore.ready,
   (ready) => {
@@ -20,6 +23,7 @@ watch(
   { immediate: true }
 )
 async function saveNickname() {
+  if (busy.value || !appStore.user || !nicknameChanged.value) return
   const value = nickname.value.trim()
   if (!value) return notify('昵称不能为空')
   saving.value = true
@@ -36,7 +40,7 @@ async function saveNickname() {
 async function changeAvatar(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
-  if (!file || avatarBusy.value) return
+  if (!file || busy.value || !appStore.user) return
   if (!file.type.startsWith('image/')) return notify('请选择图片文件')
   avatarBusy.value = true
   try {
@@ -49,12 +53,16 @@ async function changeAvatar(event) {
   }
 }
 async function logout() {
+  if (busy.value) return
+  loggingOut.value = true
   try {
     await api.logout()
     appStore.user = null
     router.push('/')
   } catch (error) {
     notify(error.message)
+  } finally {
+    loggingOut.value = false
   }
 }
 </script>
@@ -73,7 +81,7 @@ async function logout() {
           rounded
         />
         <Camera :size="20" />
-        <input type="file" accept="image/*" hidden :disabled="avatarBusy" @change="changeAvatar" />
+        <input type="file" accept="image/*" hidden :disabled="busy" @change="changeAvatar" />
       </label>
       <div class="profile-details">
         <span class="eyebrow">ACCOUNT</span>
@@ -84,11 +92,17 @@ async function logout() {
           >{{ appStore.user.titleName }}</span
         >
         <form class="profile-form" @submit.prevent="saveNickname">
-          <label>昵称<input v-model="nickname" maxlength="30" /></label>
-          <button class="primary-button" :disabled="saving"><Save :size="16" />保存</button>
+          <label
+            >昵称<input v-model="nickname" maxlength="30" :disabled="saving || loggingOut"
+          /></label>
+          <button class="primary-button" :disabled="busy || !nickname.trim() || !nicknameChanged">
+            <Save :size="16" />{{ saving ? '保存中…' : '保存' }}
+          </button>
         </form>
       </div>
-      <button class="secondary-button" @click="logout"><LogOut :size="17" />退出</button>
+      <button class="secondary-button" :disabled="busy" @click="logout">
+        <LogOut :size="17" />{{ loggingOut ? '退出中…' : '退出' }}
+      </button>
     </section>
   </div>
 </template>

@@ -14,6 +14,7 @@ const props = defineProps({
   label: { type: String, default: '对话框' },
   closeLabel: { type: String, default: '关闭' },
   closeOnBackdrop: { type: Boolean, default: true },
+  closeDisabled: Boolean,
   size: { type: String, default: 'medium' }
 })
 const emit = defineEmits(['close'])
@@ -52,7 +53,7 @@ function restoreFocus() {
 }
 
 function close() {
-  emit('close')
+  if (!props.closeDisabled) emit('close')
 }
 
 function backdrop(event) {
@@ -128,7 +129,13 @@ onBeforeUnmount(() => {
               <h2 v-if="title" :id="titleId">{{ title }}</h2>
               <p v-if="description" :id="descriptionId">{{ description }}</p>
             </div>
-            <button class="icon-button" type="button" :aria-label="closeLabel" @click="close">
+            <button
+              class="icon-button"
+              type="button"
+              :aria-label="closeLabel"
+              :disabled="closeDisabled"
+              @click="close"
+            >
               <X :size="19" />
             </button>
           </header>
@@ -153,6 +160,8 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px) saturate(80%);
 }
 .app-dialog-panel {
+  display: flex;
+  flex-direction: column;
   width: min(100%, 620px);
   max-height: min(820px, calc(100vh - 32px));
   overflow: hidden;
@@ -165,6 +174,7 @@ onBeforeUnmount(() => {
   width: min(100%, 980px);
 }
 .app-dialog-head {
+  flex-shrink: 0;
   display: flex;
   gap: 20px;
   align-items: flex-start;
@@ -186,11 +196,13 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .app-dialog-body {
+  min-height: 0;
   max-height: calc(100vh - 230px);
   overflow: auto;
   padding: 22px;
 }
 .app-dialog-footer {
+  flex-shrink: 0;
   display: flex;
   gap: 10px;
   justify-content: flex-end;

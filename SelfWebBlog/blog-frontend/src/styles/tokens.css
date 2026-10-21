@@ -1,0 +1,66 @@
+/* Neutral adaptive materials: content surfaces stay calm; navigation floats above them. */
+:root {
+  color-scheme: light;
+  --bg: #e5e7ec;
+  --bg-deep: #e8ebf0;
+  --ink: #202126;
+  --muted: #555b65;
+  --line: rgb(255 255 255 / 42%);
+  --glass: rgb(230 233 239 / 48%);
+  --glass-strong: rgb(235 238 244 / 94%);
+  --chrome: rgb(221 226 234 / 36%);
+  --surface-raised: rgb(238 241 246 / 28%);
+  --field: rgb(243 246 250 / 32%);
+  --accent: #006be0;
+  --accent-deep: #0059bd;
+  --accent-soft: rgb(0 112 240 / 9%);
+  --primary-ink: #fff;
+  --danger: #ba283b;
+  --positive: #23764b;
+  --selection: rgb(0 122 255 / 19%);
+  --scrim: rgb(22 29 42 / 6%);
+  --scrim-bottom: rgb(28 35 48 / 9%);
+  --shadow:
+    0 10px 32px rgb(24 32 52 / 8%), inset 0 1px 1px rgb(255 255 255 / 56%),
+    inset 0 -1px 1px rgb(255 255 255 / 18%);
+  --shadow-hover: 0 14px 38px rgb(24 32 52 / 13%), inset 0 1px 1px #fff;
+  --radius-xl: 28px;
+  --radius-lg: 26px;
+  --radius-md: 16px;
+  --font: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-display: 'Inter Tight', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --canvas-gutter: clamp(24px, 3.1vw, 56px);
+  --nav-width: 76px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --chart-views: #006bd6;
+  --chart-interactions: #7358b7;
+  --chart-posts: #a56a0a;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #16171b;
+  --bg-deep: #23252c;
+  --ink: #f4f5f8;
+  --muted: #c6c9d2;
+  --line: rgb(255 255 255 / 22%);
+  --glass: rgb(30 32 39 / 64%);
+  --glass-strong: rgb(35 37 45 / 94%);
+  --chrome: rgb(32 34 42 / 52%);
+  --surface-raised: rgb(255 255 255 / 10%);
+  --field: rgb(255 255 255 / 9%);
+  --accent: #8cbfff;
+  --accent-deep: #b3d5ff;
+  --accent-soft: rgb(100 169 255 / 16%);
+  --primary-ink: #12223c;
+  --danger: #ffb0ba;
+  --positive: #a5e4bd;
+  --selection: rgb(109 176 255 / 28%);
+  --scrim: rgb(0 0 0 / 22%);
+  --scrim-bottom: rgb(0 0 0 / 28%);
+  --shadow:
+    0 10px 32px rgb(0 0 0 / 16%), inset 0 1px 1px rgb(255 255 255 / 24%),
+    inset 0 -1px 1px rgb(255 255 255 / 6%);
+  --chart-views: #9ac9ff;
+  --chart-interactions: #cfbaff;
+  --chart-posts: #ffdd9c;
+}

@@ -1,5 +1,6 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   ChevronDown,
   ChevronUp,
@@ -7,6 +8,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Pin,
+  RefreshCw,
   Reply,
   Trash2
 } from 'lucide-vue-next'
@@ -33,8 +35,20 @@ import AdminToolbar from './AdminToolbar.vue'
 const result = ref({ records: [], current: 1, pages: 1, total: 0 })
 const page = ref(1)
 const keyword = ref('')
-const status = ref('')
+const route = useRoute()
+const status = ref(
+  ['PENDING', 'PUBLISHED', 'HIDDEN', 'SPAM', 'DELETED'].includes(route.query.status)
+    ? route.query.status
+    : ''
+)
 const targetType = ref('')
+const targetId = ref('')
+const sources = ref([])
+const sourceQuery = ref('')
+const sourcesLoading = ref(false)
+const sourcesError = ref('')
+const loadError = ref('')
+const sourceRequestGate = createAdminRequestGate()
 const pinned = ref('')
 const contentType = ref('')
 const selected = ref(new Set())
@@ -48,11 +62,57 @@ const replyContent = ref('')
 const replyInput = ref(null)
 const requestGate = createAdminRequestGate()
 const controlsLocked = computed(() => loading.value || busy.value)
+const visibleSources = computed(() => {
+  const query = sourceQuery.value.trim().toLocaleLowerCase()
+  return sources.value.filter(
+    (source) =>
+      (!targetType.value || source.targetType === targetType.value) &&
+      (!query || `${source.sourceTitle} ${source.targetId}`.toLocaleLowerCase().includes(query))
+  )
+})
+const currentSource = computed(() =>
+  sources.value.find(
+    (source) => source.targetType === targetType.value && String(source.targetId) === targetId.value
+  )
+)
+const sourceHeading = computed(() =>
+  targetId.value
+    ? currentSource.value?.sourceTitle ||
+      (targetType.value === 'POST' ? `文章 ${targetId.value}` : '留言板')
+    : targetType.value === 'POST'
+      ? '全部文章评论'
+      : targetType.value === 'GUESTBOOK'
+        ? '留言板'
+        : '全部评论'
+)
+const sourceCategories = computed(() =>
+  [
+    { type: '', label: '全部来源' },
+    { type: 'POST', label: '文章评论' },
+    { type: 'GUESTBOOK', label: '留言板' }
+  ].map((category) => {
+    const matching = sources.value.filter(
+      (source) => !category.type || source.targetType === category.type
+    )
+    return {
+      ...category,
+      count: matching.reduce((sum, source) => sum + Number(source.rootCount || 0), 0),
+      pending: matching.reduce((sum, source) => sum + Number(source.pendingCount || 0), 0)
+    }
+  })
+)
 
 const transitionLabels = {
   PUBLISHED: '通过',
   HIDDEN: '隐藏',
   SPAM: '标记垃圾'
+}
+const statusLabels = {
+  PENDING: '待审核',
+  PUBLISHED: '已显示',
+  HIDDEN: '已隐藏',
+  SPAM: '垃圾评论',
+  DELETED: '已删除'
 }
 
 const records = computed(() => result.value.records || [])
@@ -75,10 +135,12 @@ async function load(nextPage = page.value) {
   selected.value = new Set()
   batchRemoving.value = false
   loading.value = true
+  loadError.value = ''
   try {
     const value = await api.adminInteractions({
       status: status.value,
       targetType: targetType.value,
+      targetId: targetId.value,
       pinned: pinned.value,
       contentType: contentType.value,
       keyword: keyword.value.trim(),
@@ -91,13 +153,62 @@ async function load(nextPage = page.value) {
     selected.value = new Set()
     return true
   } catch (error) {
-    if (requestGate.isCurrent(ticket)) notify(error.message)
+    if (requestGate.isCurrent(ticket)) {
+      result.value = { records: [], current: nextPage, pages: 1, total: 0 }
+      loadError.value = error.message || '评论加载失败'
+    }
     return false
   } finally {
     requestGate.runIfCurrent(ticket, () => {
       loading.value = false
     })
   }
+}
+
+async function loadSources() {
+  const ticket = sourceRequestGate.begin()
+  sourcesLoading.value = true
+  sourcesError.value = ''
+  try {
+    const value = await api.interactionSources()
+    if (sourceRequestGate.isCurrent(ticket)) sources.value = Array.isArray(value) ? value : []
+  } catch (error) {
+    if (sourceRequestGate.isCurrent(ticket))
+      sourcesError.value = error.message || '评论来源加载失败'
+  } finally {
+    sourceRequestGate.runIfCurrent(ticket, () => {
+      sourcesLoading.value = false
+    })
+  }
+}
+
+async function refresh() {
+  if (busy.value) return
+  await Promise.all([load(), loadSources()])
+}
+
+function chooseCategory(type) {
+  if (controlsLocked.value) return
+  targetType.value = type
+  targetId.value = ''
+  sourceQuery.value = ''
+  changeFilter()
+}
+
+function chooseSource(source) {
+  if (controlsLocked.value) return
+  targetType.value = source.targetType
+  targetId.value = String(source.targetId)
+  changeFilter()
+}
+
+function clearFilters() {
+  if (controlsLocked.value) return
+  keyword.value = ''
+  status.value = ''
+  contentType.value = ''
+  pinned.value = ''
+  changeFilter()
 }
 
 function itemReplyCount(item) {
@@ -123,6 +234,7 @@ function expandReplies(id) {
 }
 
 async function loadAfterMutation() {
+  await loadSources()
   const previousPage = page.value
   if (!(await load(previousPage))) return
   const nextPage = pageAfterMutation(previousPage, records.value)
@@ -130,7 +242,9 @@ async function loadAfterMutation() {
 }
 
 function changeFilter() {
+  if (busy.value) return
   page.value = 1
+  expandedRoots.value = new Set()
   load(1)
 }
 
@@ -312,17 +426,100 @@ function blockLockedMenu(event) {
   event.preventDefault()
 }
 
-onMounted(load)
+onMounted(refresh)
+onBeforeUnmount(() => {
+  requestGate.begin()
+  sourceRequestGate.begin()
+})
 </script>
 
 <template>
   <section class="interactions-panel">
+    <section class="moderation-sources glass" aria-label="评论来源">
+      <header class="source-directory-head">
+        <div>
+          <h2>按来源管理</h2>
+          <p>先选择文章或留言板，再集中查看、审核和回复。</p>
+        </div>
+        <label class="source-search"
+          ><span>查找来源</span
+          ><input v-model="sourceQuery" type="search" placeholder="搜索文章标题或编号"
+        /></label>
+      </header>
+      <nav class="source-categories" aria-label="评论来源分类">
+        <button
+          v-for="category in sourceCategories"
+          :key="category.type"
+          type="button"
+          :class="{ active: targetType === category.type && !targetId }"
+          :aria-pressed="targetType === category.type && !targetId"
+          :disabled="controlsLocked"
+          @click="chooseCategory(category.type)"
+        >
+          <strong>{{ category.label }}</strong
+          ><span>{{ sourcesLoading ? '…' : category.count }}</span
+          ><small v-if="category.pending">{{ category.pending }} 待处理</small>
+        </button>
+      </nav>
+      <p v-if="sourcesLoading" class="muted" aria-live="polite">正在汇总评论来源…</p>
+      <div v-else-if="sourcesError" class="source-error" role="alert">
+        <span>{{ sourcesError }}</span
+        ><button type="button" class="secondary-button" @click="loadSources">
+          <RefreshCw :size="14" />重试来源统计
+        </button>
+      </div>
+      <div v-else-if="visibleSources.length" class="source-directory">
+        <button
+          v-for="source in visibleSources"
+          :key="`${source.targetType}:${source.targetId}`"
+          type="button"
+          :class="{
+            active: targetType === source.targetType && targetId === String(source.targetId)
+          }"
+          :aria-pressed="targetType === source.targetType && targetId === String(source.targetId)"
+          :disabled="controlsLocked"
+          @click="chooseSource(source)"
+        >
+          <span class="source-name"
+            ><small>{{
+              source.targetType === 'POST' ? `文章 #${source.targetId}` : '留言板'
+            }}</small
+            ><strong>{{ source.sourceTitle }}</strong></span
+          >
+          <span class="source-counts"
+            >{{ source.rootCount }} 条主评论 · {{ source.replyCount }} 条回复
+            <b v-if="source.pendingCount">{{ source.pendingCount }} 待处理</b></span
+          >
+        </button>
+      </div>
+      <p v-else class="muted source-empty">
+        {{ sourceQuery.trim() ? '没有匹配的来源，试试文章标题或编号' : '这个分类还没有评论' }}
+      </p>
+      <p class="source-stat-note">来源数量包含所有审核状态，待处理数量包含回复。</p>
+    </section>
+    <header class="moderation-context">
+      <div>
+        <h3>{{ sourceHeading }}</h3>
+        <span v-if="targetId && currentSource"
+          >{{ currentSource.rootCount }} 条主评论 · {{ currentSource.replyCount }} 条回复</span
+        >
+      </div>
+      <button
+        v-if="keyword || status || contentType || pinned"
+        type="button"
+        class="secondary-button"
+        :disabled="controlsLocked"
+        @click="clearFilters"
+      >
+        清空审核筛选
+      </button>
+    </header>
     <AdminToolbar
       v-model="keyword"
       placeholder="搜索评论内容或昵称"
       :busy="loading || busy"
       @submit="changeFilter"
-      @refresh="load()"
+      @refresh="refresh"
     >
       <select
         v-model="status"
@@ -346,16 +543,6 @@ onMounted(load)
         <option value="">全部内容</option>
         <option value="TEXT">文字</option>
         <option value="STICKER">表情</option>
-      </select>
-      <select
-        v-model="targetType"
-        aria-label="评论位置"
-        :disabled="controlsLocked"
-        @change="changeFilter"
-      >
-        <option value="">全部位置</option>
-        <option value="POST">文章</option>
-        <option value="GUESTBOOK">留言板</option>
       </select>
       <select
         v-model="pinned"
@@ -404,7 +591,7 @@ onMounted(load)
             :disabled="controlsLocked"
             @change="toggleAll"
           />选择本页</label
-        ><span>共 {{ result.total || 0 }} 条</span>
+        ><span>共 {{ result.total || 0 }} 条主评论</span>
       </div>
       <article
         v-for="item in records"
@@ -430,17 +617,25 @@ onMounted(load)
                 :class="['title-badge', `title-${item.titleStyle || 'default'}`]"
                 >{{ item.titleName }}</span
               >
-              <span class="target-chip" :title="item.sourceTitle || ''">
+              <button
+                type="button"
+                class="target-chip"
+                :title="item.sourceTitle || ''"
+                :disabled="controlsLocked"
+                @click="chooseSource(item)"
+              >
                 {{
                   item.sourceTitle ||
                   (item.targetType === 'POST' ? `文章 ${item.targetId}` : '留言板')
                 }}
-              </span>
+              </button>
               <time>{{ formatDate(item.createTime) }}</time>
             </header>
             <CommentBody :content="item.content" />
             <footer>
-              <span :class="['status-chip', item.status?.toLowerCase()]">{{ item.status }}</span>
+              <span :class="['status-chip', item.status?.toLowerCase()]">{{
+                statusLabels[item.status] || item.status
+              }}</span>
               <span><Heart :size="13" />{{ item.likeCount || 0 }}</span>
               <span><MessageCircle :size="13" />{{ itemReplyCount(item) }}</span>
               <span v-if="item.ipRegion">{{ item.ipRegion }}</span>
@@ -560,7 +755,7 @@ onMounted(load)
                 <CommentBody :content="reply.content" />
                 <footer>
                   <span :class="['status-chip', reply.status?.toLowerCase()]">{{
-                    reply.status
+                    statusLabels[reply.status] || reply.status
                   }}</span>
                   <span><Heart :size="13" />{{ reply.likeCount || 0 }}</span>
                   <span v-if="reply.ipRegion">{{ reply.ipRegion }}</span>
@@ -611,7 +806,11 @@ onMounted(load)
           </div>
         </div>
       </article>
-      <p v-if="!loading && !records.length" class="moderation-empty">没有符合条件的评论</p>
+      <div v-if="loadError" class="moderation-empty" role="alert">
+        <p>{{ loadError }}</p>
+        <button type="button" class="secondary-button" @click="load()">重试加载评论</button>
+      </div>
+      <p v-else-if="!loading && !records.length" class="moderation-empty">没有符合条件的评论</p>
     </div>
     <AdminPager
       :page="page"
@@ -671,6 +870,160 @@ onMounted(load)
 </template>
 
 <style scoped>
+.moderation-sources {
+  padding: 20px;
+  margin-bottom: 18px;
+  border-radius: 22px;
+}
+.source-directory-head,
+.moderation-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.source-directory-head h2,
+.moderation-context h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.source-directory-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.source-search {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.source-search input {
+  width: 260px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--ink);
+  background: var(--glass-strong);
+  font: inherit;
+}
+.source-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 14px;
+}
+.source-categories button {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+}
+.source-categories button.active,
+.source-directory button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.source-categories small,
+.source-counts b {
+  color: var(--accent);
+  font-size: 11px;
+}
+.source-directory {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 2px;
+}
+.source-directory > button {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+.source-name {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.source-name small {
+  color: var(--muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.source-name strong {
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.source-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.source-stat-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.source-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  color: var(--danger);
+  font-size: 12px;
+}
+.source-empty {
+  padding: 14px 0;
+  font-size: 12px;
+}
+.moderation-context {
+  margin: 18px 2px 12px;
+}
+.moderation-context > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.moderation-context h3 {
+  overflow-wrap: anywhere;
+}
+.moderation-context span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.source-directory button:active,
+.source-categories button:active {
+  transform: scale(0.98);
+}
+.source-search input:focus-visible,
+.source-directory button:focus-visible,
+.source-categories button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .interactions-panel select {
   padding: 8px 10px;
   border: 1px solid var(--line);
@@ -785,6 +1138,8 @@ onMounted(load)
 }
 .title-badge,
 .target-chip {
+  border: 0;
+  cursor: pointer;
   color: var(--accent);
   background: var(--accent-soft);
 }
@@ -803,11 +1158,11 @@ onMounted(load)
   background: var(--accent-soft);
 }
 .status-chip.published {
-  color: #267c59;
+  color: var(--positive);
   background: rgb(70 189 132 / 14%);
 }
 .status-chip.pending {
-  color: #a66c12;
+  color: var(--chart-posts);
   background: rgb(214 151 50 / 14%);
 }
 .pin-chip {
@@ -947,6 +1302,17 @@ onMounted(load)
   text-align: center;
 }
 @media (max-width: 760px) {
+  .moderation-sources {
+    padding: 15px;
+  }
+  .source-search,
+  .source-search input {
+    width: 100%;
+  }
+  .source-directory {
+    grid-template-columns: 1fr;
+    max-height: 240px;
+  }
   .moderation-root {
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     gap: 9px;

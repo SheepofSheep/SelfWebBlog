@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Copy, Grid2X2, List, ScanSearch, Trash2, Upload } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import {
@@ -17,7 +18,10 @@ import AdminToolbar from './AdminToolbar.vue'
 const result = ref({ records: [], current: 1, pages: 1, total: 0 })
 const page = ref(1)
 const keyword = ref('')
-const status = ref('')
+const route = useRoute()
+const status = ref(
+  ['REFERENCED', 'ORPHANED'].includes(route.query.status) ? route.query.status : ''
+)
 const purpose = ref('')
 const view = ref('grid')
 const loading = ref(false)

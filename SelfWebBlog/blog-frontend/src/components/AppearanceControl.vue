@@ -2,7 +2,6 @@
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Monitor, Moon, Sparkles, Sun } from 'lucide-vue-next'
 import { installAppearance } from '@/core/appearance.js'
-import '@/styles-public-upgrade.css'
 
 const props = defineProps({ trigger: { type: Object, default: null } })
 const emit = defineEmits(['close'])

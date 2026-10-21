@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.selfwebblog.interaction.dto.AdminInteractionResponse;
 import org.example.selfwebblog.interaction.dto.InteractionCreateRequest;
 import org.example.selfwebblog.entity.User;
+import org.example.selfwebblog.service.CommentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,8 @@ class InteractionPersistenceIntegrationTest {
     private InteractionService interactionService;
     @Autowired
     private LikeService likeService;
+    @Autowired
+    private CommentService legacyCommentService;
 
     @BeforeEach
     void resetInteractions() {
@@ -43,6 +46,74 @@ class InteractionPersistenceIntegrationTest {
         jdbc.update("DELETE FROM post");
         jdbc.update("DELETE FROM user WHERE username <> 'admin'");
         jdbc.update("INSERT INTO post (id, title, content, status) VALUES (7, '公开文章', '正文', 'PUBLISHED')");
+    }
+
+    @Test
+    void legacyCommentListHidesRepliesWhoseRootIsNotPublic() {
+        insertRoot(400, 0, "PUBLISHED", "公开根");
+        insertReply(401, 400, null, "PUBLISHED", "公开回复");
+        insertRoot(402, 0, "HIDDEN", "隐藏根");
+        insertReply(403, 402, null, "PUBLISHED", "隐藏根的回复");
+        insertRoot(404, 0, "DELETED", "删除根");
+        insertReply(405, 404, null, "PUBLISHED", "删除根的回复");
+        insertReply(406, 999, null, "PUBLISHED", "孤立回复");
+
+        var visible = legacyCommentService.getCommentsByPostId(7L, 1, 20);
+        assertEquals(java.util.Set.of(400L, 401L), visible.getRecords().stream()
+                .map(org.example.selfwebblog.entity.Comment::getId).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(2, visible.getTotal());
+
+        interactionService.softDelete(400L);
+        assertEquals(0, legacyCommentService.getCommentsByPostId(7L, 1, 20).getTotal());
+    }
+
+    @Test
+    void moderationSourcesAggregateAcrossPagesAndKeepArticlesSeparateFromTheGuestbook() {
+        jdbc.update("INSERT INTO post (id, title, content, status) VALUES (8, '', '正文', 'ARCHIVED')");
+        for (int index = 0; index < 24; index++) insertRoot(500 + index, 0, "PUBLISHED", "文章评论");
+        insertReply(550, 500, null, "PENDING", "需要审核的回复");
+        insertRoot(551, 0, "HIDDEN", "另一篇文章的隐藏评论");
+        jdbc.update("UPDATE comment SET post_id = 8, target_id = 8 WHERE id = 551");
+        insertRoot(552, 0, "PENDING", "留言板待处理");
+        jdbc.update("UPDATE comment SET post_id = NULL, target_type = 'GUESTBOOK', target_id = 1 WHERE id = 552");
+        insertRoot(553, 0, "DELETED", "已删除文章的评论");
+        jdbc.update("UPDATE comment SET post_id = NULL, target_id = 999 WHERE id = 553");
+
+        var sources = interactionService.listModerationSources();
+        assertEquals(4, sources.size());
+        var article = sources.stream().filter(source -> Long.valueOf(7).equals(source.getTargetId())).findFirst().orElseThrow();
+        assertEquals("公开文章", article.getSourceTitle());
+        assertEquals(24, article.getRootCount());
+        assertEquals(1, article.getReplyCount());
+        assertEquals(1, article.getPendingCount());
+        assertEquals("无题文章", sources.stream().filter(source -> Long.valueOf(8).equals(source.getTargetId())).findFirst().orElseThrow().getSourceTitle());
+        assertEquals("已删除文章", sources.stream().filter(source -> Long.valueOf(999).equals(source.getTargetId())).findFirst().orElseThrow().getSourceTitle());
+        var guestbook = sources.stream().filter(source -> "GUESTBOOK".equals(source.getTargetType())).findFirst().orElseThrow();
+        assertEquals("留言板", guestbook.getSourceTitle());
+        assertEquals(1, guestbook.getRootCount());
+        assertEquals(1, guestbook.getPendingCount());
+
+        var articlePage = interactionService.listForModeration("", "POST", 7L, null, "", "", 2, 20);
+        assertEquals(24, articlePage.getTotal());
+        assertEquals(4, articlePage.getRecords().size());
+        assertTrue(articlePage.getRecords().stream().allMatch(item -> Long.valueOf(7).equals(item.targetId())));
+        var pending = interactionService.listForModeration("PENDING", "POST", 7L, null, "", "", 1, 20);
+        assertEquals(1, pending.getTotal());
+        assertEquals(500L, pending.getRecords().get(0).id());
+        assertEquals(550L, pending.getRecords().get(0).replies().get(0).id());
+        var guestbookPage = interactionService.listForModeration("", "GUESTBOOK", 1L, null, "", "", 1, 20);
+        assertEquals(1, guestbookPage.getTotal());
+        assertEquals(552L, guestbookPage.getRecords().get(0).id());
+    }
+
+    @Test
+    void sourceIdFilterRequiresAnExplicitValidTargetType() {
+        assertThrows(IllegalArgumentException.class, () -> interactionService.listForModeration(
+                "", "", 7L, null, "", "", 1, 20));
+        assertThrows(IllegalArgumentException.class, () -> interactionService.listForModeration(
+                "", "POST", -1L, null, "", "", 1, 20));
+        assertThrows(IllegalArgumentException.class, () -> interactionService.listForModeration(
+                "", "UNKNOWN", 7L, null, "", "", 1, 20));
     }
 
     @Test

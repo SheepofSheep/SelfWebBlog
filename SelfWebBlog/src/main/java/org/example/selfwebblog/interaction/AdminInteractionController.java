@@ -8,6 +8,7 @@ import org.example.selfwebblog.controller.AuthHelper;
 import org.example.selfwebblog.entity.Result;
 import org.example.selfwebblog.interaction.dto.InteractionItemResponse;
 import org.example.selfwebblog.interaction.dto.AdminInteractionResponse;
+import org.example.selfwebblog.interaction.dto.InteractionSourceResponse;
 import org.example.selfwebblog.interaction.model.Interaction;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,6 +37,7 @@ public class AdminInteractionController {
     public Result<Page<AdminInteractionResponse>> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) Long targetId,
             @RequestParam(required = false) Boolean pinned,
             @RequestParam(required = false) String contentType,
             @RequestParam(required = false) String keyword,
@@ -44,7 +46,12 @@ public class AdminInteractionController {
             HttpServletRequest request) {
         PaginationPolicy.PageRequest pagination = PaginationPolicy.require(page, size);
         return Result.success(interactionService.listForModeration(
-                status, targetType, pinned, contentType, keyword, pagination.page(), pagination.size()));
+                status, targetType, targetId, pinned, contentType, keyword, pagination.page(), pagination.size()));
+    }
+
+    @GetMapping("/sources")
+    public Result<List<InteractionSourceResponse>> sources() {
+        return Result.success(interactionService.listModerationSources());
     }
 
     @PutMapping("/{id}/status")

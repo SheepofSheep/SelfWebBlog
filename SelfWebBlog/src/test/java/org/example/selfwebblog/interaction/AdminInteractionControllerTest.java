@@ -86,12 +86,13 @@ class AdminInteractionControllerTest {
     @Test
     void moderationListDelegatesOptionalDatabaseFilters() throws Exception {
         when(interactionService.listForModeration(
-                "PENDING", "POST", true, "STICKER", "needle", 2, 10))
+                "PENDING", "POST", 9007199254740993L, true, "STICKER", "needle", 2, 10))
                 .thenReturn(new Page<AdminInteractionResponse>(2, 10, 0));
 
         mockMvc.perform(get("/api/admin/interactions")
                         .param("status", "PENDING")
                         .param("targetType", "POST")
+                        .param("targetId", "9007199254740993")
                         .param("pinned", "true")
                         .param("contentType", "STICKER")
                         .param("keyword", "needle")
@@ -101,7 +102,26 @@ class AdminInteractionControllerTest {
                 .andExpect(jsonPath("$.data.current").value(2));
 
         verify(interactionService).listForModeration(
-                "PENDING", "POST", true, "STICKER", "needle", 2, 10);
+                "PENDING", "POST", 9007199254740993L, true, "STICKER", "needle", 2, 10);
+    }
+
+    @Test
+    void sourcesAreAdminOnlyAndSerializeTargetIdsWithoutLosingPrecision() throws Exception {
+        securedMockMvc.perform(get("/api/admin/interactions/sources").requestAttr("role", "USER"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(interactionService);
+
+        var source = new org.example.selfwebblog.interaction.dto.InteractionSourceResponse();
+        source.setTargetType("POST");
+        source.setTargetId(9007199254740993L);
+        source.setSourceTitle("文章标题");
+        source.setRootCount(21);
+        when(interactionService.listModerationSources()).thenReturn(List.of(source));
+
+        mockMvc.perform(get("/api/admin/interactions/sources"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].targetId").value("9007199254740993"))
+                .andExpect(jsonPath("$.data[0].rootCount").value(21));
     }
 
     @Test

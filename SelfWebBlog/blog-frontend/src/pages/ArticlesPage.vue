@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RefreshCw, Search } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { RefreshCw, Search, X } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import { filterArticles } from '@/core/articleFilter.js'
 import { collectAllPosts } from '@/core/archiveModel.js'
@@ -8,7 +9,12 @@ import PostCard from '@/components/PostCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 const posts = ref([])
-const query = ref('')
+const route = useRoute()
+const router = useRouter()
+const query = computed({
+  get: () => (typeof route.query.q === 'string' ? route.query.q : ''),
+  set: (value) => router.replace({ query: { ...route.query, q: value || undefined } })
+})
 const loading = ref(true)
 const error = ref('')
 const filtered = computed(() => filterArticles(posts.value, query.value))
@@ -36,7 +42,20 @@ onMounted(load)
         <h1>文章</h1>
       </div>
       <label class="filter-input glass">
-        <Search :size="18" /><input v-model="query" placeholder="搜索正文或标签" />
+        <Search :size="18" /><input
+          v-model="query"
+          aria-label="筛选文章"
+          placeholder="搜索标题、正文或标签"
+        />
+        <button
+          v-if="query"
+          class="icon-button"
+          type="button"
+          aria-label="清空文章筛选"
+          @click="query = ''"
+        >
+          <X :size="16" />
+        </button>
       </label>
     </header>
     <div v-if="loading" class="articles-loading glass" aria-live="polite">加载中</div>
@@ -45,10 +64,17 @@ onMounted(load)
         <RefreshCw :size="16" />重试
       </button>
     </EmptyState>
-    <div v-else-if="filtered.length" class="post-grid articles-grid">
-      <PostCard v-for="post in filtered" :key="post.id" :post="post" />
-    </div>
-    <EmptyState v-else />
+    <template v-else-if="filtered.length">
+      <p v-if="query.trim()" class="muted" aria-live="polite">找到 {{ filtered.length }} 篇文章</p>
+      <div class="post-grid articles-grid">
+        <PostCard v-for="post in filtered" :key="post.id" :post="post" />
+      </div>
+    </template>
+    <EmptyState v-else :label="query.trim() ? '没有匹配的文章，换个关键词试试' : '还没有发布文章'">
+      <button v-if="query" type="button" class="secondary-button" @click="query = ''">
+        清空筛选
+      </button>
+    </EmptyState>
   </div>
 </template>
 

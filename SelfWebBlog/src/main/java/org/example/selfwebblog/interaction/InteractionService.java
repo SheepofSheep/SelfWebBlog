@@ -8,6 +8,7 @@ import org.example.selfwebblog.identity.captcha.CaptchaService;
 import org.example.selfwebblog.interaction.dto.InteractionCreateRequest;
 import org.example.selfwebblog.interaction.dto.InteractionItemResponse;
 import org.example.selfwebblog.interaction.dto.AdminInteractionResponse;
+import org.example.selfwebblog.interaction.dto.InteractionSourceResponse;
 import org.example.selfwebblog.interaction.dto.InteractionThreadResponse;
 import org.example.selfwebblog.interaction.mapper.InteractionLikeMapper;
 import org.example.selfwebblog.interaction.mapper.InteractionMapper;
@@ -193,6 +194,25 @@ public class InteractionService {
             String keyword,
             int page,
             int size) {
+        return listForModeration(status, targetType, null, pinned, contentType, keyword, page, size);
+    }
+
+    public List<InteractionSourceResponse> listModerationSources() {
+        return interactionMapper.listModerationSources();
+    }
+
+    public Page<AdminInteractionResponse> listForModeration(
+            String status,
+            String targetType,
+            Long targetId,
+            Boolean pinned,
+            String contentType,
+            String keyword,
+            int page,
+            int size) {
+        if (targetId != null && (targetId <= 0 || targetType == null || targetType.isBlank())) {
+            throw new IllegalArgumentException("筛选评论来源需要有效的目标类型和目标编号");
+        }
         LambdaQueryWrapper<Interaction> query = new LambdaQueryWrapper<Interaction>()
                 .isNull(Interaction::getRootId)
                 .orderByDesc(Interaction::getPinned)
@@ -207,6 +227,7 @@ public class InteractionService {
         if (targetType != null && !targetType.isBlank()) {
             query.eq(Interaction::getTargetType, normalizeTargetType(targetType));
         }
+        if (targetId != null) query.eq(Interaction::getTargetId, targetId);
         if (pinned != null) query.eq(Interaction::getPinned, pinned ? 1 : 0);
         if (normalizedStatus != null || normalizedContentType != null || normalizedKeyword != null) {
             query.and(thread -> {

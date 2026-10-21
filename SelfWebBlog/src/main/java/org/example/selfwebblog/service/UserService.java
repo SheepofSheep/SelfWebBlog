@@ -9,9 +9,11 @@ import org.example.selfwebblog.mapper.UserMapper;
 import org.example.selfwebblog.interaction.security.VisitorIdentityService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class UserService extends ServiceImpl<UserMapper, User> {
@@ -93,17 +95,33 @@ public class UserService extends ServiceImpl<UserMapper, User> {
         if (user != null) {
             return user;
         }
-        user = new User();
-        user.setGithubId(githubId);
-        user.setUsername(username);
-        user.setAvatarUrl(avatarUrl);
-        user.setEmail(email);
-        user.setRole("USER");
-        user.setTokenVersion(0);
-        user.setIpAddress("");
-        user.setRegistrationIpHash(hashIp(ipAddress));
-        save(user);
-        return user;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            String candidate = switch (attempt) {
+                case 0 -> username;
+                case 1 -> "github_" + githubId;
+                default -> "github_" + githubId + "_" + UUID.randomUUID().toString().replace("-", "");
+            };
+            if (getByUsername(candidate) != null) continue;
+            user = new User();
+            user.setGithubId(githubId);
+            user.setUsername(candidate);
+            user.setAvatarUrl(avatarUrl);
+            user.setEmail(email);
+            user.setRole("USER");
+            user.setTokenVersion(0);
+            user.setIpAddress("");
+            user.setRegistrationIpHash(hashIp(ipAddress));
+            try {
+                if (!save(user)) throw new IllegalStateException("GitHub 用户保存失败");
+                return user;
+            } catch (DataAccessException collision) {
+                // Another callback or registration may have won a unique-key race.
+                User existing = getByGithubId(githubId);
+                if (existing != null) return existing;
+                if (getByUsername(candidate) == null) throw collision;
+            }
+        }
+        throw new IllegalStateException("无法分配 GitHub 用户名，请重试");
     }
 
     private String hashIp(String ipAddress) {

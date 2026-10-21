@@ -288,9 +288,9 @@ onBeforeUnmount(() => {
       </div>
       <fieldset class="site-form-grid" :disabled="profileLocked">
         <div class="avatar-editor">
-          <AppAvatar :src="site.avatarUrl" :name="site.nickname" :size="84" />
+          <AppAvatar :src="site.avatarUrl" :name="site.nickname" :size="56" />
           <div>
-            <strong>{{ site.nickname || '站点头像' }}</strong
+            <strong>站点头像</strong
             ><button
               class="secondary-button"
               type="button"
@@ -308,16 +308,9 @@ onBeforeUnmount(() => {
             />
           </div>
         </div>
-        <label>昵称<input v-model="site.nickname" required maxlength="40" /></label>
-        <label>建站日期<input v-model="site.siteStartDate" type="date" :max="today" /></label>
-        <label class="full">简介<textarea v-model="site.bio" rows="3" maxlength="240" /></label>
-        <label class="full"
-          >当前近况<textarea v-model="site.currentStatus" rows="3" maxlength="300" />
-        </label>
-        <label>头像地址<input v-model="site.avatarUrl" maxlength="1000" /></label>
         <div class="site-form-field background-field">
           <div class="field-title">
-            <label for="site-background-url">背景地址</label>
+            <span>站点背景</span>
             <button
               class="secondary-button"
               type="button"
@@ -327,10 +320,10 @@ onBeforeUnmount(() => {
               <Upload :size="15" />{{ backgroundUploading ? '上传中…' : '上传背景' }}
             </button>
           </div>
-          <input id="site-background-url" v-model="site.bgUrl" maxlength="1000" />
           <div v-if="site.bgUrl" class="background-preview">
             <img :src="site.bgUrl" alt="站点背景预览" />
           </div>
+          <p v-else class="background-empty">上传一张喜欢的图片，作为全站背景。</p>
           <input
             ref="backgroundInput"
             class="visually-hidden"
@@ -341,8 +334,19 @@ onBeforeUnmount(() => {
             @change="uploadBackground"
           />
         </div>
+        <label>昵称<input v-model="site.nickname" required maxlength="40" /></label>
+        <label>建站日期<input v-model="site.siteStartDate" type="date" :max="today" /></label>
+        <label
+          >一句话介绍<input v-model="site.bio" maxlength="240" placeholder="在头像旁介绍一下自己"
+        /></label>
+        <label>当前近况<textarea v-model="site.currentStatus" rows="2" maxlength="300" /></label>
         <label class="full"
-          >关于正文<textarea v-model="site.aboutMarkdown" rows="12" maxlength="20000" />
+          >简介<textarea
+            v-model="site.aboutMarkdown"
+            rows="6"
+            maxlength="20000"
+            placeholder="在关于页展示，支持 Markdown"
+          />
         </label>
       </fieldset>
     </form>
@@ -546,14 +550,14 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   outline: 0;
   color: var(--ink);
-  background: var(--glass-strong);
+  background: var(--field);
 }
 .site-form-grid .full {
   grid-column: 1 / -1;
 }
 .background-preview {
   overflow: hidden;
-  aspect-ratio: 16 / 5;
+  height: 96px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--accent-soft);
@@ -563,14 +567,26 @@ onBeforeUnmount(() => {
   height: 100%;
   object-fit: cover;
 }
+.background-empty {
+  margin: 0;
+  padding: 20px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+}
+.site-form-grid textarea {
+  resize: vertical;
+}
+.site-form-grid .background-field {
+  padding-block: 8px;
+}
 .avatar-editor {
   display: flex;
-  grid-column: 1 / -1;
   gap: 15px;
   align-items: center;
-  padding: 14px;
+  padding: 0 0 4px;
   border-radius: 18px;
-  background: var(--accent-soft);
+  background: transparent;
 }
 .avatar-editor > div {
   display: grid;

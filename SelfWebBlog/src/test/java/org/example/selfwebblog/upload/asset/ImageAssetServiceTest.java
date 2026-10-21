@@ -131,6 +131,7 @@ class ImageAssetServiceTest {
         asset.setContentHash(hash);
         asset.setPurpose("ARTICLE");
         asset.setOriginalPath("/uploads/existing.png");
+        asset.setReferenceStatus("ACTIVE");
         asset.setWidth(10);
         asset.setHeight(10);
 

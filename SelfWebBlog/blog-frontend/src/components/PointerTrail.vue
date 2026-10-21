@@ -468,5 +468,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <canvas ref="canvas" class="pointer-effects-canvas" aria-hidden="true" />
+  <Teleport to="body">
+    <canvas ref="canvas" class="pointer-effects-canvas" aria-hidden="true" />
+  </Teleport>
 </template>

@@ -5,7 +5,6 @@ import org.example.selfwebblog.entity.User;
 import org.example.selfwebblog.service.UserService;
 import org.example.selfwebblog.service.upload.StoredUpload;
 import org.example.selfwebblog.service.upload.UploadStorageService;
-import org.example.selfwebblog.service.upload.UploadTarget;
 import org.example.selfwebblog.security.ActionRateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,14 +96,14 @@ public class UserController {
         String previousAvatar = currentUser.getAvatarUrl();
 
         try {
-            StoredUpload upload = uploadStorageService.storeImage(file, UploadTarget.AVATAR);
+            StoredUpload upload = uploadStorageService.storeAvatar(file, userId);
             String fileUrl = upload.url();
             log.info("用户 {} 上传头像: {}", userId, fileUrl);
 
             // 更新用户头像
             currentUser.setAvatarUrl(fileUrl);
             userService.updateById(currentUser);
-            uploadStorageService.deleteManagedAvatar(previousAvatar);
+            uploadStorageService.deleteOwnedAvatar(previousAvatar, userId);
             log.info("用户 {} 头像已更新: {}", currentUser.getUsername(), fileUrl);
 
             return Result.success(fileUrl);

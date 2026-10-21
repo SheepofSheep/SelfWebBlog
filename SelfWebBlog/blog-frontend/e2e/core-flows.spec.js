@@ -39,6 +39,228 @@ const posts = [
   }
 ]
 
+test('writing studio formats selections, undoes changes and saves presentation as Markdown', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.goto('/write')
+  const editor = page.getByRole('textbox', { name: '文章正文' })
+  await editor.fill('值得留下的文字')
+  await editor.press('ControlOrMeta+A')
+  await page.getByRole('button', { name: '粗体', exact: true }).click()
+  await expect(page.locator('.preview-pane .markdown-body strong')).toHaveText('值得留下的文字')
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect(editor).toHaveText('值得留下的文字')
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  await expect(page.locator('.preview-pane .markdown-body strong')).toHaveText('值得留下的文字')
+  await editor.press('ControlOrMeta+A')
+  await page.getByRole('button', { name: '居中', exact: true }).click()
+  await page.getByRole('combobox', { name: '字号', exact: true }).selectOption('large')
+  await expect(page.locator('.preview-pane .md-align-center')).toHaveCSS('text-align', 'center')
+  await expect(page.locator('.preview-pane .md-size-large')).toHaveCSS(
+    'font-size',
+    /2[01]\.25px|20px/
+  )
+  await page.getByRole('button', { name: '右对齐', exact: true }).click()
+  await expect(page.locator('.preview-pane .md-align-right')).toHaveCSS('text-align', 'right')
+  await expect(page.locator('.preview-pane .md-align-center')).toHaveCount(0)
+  await page.getByRole('button', { name: '左对齐', exact: true }).click()
+  await expect(page.locator('.preview-pane .md-align-left')).toHaveCSS('text-align', 'left')
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await expectNoOverflow(page)
+  await page.screenshot({ path: test.info().outputPath('writing-formats.png'), fullPage: true })
+  await page.getByRole('button', { name: '保存草稿', exact: true }).click()
+  await expect
+    .poll(() => mocks.calls.some((call) => call.path === '/api/posts' && call.method === 'POST'))
+    .toBe(true)
+  const saved = mocks.calls.findLast((call) => call.path === '/api/posts' && call.method === 'POST')
+  expect(saved.body.content).toContain('::: align-left')
+  expect(saved.body.content).toContain('::: size-large')
+  expect(saved.body.content).toContain('**值得留下的文字**')
+  await expect(page).toHaveURL(/\/admin\?tab=content$/)
+  expectCleanRun(failures, mocks)
+})
+
+test('writing studio shortcuts, focus mode and Markdown rendering remain safe in the reader', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.goto('/write')
+  const editor = page.getByRole('textbox', { name: '文章正文' })
+  await editor.fill('快捷操作')
+  await editor.press('ControlOrMeta+A')
+  await editor.press('ControlOrMeta+i')
+  await expect(page.locator('.preview-pane em')).toHaveText('快捷操作')
+  await page.getByRole('button', { name: '专注写作', exact: true }).click()
+  await expect(page.locator('.preview-pane')).toBeHidden()
+  await expect(page.locator('.settings-pane')).toBeHidden()
+  await expect(editor).toBeVisible()
+  await page.getByRole('button', { name: '退出专注写作', exact: true }).click()
+  await expect(page.locator('.preview-pane')).toBeVisible()
+  const content =
+    '::: align-center\n::: size-large\n**安全正文**\n:::\n:::\n\n<script>window.markdownCompromised=true</script>\n<img src="/uploads/test.png" onerror="window.markdownCompromised=true">\n<div class="admin-sidebar" style="position:fixed">普通文字</div>\n<a href="javascript:alert(1)">恶意链接</a>\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n```js\nconst value = 1\n```'
+  await editor.fill(content)
+  const preview = page.locator('.preview-pane .markdown-body')
+  await expect(preview.locator('.md-align-center strong')).toHaveText('安全正文')
+  await expect(
+    preview.locator('[style],script,[onerror],.admin-sidebar,a[href^="javascript:"]')
+  ).toHaveCount(0)
+  await expect(preview.locator('table')).toHaveCount(1)
+  await expect(preview.getByRole('button', { name: '复制代码' })).toBeVisible()
+  mocks.posts[0].content = content
+  await page.goto(`/post/${mocks.posts[0].id}`)
+  await expect(page.locator('.article-surface .md-align-center')).toHaveCSS('text-align', 'center')
+  await expect(page.locator('.article-surface .md-size-large strong')).toHaveText('安全正文')
+  expect(await page.evaluate(() => window.markdownCompromised)).toBeUndefined()
+  await expectNoOverflow(page)
+  expectCleanRun(failures, mocks)
+})
+
+test('redesigned workspace keeps every management area reachable at each width', async ({
+  page
+}, testInfo) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.goto('/admin')
+  await expect(page.getByRole('heading', { level: 1, name: '概览', exact: true })).toBeVisible()
+  const mobileNavigation = page.getByRole('button', { name: '管理导航', exact: true })
+  for (const [label, key] of [
+    ['文章', 'content'],
+    ['评论', 'interactions'],
+    ['标签', 'tags'],
+    ['媒体', 'assets'],
+    ['用户', 'users'],
+    ['站点', 'site'],
+    ['安全', 'security'],
+    ['概览', 'overview']
+  ]) {
+    if (await mobileNavigation.isVisible()) await mobileNavigation.click()
+    await page
+      .getByRole('navigation', { name: '管理功能' })
+      .getByRole('button', { name: label, exact: true })
+      .click()
+    await expect(page).toHaveURL(new RegExp(`tab=${key}`))
+    await expect(page.getByRole('heading', { level: 1, name: label, exact: true })).toBeVisible()
+    await expectNoOverflow(page)
+  }
+  await page.screenshot({ path: testInfo.outputPath('studio-overview.png'), fullPage: true })
+  await page.goto('/')
+  await page.getByRole('textbox', { name: '搜索博客文章' }).fill('可验证')
+  await expect(page.getByRole('link', { name: '账户', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '查找文章', exact: true }).click()
+  await expect(page).toHaveURL(/articles\?q=/)
+  await expect(page.locator('.post-card')).toHaveCount(1)
+  expectCleanRun(failures, mocks)
+})
+
+test('workspace overview opens actionable filters and all shells retain the configured background', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.route('**/api/site/about', (route) =>
+    route.fulfill({
+      json: ok({ nickname: '博主', bgUrl: backgroundPath, bio: '', links: [], aboutMarkdown: '' })
+    })
+  )
+  for (const path of ['/', '/admin', '/write']) {
+    await page.goto(path)
+    await expect(page.locator('.app-shell')).toHaveClass(/has-site-background/)
+    await expect(page.locator('.aurora-backdrop')).toHaveCSS(
+      'background-image',
+      /site-background\.webp/
+    )
+    await expectNoOverflow(page)
+  }
+  for (const [label, tab, status, endpoint] of [
+    ['草稿', 'content', 'DRAFT', '/api/posts/admin'],
+    ['待处理评论', 'interactions', 'PENDING', '/api/admin/interactions'],
+    ['孤立媒体', 'assets', 'ORPHANED', '/api/admin/assets']
+  ]) {
+    await page.goto('/admin')
+    await page.locator('.overview-stat').filter({ hasText: label }).click()
+    await expect(page).toHaveURL(new RegExp('tab=' + tab + '&status=' + status))
+    await expect
+      .poll(() => mocks.calls.filter((call) => call.path === endpoint).at(-1)?.query.status)
+      .toBe(status)
+  }
+  expectCleanRun(failures, mocks)
+})
+
+test('light materials, compact site settings and expandable navigation follow the annotated design', async ({
+  page
+}, testInfo) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.goto('/')
+  await expect(page.locator('.context-chip')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /的个人空间/ })).toHaveCount(0)
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'light')
+  const expand = page.getByRole('button', { name: '展开导航', exact: true })
+  if (testInfo.project.name === 'desktop') {
+    const opening = await page.evaluate(async () => {
+      const nav = document.querySelector('.public-navigation')
+      nav.querySelector('.navigation-expand').click()
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      return { width: nav.getBoundingClientRect().width, animating: nav.getAnimations().length > 0 }
+    })
+    expect(opening.animating).toBe(true)
+    expect(opening.width).toBeGreaterThan(76)
+    expect(opening.width).toBeLessThan(216)
+    await expect
+      .poll(() =>
+        page.locator('.public-navigation').evaluate((el) => el.getBoundingClientRect().width)
+      )
+      .toBe(216)
+    await expect(page.locator('.public-navigation')).toHaveClass(/expanded/)
+    await expect(page.getByRole('button', { name: '收起导航' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+    await expectNoOverflow(page)
+    await page.getByRole('button', { name: '收起导航' }).click()
+    await expect
+      .poll(() =>
+        page.locator('.public-navigation').evaluate((el) => el.getBoundingClientRect().width)
+      )
+      .toBe(76)
+    await expect(page.locator('.public-navigation')).not.toHaveClass(/expanded/)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expand.click()
+    await expect(page.locator('.public-navigation')).toHaveCSS('width', '216px')
+    const transitionDuration = await page
+      .locator('.public-navigation')
+      .evaluate((el) => getComputedStyle(el).transitionDuration)
+    expect(parseFloat(transitionDuration)).toBeLessThan(0.001)
+    await page.getByRole('button', { name: '收起导航' }).click()
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+  } else {
+    await expect(expand).toBeHidden()
+  }
+  await page.goto('/admin?tab=site')
+  await expect(page.getByLabel('简介', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('一句话介绍', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('头像地址', { exact: true })).toHaveCount(0)
+  await expect(page.locator('#site-background-url')).toHaveCount(0)
+  await expectNoOverflow(page)
+  await page.screenshot({ path: testInfo.outputPath('site-light.png') })
+  await page.goto('/write')
+  const lightGlass = await page.locator('.preview-pane').evaluate((el) => ({
+    color: getComputedStyle(el).color,
+    bg: getComputedStyle(el).backgroundColor
+  }))
+  expect(lightGlass.color).toBe('rgb(32, 33, 38)')
+  await expectNoOverflow(page)
+  await page.screenshot({ path: testInfo.outputPath('write-light.png') })
+  await page.goto('/about')
+  await page.getByRole('button', { name: '外观', exact: true }).click()
+  await page.getByRole('button', { name: '暗色', exact: true }).click()
+  await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark')
+  expectCleanRun(failures, mocks)
+})
+
 async function mockApi(page, user = null) {
   const state = {
     posts: posts.map((post) => ({ ...post })),
@@ -368,15 +590,53 @@ async function mockApi(page, user = null) {
       })
     }
 
-    if (path === '/api/admin/interactions' && method === 'GET')
+    if (path === '/api/admin/interactions/sources' && method === 'GET') {
+      const sources = new Map()
+      for (const root of state.interactions) {
+        const key = `${root.targetType}:${root.targetId}`
+        const post = state.posts.find((item) => String(item.id) === String(root.targetId))
+        if (!sources.has(key))
+          sources.set(key, {
+            targetType: root.targetType,
+            targetId: String(root.targetId),
+            sourceTitle:
+              root.targetType === 'GUESTBOOK'
+                ? '留言板'
+                : post
+                  ? post.title || '无题文章'
+                  : '已删除文章',
+            sourceStatus: root.targetType === 'POST' ? post?.status : null,
+            rootCount: 0,
+            replyCount: 0,
+            pendingCount: 0
+          })
+        const source = sources.get(key)
+        source.rootCount++
+        source.replyCount += root.replies?.length || 0
+        source.pendingCount += [root, ...(root.replies || [])].filter(
+          (item) => item.status === 'PENDING'
+        ).length
+      }
+      return route.fulfill({ json: ok([...sources.values()]) })
+    }
+    if (path === '/api/admin/interactions' && method === 'GET') {
+      const type = url.searchParams.get('targetType')
+      const targetId = url.searchParams.get('targetId')
+      const records = state.interactions.filter(
+        (item) =>
+          (!type || item.targetType === type) && (!targetId || String(item.targetId) === targetId)
+      )
+      const pageNumber = Number(url.searchParams.get('page') || 1)
+      const size = Number(url.searchParams.get('size') || 20)
       return route.fulfill({
         json: ok({
-          records: state.interactions,
-          current: 1,
-          pages: 1,
-          total: state.interactions.length
+          records: records.slice((pageNumber - 1) * size, pageNumber * size),
+          current: pageNumber,
+          pages: Math.max(1, Math.ceil(records.length / size)),
+          total: records.length
         })
       })
+    }
     if (path === '/api/admin/interactions/batch/status' && method === 'PUT')
       return route.fulfill({ json: ok(body.ids.length) })
     if (path === '/api/admin/interactions/batch-delete' && method === 'POST') {
@@ -610,6 +870,253 @@ test('home, search and responsive layout use real data contracts', async ({ page
   expectCleanRun(failures, mocks)
 })
 
+test('usability search reports failures, retries and clears with keyboard focus intact', async ({
+  page
+}, testInfo) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page)
+  let fail = true
+  await page.route('**/api/posts/search?*', (route) =>
+    route.fulfill({
+      json: fail ? { code: 503, msg: '搜索服务暂不可用' } : ok({ records: [mocks.posts[0]] })
+    })
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: '搜索', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '搜索文章' })
+  const input = dialog.getByRole('textbox', { name: '搜索关键词' })
+  await input.fill('文章')
+  await expect(dialog.getByRole('alert')).toContainText('搜索服务暂不可用')
+  await expect(dialog.getByText('没有匹配的文章', { exact: true })).toHaveCount(0)
+  fail = false
+  await dialog.getByRole('button', { name: '重试搜索' }).click()
+  await expect(dialog.getByRole('link', { name: '可验证的文章' })).toBeVisible()
+  await dialog.getByRole('button', { name: '清空搜索' }).click()
+  await expect(input).toHaveValue('')
+  await expect(input).toBeFocused()
+  await expect(dialog.getByRole('link')).toHaveCount(0)
+  await expectNoOverflow(page)
+  await page.screenshot({ path: testInfo.outputPath('search-usability.png') })
+  expectCleanRun(failures, mocks)
+})
+
+test('usability directory filters survive refresh and browser back and can be cleared', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page)
+  await page.goto('/articles?q=可验证')
+  const input = page.getByRole('textbox', { name: '筛选文章', exact: true })
+  await expect(input).toHaveValue('可验证')
+  await page.reload()
+  await expect(input).toHaveValue('可验证')
+  await page
+    .getByRole('link')
+    .filter({ has: page.getByRole('heading', { name: '可验证的文章' }) })
+    .click()
+  await expect(page).toHaveURL(/\/post\//)
+  await page.goBack()
+  await expect(input).toHaveValue('可验证')
+  await input.fill('不可能存在的关键词')
+  await expect(page.getByText('没有匹配的文章，换个关键词试试')).toBeVisible()
+  await page.getByRole('button', { name: '清空筛选', exact: true }).click()
+  await expect(input).toHaveValue('')
+  await expect(page.getByRole('heading', { name: '八月日历文章' })).toBeVisible()
+  await page.goto('/archive?q=八月')
+  await expect(page.getByRole('heading', { name: '归档', exact: true })).toBeVisible()
+  await expect(page.locator('.archive-year-posts a')).toHaveCount(1)
+  await page.getByRole('button', { name: '清空归档筛选' }).click()
+  await expect(page.locator('.archive-year-posts a')).toHaveCount(3)
+  await page.goto('/tags/missing-tag')
+  await expect(page.getByText('未找到这个标签')).toBeVisible()
+  await expectNoOverflow(page)
+  expectCleanRun(failures, mocks)
+})
+
+test('usability registration recovers a failed captcha and returns to the original article', async ({
+  page
+}, testInfo) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page)
+  let fail = true
+  await page.route('**/api/captcha?*', (route) =>
+    route.fulfill({
+      json: fail
+        ? { code: 503, msg: '验证码加载失败' }
+        : ok({ challengeId: 'register-1', imageDataUrl: pixel })
+    })
+  )
+  let finish
+  const hold = new Promise((resolve) => {
+    finish = resolve
+  })
+  let registerCalls = 0
+  await page.route('**/api/auth/register', async (route) => {
+    registerCalls++
+    await hold
+    await route.fulfill({ json: ok({ user: { id: '9', username: 'newreader', role: 'USER' } }) })
+  })
+  await page.goto('/login?redirect=/post/2081309851788009474')
+  await page.locator('.auth-tabs').getByRole('button', { name: '注册' }).click()
+  await expect(page.getByRole('alert')).toContainText('验证码加载失败')
+  const submit = page.locator('form').getByRole('button', { name: '注册', exact: true })
+  await expect(submit).toBeDisabled()
+  fail = false
+  await page.getByRole('button', { name: '更换验证码' }).click()
+  await expect(submit).toBeEnabled()
+  await page.getByRole('textbox', { name: '用户名', exact: true }).fill('newreader')
+  await page.locator('input[type="password"]').fill('sample-password')
+  await page.locator('.captcha-field input').fill('ABCDE')
+  await expectNoOverflow(page)
+  await page.screenshot({ path: testInfo.outputPath('register-usability.png') })
+  try {
+    await submit.click()
+    await expect(page.locator('.auth-tabs button').first()).toBeDisabled()
+    await expect(page.getByRole('button', { name: '提交中…' })).toBeDisabled()
+    await expect.poll(() => registerCalls).toBe(1)
+  } finally {
+    finish()
+  }
+  await expect(page).toHaveURL(/\/post\/2081309851788009474$/)
+  expectCleanRun(failures, mocks)
+})
+
+test('usability comments preserve new typing while sending and login links keep the article destination', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'reader', role: 'USER' })
+  let finish
+  const hold = new Promise((resolve) => {
+    finish = resolve
+  })
+  await page.route('**/api/interactions', async (route) => {
+    await hold
+    await route.fulfill({
+      json: ok({
+        id: 'new-comment',
+        content: route.request().postDataJSON().content,
+        nickname: 'reader',
+        replies: [],
+        status: 'PUBLISHED'
+      })
+    })
+  })
+  await page.goto('/post/2081309851788009474')
+  const input = page.getByRole('textbox', { name: '评论或留言内容' })
+  await input.fill('第一条已经提交')
+  try {
+    await page.locator('.composer').getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.locator('.composer').getByRole('button', { name: '发送中' })).toBeDisabled()
+    await input.fill('第二条还没有提交')
+  } finally {
+    finish()
+  }
+  await expect(page.locator('[data-interaction-id="new-comment"]')).toContainText('第一条已经提交')
+  await expect(input).toHaveValue('第二条还没有提交')
+  await page.route('**/api/auth/session', (route) => route.fulfill({ json: ok(null) }))
+  await page.reload()
+  const loginHref = await page
+    .locator('.composer')
+    .getByRole('link', { name: '登录', exact: true })
+    .getAttribute('href')
+  expect(new URL(loginHref, page.url()).searchParams.get('redirect')).toBe(
+    '/post/2081309851788009474'
+  )
+  expectCleanRun(failures, mocks)
+})
+
+test('usability profile saves only changed nicknames and prevents logout while saving', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, {
+    id: '1',
+    username: 'reader',
+    nickname: '原来的昵称',
+    role: 'USER'
+  })
+  let finish
+  const hold = new Promise((resolve) => {
+    finish = resolve
+  })
+  let calls = 0
+  await page.route('**/api/user/profile', async (route) => {
+    calls++
+    await hold
+    await route.fulfill({ json: ok({ nickname: route.request().postDataJSON().nickname }) })
+  })
+  await page.goto('/me')
+  const save = page.getByRole('button', { name: '保存', exact: true })
+  await expect(save).toBeDisabled()
+  await page.getByRole('textbox', { name: '昵称', exact: true }).fill('修改后的昵称')
+  try {
+    await save.click()
+    await expect(page.getByRole('button', { name: '退出', exact: true })).toBeDisabled()
+    await expect(page.getByRole('textbox', { name: '昵称', exact: true })).toBeDisabled()
+    await expect.poll(() => calls).toBe(1)
+  } finally {
+    finish()
+  }
+  await expect(page.getByRole('heading', { name: '修改后的昵称', exact: true })).toBeVisible()
+  await expect(save).toBeDisabled()
+  await expect(page.getByRole('button', { name: '退出', exact: true })).toBeEnabled()
+  await expectNoOverflow(page)
+  expectCleanRun(failures, mocks)
+})
+
+test('usability admin forms lock all close paths and fields until saving completes', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  let finish
+  const hold = new Promise((resolve) => {
+    finish = resolve
+  })
+  await page.route('**/api/tags/1', async (route) => {
+    await hold
+    await route.fulfill({ json: ok(null) })
+  })
+  await page.goto('/admin?tab=tags')
+  await page.getByRole('button', { name: '重命名标签' }).first().click()
+  const dialog = page.getByRole('dialog', { name: '修改标签' })
+  await dialog.getByRole('textbox', { name: '标签名称' }).fill('新的标签名称')
+  try {
+    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeDisabled()
+    await expect(dialog.getByRole('textbox', { name: '标签名称' })).toBeDisabled()
+    await dialog.press('Escape')
+    await expect(dialog).toBeVisible()
+  } finally {
+    finish()
+  }
+  await expect(dialog).toBeHidden()
+  expectCleanRun(failures, mocks)
+})
+
+test('usability writer saves with the keyboard and shows the acknowledged draft state', async ({
+  page
+}) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.goto('/write/2081309851788009474')
+  await page.getByRole('textbox', { name: '文章正文' }).fill('用快捷键保存的正文')
+  await page.keyboard.press('Control+s')
+  await expect
+    .poll(() =>
+      mocks.calls.some(
+        (call) =>
+          call.path === '/api/posts' &&
+          call.method === 'POST' &&
+          call.body?.content === '用快捷键保存的正文'
+      )
+    )
+    .toBe(true)
+  await expect(page.locator('.editor-draft-status')).toContainText('文章已保存到服务器')
+  expectCleanRun(failures, mocks)
+})
+
 test('theme transition and legacy links remain functional', async ({ page }) => {
   const failures = observeRuntime(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -665,6 +1172,8 @@ test('fluid pointer canvas draws a ribbon and click ripple without blocking cont
   await expect(canvas).toHaveCount(1)
   await expect(page.locator('.pointer-trail i')).toHaveCount(0)
   await expect(canvas).toHaveCSS('pointer-events', 'none')
+  expect(await canvas.evaluate((el) => el.parentElement === document.body)).toBe(true)
+  await expect(canvas).toHaveCSS('z-index', '3000')
 
   const trailRegion = { x: 170, y: 150, width: 430, height: 330 }
   await page.mouse.move(220, 210)
@@ -677,16 +1186,17 @@ test('fluid pointer canvas draws a ribbon and click ripple without blocking cont
     .toBeGreaterThan(40)
   await expect.poll(() => canvasRegionHasInk(page, trailRegion), { timeout: 1500 }).toBe(false)
 
-  const quietRegion = { x: 0, y: 300, width: 190, height: 390 }
-  await page.mouse.move(90, 600)
+  // Exercise ripples in the gutter between the floating rail and public canvas.
+  const quietRegion = { x: 96, y: 300, width: 28, height: 390 }
+  await page.mouse.move(108, 600)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1500 }).toBe(false)
-  await page.mouse.click(90, 600, { button: 'right' })
+  await page.mouse.click(108, 600, { button: 'right' })
   await page.waitForTimeout(120)
   expect(await canvasRegionHasInk(page, quietRegion)).toBe(false)
 
   await page.mouse.down()
-  await page.mouse.move(130, 640, { steps: 4 })
+  await page.mouse.move(112, 640, { steps: 4 })
   await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1500 }).toBe(false)
   await page.mouse.up()
@@ -694,13 +1204,13 @@ test('fluid pointer canvas draws a ribbon and click ripple without blocking cont
   expect(await canvasRegionHasInk(page, quietRegion)).toBe(false)
 
   await page.evaluate(() => {
-    const target = document.elementFromPoint(130, 640) || document.body
+    const target = document.elementFromPoint(112, 640) || document.body
     const pointer = {
       bubbles: true,
       pointerId: 43,
       pointerType: 'mouse',
       isPrimary: true,
-      clientX: 130,
+      clientX: 112,
       clientY: 640
     }
     target.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, button: 0, buttons: 1 }))
@@ -711,10 +1221,10 @@ test('fluid pointer canvas draws a ribbon and click ripple without blocking cont
   await page.waitForTimeout(120)
   expect(await canvasRegionHasInk(page, quietRegion)).toBe(false)
 
-  await page.mouse.move(90, 420)
+  await page.mouse.move(108, 420)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1500 }).toBe(false)
-  await page.mouse.click(90, 420)
+  await page.mouse.click(108, 420)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion)).toBe(true)
   await expect.poll(() => canvasRegionHasInk(page, quietRegion), { timeout: 1200 }).toBe(false)
 
@@ -914,6 +1424,137 @@ test('editor flushes the last local change before navigation', async ({ page }, 
   expectCleanRun(failures, mocks)
 })
 
+test('editor cover upload persists title, summary and cover through draft recovery and save', async ({
+  page
+}, testInfo) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  await page.route(`**${backgroundPath}`, (route) =>
+    route.fulfill({ path: 'public/images/login-illust.jpg', contentType: 'image/jpeg' })
+  )
+  await page.goto('/write')
+  await expect(page).toHaveURL(/\/write$/)
+  await expect(page).toHaveTitle(/.+/)
+  await expect(page.getByRole('region', { name: '文章信息' })).toBeVisible()
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0)
+  await page.getByPlaceholder('标题（可选）').fill('把灵感写成一篇文章')
+  await page
+    .getByPlaceholder('写下文章的核心内容，方便读者快速了解…')
+    .fill('从标题、摘要到封面，在同一个空间里整理文章的第一印象。')
+  await page.getByLabel('选择封面图片').setInputFiles('public/images/login-illust.jpg')
+  const cover = page.getByRole('img', { name: '文章封面预览' })
+  await expect(cover).toHaveAttribute('src', backgroundPath)
+  await expect
+    .poll(() => cover.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true)
+  await page
+    .getByRole('textbox', { name: '文章正文' })
+    .fill('## 从一个想法开始\n\n记录生活，也记录每一次认真思考。')
+  await expect(page.getByRole('heading', { name: '把灵感写成一篇文章' })).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await expectNoOverflow(page)
+  await page.screenshot({ path: testInfo.outputPath('article-details.png') })
+
+  await page.reload()
+  await expect(page.getByPlaceholder('标题（可选）')).toHaveValue('把灵感写成一篇文章')
+  await expect(cover).toHaveAttribute('src', backgroundPath)
+  await page.getByRole('button', { name: '保存草稿' }).click()
+  await expect
+    .poll(() =>
+      mocks.calls.some(
+        (call) =>
+          call.path === '/api/posts' &&
+          call.method === 'POST' &&
+          call.body?.coverUrl === backgroundPath &&
+          call.body?.title === '把灵感写成一篇文章' &&
+          call.body?.summary.includes('第一印象')
+      )
+    )
+    .toBe(true)
+  expectCleanRun(failures, mocks)
+})
+
+test('editor cover upload failure keeps the previous cover and supports retry and removal', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Cover failure lifecycle runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  mocks.posts[0].coverUrl = '/uploads/old-cover.png'
+  mocks.failBackgroundUpload = true
+  await page.goto('/write/2081309851788009474')
+  await page.getByLabel('选择封面图片').setInputFiles('public/images/login-illust.jpg')
+  await expect(page.getByRole('alert')).toContainText('背景上传失败')
+  await expect(page.getByRole('img', { name: '文章封面预览' })).toHaveAttribute(
+    'src',
+    '/uploads/old-cover.png'
+  )
+  await expect(page.getByRole('button', { name: '保存修改' })).toBeEnabled()
+  mocks.failBackgroundUpload = false
+  await page.getByRole('button', { name: '重试上传' }).click()
+  await expect(page.getByRole('img', { name: '文章封面预览' })).toHaveAttribute(
+    'src',
+    backgroundPath
+  )
+  await page.getByRole('button', { name: '移除封面' }).click()
+  await expect(page.getByRole('img', { name: '文章封面预览' })).toHaveCount(0)
+  await page.getByRole('button', { name: '保存修改' }).click()
+  await expect
+    .poll(() =>
+      mocks.calls.some(
+        (call) => call.path === '/api/posts' && call.method === 'POST' && call.body?.coverUrl === ''
+      )
+    )
+    .toBe(true)
+  expectCleanRun(failures, mocks)
+})
+
+test('editor cover drop blocks submission during upload and can be cancelled', async ({
+  page
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Cover pending lifecycle runs once on desktop')
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  let finishUpload
+  const pending = new Promise((resolve) => {
+    finishUpload = resolve
+  })
+  await page.route('**/api/upload/image', async (route) => {
+    await pending
+    await route.fulfill({ json: ok({ originalUrl: backgroundPath }) }).catch(() => {})
+  })
+  await page.goto('/write')
+  await page.getByRole('textbox', { name: '文章正文' }).fill('已有正文')
+  const transfer = await page.evaluateHandle(() => {
+    const data = new DataTransfer()
+    data.items.add(
+      new File(
+        [
+          Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='), (char) =>
+            char.charCodeAt(0)
+          )
+        ],
+        'cover.gif',
+        { type: 'image/gif' }
+      )
+    )
+    return data
+  })
+  try {
+    await page.locator('.article-cover-dropzone').dispatchEvent('drop', { dataTransfer: transfer })
+    await expect(page.getByText('封面上传中…', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '保存草稿' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '发布', exact: true })).toBeDisabled()
+    await page.getByRole('button', { name: '取消上传' }).click()
+    await expect(page.getByRole('button', { name: '保存草稿' })).toBeEnabled()
+    await expect(page.getByRole('img', { name: '文章封面预览' })).toHaveCount(0)
+  } finally {
+    finishUpload()
+    await transfer.dispose()
+  }
+  expectCleanRun(failures, mocks)
+})
+
 test('archived articles remain editable without silently leaving the archive', async ({
   page
 }, testInfo) => {
@@ -1013,6 +1654,7 @@ test('calendar redirect opens a switchable month dialog with dated article links
   page
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Calendar acceptance runs on desktop')
+  await page.clock.setFixedTime(new Date('2026-07-26T12:00:00+08:00'))
   const failures = observeRuntime(page)
   const mocks = await mockApi(page)
 
@@ -1038,6 +1680,7 @@ test('calendar redirect opens a switchable month dialog with dated article links
 test('compact calendar keeps empty dates inert and opens nearby article links', async ({
   page
 }) => {
+  await page.clock.setFixedTime(new Date('2026-07-26T12:00:00+08:00'))
   const failures = observeRuntime(page)
   const mocks = await mockApi(page)
 
@@ -1075,6 +1718,7 @@ test('compact calendar keeps empty dates inert and opens nearby article links', 
 
 test('image-only untitled posts keep a neutral clickable label', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Untitled media label runs once on desktop')
+  await page.clock.setFixedTime(new Date('2026-07-26T12:00:00+08:00'))
   const failures = observeRuntime(page)
   const mocks = await mockApi(page)
   mocks.posts[0].title = ''
@@ -1119,7 +1763,7 @@ test('article directory loads and searches beyond the first hundred posts', asyn
     )
   ).toBe(true)
 
-  await page.getByPlaceholder('搜索正文或标签').fill('第 101 篇')
+  await page.getByRole('textbox', { name: '筛选文章', exact: true }).fill('第 101 篇')
   await expect(page.locator('.articles-grid .post-card')).toHaveCount(1)
   await expect(page.getByRole('heading', { name: '目录文章第 101 篇' })).toBeVisible()
   await expectNoOverflow(page)
@@ -1407,7 +2051,7 @@ test('admin interactions, title dialog, media and site links use their new contr
   expectCleanRun(failures, mocks)
 })
 
-test('site background upload fills the address and persists only when saved', async ({
+test('site background upload hides the address and persists only when saved', async ({
   page
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Site background upload runs once on desktop')
@@ -1427,7 +2071,12 @@ test('site background upload fills the address and persists only when saved', as
     mimeType: 'image/png',
     buffer: Buffer.from('image')
   })
-  await expect(page.getByLabel('背景地址')).toHaveValue(backgroundPath)
+  await expect(page.locator('#site-background-url')).toHaveCount(0)
+  await expect(page.getByLabel('头像地址', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('img', { name: '站点背景预览' })).toHaveAttribute(
+    'src',
+    backgroundPath
+  )
   await expect(page.getByRole('img', { name: '站点背景预览' })).toBeVisible()
   await expect(page.locator('.app-shell')).not.toHaveClass(/has-site-background/)
   expect(mocks.calls.some((call) => call.path === '/api/admin/site' && call.method === 'PUT')).toBe(
@@ -1460,26 +2109,26 @@ test('failed site background upload preserves the old address and can retry the 
     nickname: '管理者',
     role: 'ADMIN'
   })
-  mocks.failBackgroundUpload = true
-
   await page.goto('/admin?tab=site')
-  const address = page.getByLabel('背景地址')
+  const preview = page.getByRole('img', { name: '站点背景预览' })
   const input = page.getByLabel('选择背景图片')
-  await address.fill('/uploads/existing.webp')
   const file = {
     name: 'background.png',
     mimeType: 'image/png',
     buffer: Buffer.from('image')
   }
   await input.setInputFiles(file)
-  await expect(address).toHaveValue('/uploads/existing.webp')
+  await expect(preview).toHaveAttribute('src', backgroundPath)
+  mocks.failBackgroundUpload = true
+  await input.setInputFiles(file)
+  await expect(preview).toHaveAttribute('src', backgroundPath)
   await expect(input).toHaveValue('')
   await expect(page.getByRole('status')).toContainText('背景上传失败')
   await expect(page.getByRole('button', { name: '上传背景' })).toBeEnabled()
 
   mocks.failBackgroundUpload = false
   await input.setInputFiles(file)
-  await expect(address).toHaveValue(backgroundPath)
+  await expect(preview).toHaveAttribute('src', backgroundPath)
   expectCleanRun(failures, mocks)
 })
 
@@ -1525,6 +2174,122 @@ test('media management filters and batch deletes only selected orphaned assets',
     (call) => call.path === '/api/admin/assets/batch' && call.method === 'DELETE'
   )
   expect(batchCall.body.ids.sort()).toEqual(['9001', '9002'])
+  expectCleanRun(failures, mocks)
+})
+
+test('moderation groups all pages by article and guestbook and keeps scope during paging and filtering', async ({
+  page
+}, testInfo) => {
+  const failures = observeRuntime(page)
+  const mocks = await mockApi(page, { id: '1', username: 'root', role: 'ADMIN' })
+  const root = mocks.interactions[0]
+  root.replies[0].status = 'PENDING'
+  for (let index = 1; index < 25; index++)
+    mocks.interactions.push({
+      ...root,
+      id: `article-a-${index}`,
+      content: `第一篇文章的评论 ${index}`,
+      pinned: false,
+      replies: [],
+      replyCount: 0
+    })
+  mocks.interactions.push({
+    ...root,
+    id: 'article-b',
+    targetId: mocks.posts[1].id,
+    sourceTitle: mocks.posts[1].title,
+    content: '第二篇文章的独立评论',
+    nickname: '第二篇的读者',
+    pinned: false,
+    replies: [],
+    replyCount: 0
+  })
+  mocks.interactions.push({
+    ...root,
+    id: 'guestbook-root',
+    targetType: 'GUESTBOOK',
+    targetId: '1',
+    sourceTitle: '留言板',
+    content: '留言板的独立留言',
+    nickname: '留言板访客',
+    pinned: false,
+    replies: [],
+    replyCount: 0
+  })
+  await page.goto('/admin?tab=interactions')
+  const directory = page.getByRole('region', { name: '评论来源' })
+  const articleA = directory
+    .locator('.source-directory')
+    .getByRole('button')
+    .filter({ hasText: '可验证的文章' })
+  await expect(articleA).toContainText('25 条主评论')
+  await expect(articleA).toContainText('1 条回复')
+  await expect(articleA).toContainText('1 待处理')
+  await expect(directory.locator('.source-directory > button')).toHaveCount(3)
+  await expect(page.locator('.moderation-item')).toHaveCount(20)
+  await expectNoOverflow(page)
+  await page.screenshot({ path: testInfo.outputPath('comment-sources-overview.png') })
+
+  await articleA.click()
+  await expect
+    .poll(() =>
+      mocks.calls.some(
+        (call) =>
+          call.path === '/api/admin/interactions' &&
+          call.query.targetType === 'POST' &&
+          call.query.targetId === mocks.posts[0].id
+      )
+    )
+    .toBe(true)
+  await expect(page.locator('.moderation-context h3')).toHaveText('可验证的文章')
+  await page.getByRole('button', { name: '下一页', exact: true }).click()
+  await expect(page.locator('.moderation-item')).toHaveCount(5)
+  await expect
+    .poll(() =>
+      mocks.calls.some(
+        (call) =>
+          call.path === '/api/admin/interactions' &&
+          call.query.page === '2' &&
+          call.query.targetId === mocks.posts[0].id
+      )
+    )
+    .toBe(true)
+  await page.getByRole('checkbox', { name: '选择本页' }).check()
+  await expect(page.getByText('已选择 5 条')).toBeVisible()
+
+  await directory
+    .locator('.source-directory')
+    .getByRole('button')
+    .filter({ hasText: '八月日历文章' })
+    .click()
+  await expect(page.locator('.moderation-item')).toHaveCount(1)
+  await expect(page.locator('.moderation-item')).toContainText('第二篇文章的独立评论')
+  await expect(page.getByText('已选择 5 条')).toHaveCount(0)
+  await expect
+    .poll(() => mocks.calls.filter((call) => call.path === '/api/admin/interactions').at(-1)?.query)
+    .toMatchObject({ targetType: 'POST', targetId: mocks.posts[1].id, page: '1' })
+  await page.getByLabel('评论状态', { exact: true }).selectOption('PENDING')
+  await expect
+    .poll(() => mocks.calls.filter((call) => call.path === '/api/admin/interactions').at(-1)?.query)
+    .toMatchObject({ status: 'PENDING', targetId: mocks.posts[1].id })
+  await page.getByRole('button', { name: '清空审核筛选' }).click()
+  await expect(page.getByLabel('评论状态', { exact: true })).toHaveValue('')
+  await expect(page.locator('.moderation-context h3')).toHaveText('八月日历文章')
+
+  await directory
+    .getByRole('navigation', { name: '评论来源分类' })
+    .getByRole('button', { name: /^留言板/ })
+    .click()
+  await expect(page.locator('.moderation-item')).toHaveCount(1)
+  await expect(page.locator('.moderation-item')).toContainText('留言板的独立留言')
+  await expect
+    .poll(
+      () =>
+        mocks.calls.filter((call) => call.path === '/api/admin/interactions').at(-1)?.query
+          .targetType
+    )
+    .toBe('GUESTBOOK')
+  await expectNoOverflow(page)
   expectCleanRun(failures, mocks)
 })
 
@@ -1655,7 +2420,7 @@ test('site link mutations update the public about page without reloading the SPA
   expectCleanRun(failures, mocks)
 })
 
-test('mobile admin keeps home, profile and logout actions visible without overflow', async ({
+test('mobile admin keeps home, profile and logout reachable in the navigation without overflow', async ({
   page
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'Mobile navigation acceptance runs on mobile')
@@ -1668,12 +2433,14 @@ test('mobile admin keeps home, profile and logout actions visible without overfl
   })
 
   await page.goto('/admin')
-  await expect(page.getByRole('link', { name: '返回博客首页' })).toBeVisible()
-  await expect(page.getByRole('link', { name: '修改昵称与头像' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '退出登录' })).toBeVisible()
+  await page.getByRole('button', { name: '管理导航', exact: true }).click()
+  const utilities = page.locator('.admin-mobile-actions')
+  await expect(utilities.getByRole('link', { name: '返回博客首页' })).toBeVisible()
+  await expect(utilities.getByRole('link', { name: '修改昵称与头像' })).toBeVisible()
+  await expect(utilities.getByRole('button', { name: '退出登录' })).toBeVisible()
   await expectNoOverflow(page)
 
-  await page.getByRole('link', { name: '修改昵称与头像' }).click()
+  await utilities.getByRole('link', { name: '修改昵称与头像' }).click()
   await expect(page).toHaveURL(/\/me$/)
 
   expectCleanRun(failures, mocks)

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RefreshCw, Search } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { RefreshCw, Search, X } from 'lucide-vue-next'
 import { api } from '@/api/client.js'
 import {
   archivePostDate,
@@ -12,7 +13,12 @@ import { formatDate, postTitle, postTags } from '@/core/format.js'
 import EmptyState from '@/components/EmptyState.vue'
 
 const posts = ref([])
-const query = ref('')
+const route = useRoute()
+const router = useRouter()
+const query = computed({
+  get: () => (typeof route.query.q === 'string' ? route.query.q : ''),
+  set: (value) => router.replace({ query: { ...route.query, q: value || undefined } })
+})
 const loading = ref(true)
 const error = ref('')
 const filtered = computed(() => filterArchivePosts(posts.value, query.value))
@@ -37,11 +43,24 @@ onMounted(load)
     <header class="page-title">
       <div>
         <span>ARCHIVE</span>
-        <h1>文章</h1>
+        <h1>归档</h1>
       </div>
       <label class="filter-input glass"
-        ><Search :size="18" /><input v-model="query" placeholder="筛选文章"
-      /></label>
+        ><Search :size="18" /><input
+          v-model="query"
+          aria-label="筛选归档文章"
+          placeholder="筛选文章"
+        />
+        <button
+          v-if="query"
+          type="button"
+          class="icon-button"
+          aria-label="清空归档筛选"
+          @click="query = ''"
+        >
+          <X :size="16" />
+        </button>
+      </label>
     </header>
     <div v-if="loading" class="archive-loading glass" aria-live="polite">加载中</div>
     <EmptyState v-else-if="error" :label="error">
@@ -63,7 +82,11 @@ onMounted(load)
         </div>
       </section>
     </div>
-    <EmptyState v-else label="暂无文章" />
+    <EmptyState v-else :label="query.trim() ? '没有匹配的归档文章' : '暂无文章'">
+      <button v-if="query" type="button" class="secondary-button" @click="query = ''">
+        清空筛选
+      </button>
+    </EmptyState>
   </div>
 </template>
 

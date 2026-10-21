@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import {
   ArrowDown,
   ArrowUp,
@@ -41,6 +41,7 @@ const size = ref(20)
 const total = ref(0)
 const loading = ref(false)
 const loadingMore = ref(false)
+const loadError = ref('')
 const content = ref('')
 const contentInput = ref(null)
 const replyTarget = ref(null)
@@ -52,6 +53,8 @@ const replyBusy = ref(false)
 const guestName = ref('')
 const captchaAnswer = ref('')
 const captcha = ref(null)
+const captchaLoading = ref(false)
+const captchaError = ref('')
 const deleteTarget = ref(null)
 const deleteBusy = ref(false)
 const likePendingIds = ref(new Set())
@@ -59,6 +62,7 @@ const hasMore = computed(() => items.value.length < total.value)
 const likeQueues = new Map()
 const replyElements = new Map()
 let loadGeneration = 0
+let captchaGeneration = 0
 
 function displayName(item) {
   return item?.nickname || item?.guestName || '访客'
@@ -66,14 +70,23 @@ function displayName(item) {
 
 async function loadCaptcha() {
   if (!props.guestbook || appStore.user) return
+  const generation = ++captchaGeneration
+  captcha.value = null
+  captchaAnswer.value = ''
+  captchaLoading.value = true
+  captchaError.value = ''
   try {
-    captcha.value = await api.captcha('guestbook')
+    const value = await api.captcha('guestbook')
+    if (generation === captchaGeneration) captcha.value = value
   } catch (error) {
-    notify(error.message)
+    if (generation === captchaGeneration) captchaError.value = error.message || '验证码加载失败'
+  } finally {
+    if (generation === captchaGeneration) captchaLoading.value = false
   }
 }
 
 async function fetchPage(nextPage, append, generation) {
+  loadError.value = ''
   try {
     const response =
       (await api.thread(props.targetType, props.targetId, nextPage, size.value)) || {}
@@ -90,13 +103,14 @@ async function fetchPage(nextPage, append, generation) {
       items.value = []
       total.value = 0
     }
-    notify(error.message)
+    loadError.value = error.message || '内容加载失败，请重试'
     return false
   }
 }
 
 async function resetThread() {
   const generation = ++loadGeneration
+  captchaGeneration += 1
   likeQueues.clear()
   likePendingIds.value = new Set()
   replyElements.clear()
@@ -109,8 +123,11 @@ async function resetThread() {
   replyContent.value = ''
   content.value = ''
   captcha.value = null
+  captchaLoading.value = false
+  captchaError.value = ''
   loadingMore.value = false
   loading.value = true
+  loadError.value = ''
   await fetchPage(1, false, generation)
   if (generation !== loadGeneration) return
   loading.value = false
@@ -130,6 +147,7 @@ async function loadMore() {
 
 async function refreshLoadedPages() {
   const generation = ++loadGeneration
+  loadError.value = ''
   const pagesToRefresh = Math.max(1, page.value)
   const pageSize = size.value
   let refreshed = []
@@ -152,7 +170,7 @@ async function refreshLoadedPages() {
     page.value = refreshedPage
     return true
   } catch (error) {
-    if (generation === loadGeneration) notify(error.message)
+    if (generation === loadGeneration) loadError.value = error.message || '内容加载失败，请重试'
     return false
   } finally {
     if (generation === loadGeneration) loading.value = false
@@ -181,16 +199,21 @@ function insertReplySticker(sticker) {
 
 async function send() {
   if (busy.value || !content.value.trim()) return
+  if (props.guestbook && !appStore.user && (!captcha.value || captchaLoading.value))
+    return notify('请先加载验证码')
+  const submitted = content.value
+  const generation = loadGeneration
   busy.value = true
   try {
     const created = await api.comment({
       targetType: props.targetType,
       targetId: props.targetId,
-      content: content.value.trim(),
+      content: submitted.trim(),
       guestName: props.guestbook && !appStore.user ? guestName.value : undefined,
       captchaId: captcha.value?.challengeId,
       captchaAnswer: captchaAnswer.value
     })
+    if (generation !== loadGeneration) return
     if (created) {
       const alreadyLoaded = items.value.some((item) => String(item.id) === String(created.id))
       items.value = mergeThreadRoots(items.value, [
@@ -198,12 +221,15 @@ async function send() {
       ])
       if (!alreadyLoaded) total.value += 1
     }
-    content.value = ''
+    if (content.value === submitted) content.value = ''
     captchaAnswer.value = ''
+    await loadCaptcha()
     notify('已发送')
   } catch (error) {
-    notify(error.message)
-    await loadCaptcha()
+    if (generation === loadGeneration) {
+      notify(error.message)
+      await loadCaptcha()
+    }
   } finally {
     busy.value = false
   }
@@ -229,17 +255,22 @@ async function beginReply(root, target) {
 async function sendReply() {
   if (replyBusy.value || !replyContent.value.trim() || !replyTarget.value) return
   const rootId = replyTarget.value.rootId
+  const submitted = replyContent.value
+  const generation = loadGeneration
   replyBusy.value = true
   try {
-    const created = await api.reply(replyTarget.value.targetId, replyContent.value.trim())
+    const created = await api.reply(replyTarget.value.targetId, submitted.trim())
+    if (generation !== loadGeneration) return
     if (created) items.value = appendThreadReply(items.value, rootId, created)
-    replyContent.value = ''
-    replyTarget.value = null
+    if (replyContent.value === submitted) {
+      replyContent.value = ''
+      replyTarget.value = null
+    }
     openReplies.value = new Set([...openReplies.value, rootId])
     notify('已回复')
     if (created?.id != null) await focusNewReply(created.id)
   } catch (error) {
-    notify(error.message)
+    if (generation === loadGeneration) notify(error.message)
   } finally {
     replyBusy.value = false
   }
@@ -364,6 +395,10 @@ async function confirmDelete() {
 }
 
 watch([() => props.targetType, () => props.targetId], resetThread, { immediate: true })
+onBeforeUnmount(() => {
+  loadGeneration += 1
+  captchaGeneration += 1
+})
 </script>
 
 <template>
@@ -375,18 +410,43 @@ watch([() => props.targetType, () => props.targetId], resetThread, { immediate: 
 
     <form class="composer glass" @submit.prevent="send">
       <div v-if="guestbook && !appStore.user" class="guest-fields">
-        <input v-model="guestName" placeholder="昵称" maxlength="30" required />
+        <input
+          v-model="guestName"
+          aria-label="留言昵称"
+          placeholder="昵称"
+          maxlength="30"
+          required
+        />
         <div class="captcha-inline">
           <img v-if="captcha" :src="captcha.imageDataUrl" alt="验证码" />
-          <button type="button" class="icon-button" aria-label="更换验证码" @click="loadCaptcha">
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="更换验证码"
+            :disabled="captchaLoading || busy"
+            @click="loadCaptcha"
+          >
             <RefreshCw :size="16" />
           </button>
-          <input v-model="captchaAnswer" placeholder="验证码" maxlength="12" required />
+          <input
+            v-model="captchaAnswer"
+            aria-label="留言验证码"
+            placeholder="验证码"
+            maxlength="12"
+            :disabled="captchaLoading || !captcha || busy"
+            autocomplete="off"
+            required
+          />
         </div>
+        <p v-if="captchaLoading" class="muted" aria-live="polite">正在加载验证码…</p>
+        <p v-if="captchaError" class="error-text" role="alert">
+          {{ captchaError }}，请点击刷新按钮重试
+        </p>
       </div>
       <textarea
         ref="contentInput"
         v-model="content"
+        aria-label="评论或留言内容"
         :placeholder="appStore.user || guestbook ? '写下内容' : '登录后可以评论'"
         :disabled="!appStore.user && !guestbook"
         maxlength="2000"
@@ -394,11 +454,23 @@ watch([() => props.targetType, () => props.targetId], resetThread, { immediate: 
       <div class="composer-footer">
         <div>
           <EmojiPicker v-if="appStore.user || guestbook" @select="insertContentSticker" />
-          <RouterLink v-if="!appStore.user && !guestbook" to="/login" class="text-link">
+          <RouterLink
+            v-if="!appStore.user && !guestbook"
+            :to="{ path: '/login', query: { redirect: $route.fullPath } }"
+            class="text-link"
+          >
             登录
           </RouterLink>
         </div>
-        <button class="primary-button" :disabled="busy || (!appStore.user && !guestbook)">
+        <button
+          class="primary-button"
+          :disabled="
+            busy ||
+            !content.trim() ||
+            (!appStore.user && !guestbook) ||
+            (guestbook && !appStore.user && (!captcha || captchaLoading))
+          "
+        >
           {{ busy ? '发送中' : '发送' }}
         </button>
       </div>
@@ -554,7 +626,16 @@ watch([() => props.targetType, () => props.targetId], resetThread, { immediate: 
           </div>
         </Transition>
       </article>
-      <p v-if="!items.length && !loading" class="muted thread-empty">还没有内容</p>
+      <p v-if="loading" class="muted thread-empty" aria-live="polite">
+        正在加载{{ guestbook ? '留言' : '评论' }}…
+      </p>
+      <div v-else-if="loadError" class="thread-empty" role="alert">
+        <p class="error-text">{{ loadError }}</p>
+        <button type="button" class="secondary-button" @click="refreshLoadedPages">重新加载</button>
+      </div>
+      <p v-else-if="!items.length" class="muted thread-empty">
+        {{ guestbook ? '还没有留言，来打个招呼吧' : '还没有评论，欢迎分享你的看法' }}
+      </p>
     </div>
 
     <div v-if="hasMore" class="thread-load-more">

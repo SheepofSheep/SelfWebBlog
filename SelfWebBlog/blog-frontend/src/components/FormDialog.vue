@@ -20,10 +20,11 @@ defineEmits(['submit', 'close'])
     :title="title"
     :description="description"
     :size="size"
+    :close-disabled="busy"
     @close="$emit('close')"
   >
-    <form class="form-dialog" @submit.prevent="$emit('submit')">
-      <slot />
+    <form class="form-dialog" @submit.prevent="!busy && valid && $emit('submit')">
+      <fieldset class="form-dialog-fields" :disabled="busy"><slot /></fieldset>
       <div class="form-dialog-actions">
         <button class="secondary-button" type="button" :disabled="busy" @click="$emit('close')">
           {{ cancelLabel }}
@@ -40,6 +41,14 @@ defineEmits(['submit', 'close'])
 .form-dialog {
   display: grid;
   gap: 16px;
+}
+.form-dialog-fields {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 .form-dialog-actions {
   display: flex;

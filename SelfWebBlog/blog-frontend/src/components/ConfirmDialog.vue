@@ -14,7 +14,13 @@ defineEmits(['confirm', 'close'])
 </script>
 
 <template>
-  <AppDialog :open="open" :title="title" size="small" @close="$emit('close')">
+  <AppDialog
+    :open="open"
+    :title="title"
+    size="small"
+    :close-disabled="busy"
+    @close="$emit('close')"
+  >
     <p class="confirm-message">{{ message }}</p>
     <template #footer>
       <button class="secondary-button" type="button" :disabled="busy" @click="$emit('close')">

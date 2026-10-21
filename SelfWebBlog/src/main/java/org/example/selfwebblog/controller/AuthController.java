@@ -293,37 +293,6 @@ public class AuthController {
         return adminUser;
     }
 
-    // ==================== 管理员登录 ====================
-
-    @PostMapping("/admin")
-    public Result<?> adminLogin(
-            @RequestBody Map<String, String> body,
-            HttpServletRequest request,
-            HttpServletResponse response) {
-        if (!tryAcquireRateLimit("admin-login", request)) {
-            return Result.rateLimited("登录请求过于频繁，请稍后再试", 60);
-        }
-
-        String username = body.get("username");
-        String password = body.get("password");
-
-        if (isBlank(username) || isBlank(password)) {
-            return Result.badRequest("用户名或密码不能为空");
-        }
-
-        if (!adminUsername.equals(username) || !passwordEncoder.matches(password, adminPasswordHash)) {
-            recordAuthEvent(request, null, "ADMIN_LOGIN_FAILURE", username);
-            return Result.unauthorized("用户名或密码错误");
-        }
-
-        User adminUser = ensureAdminUser();
-        issueSession(adminUser, response);
-        UserInfo info = toUserInfo(adminUser);
-        recordAuthEvent(request, adminUser.getId(), "ADMIN_LOGIN_SUCCESS", username);
-        log.info("博主登录成功");
-        return Result.success(Map.of("user", info));
-    }
-
     // ==================== GitHub OAuth ====================
 
     @GetMapping("/github")

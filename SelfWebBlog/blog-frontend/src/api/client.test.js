@@ -201,6 +201,8 @@ test('interaction moderation sends content filters and exact string ids for batc
 
   await api.adminInteractions({ contentType: 'STICKER', page: 2, size: 10 })
   await api.batchDeleteInteractions(['9007199254740993', '9007199254740995'])
+  await api.adminInteractions({ targetType: 'POST', targetId: '9007199254740995' })
+  await api.interactionSources()
 
   const sent = calls.filter((call) => call.path !== '/api/auth/csrf')
   assert.equal(sent[0].path, '/api/admin/interactions?page=2&size=10&contentType=STICKER')
@@ -209,6 +211,11 @@ test('interaction moderation sends content filters and exact string ids for batc
   assert.deepEqual(JSON.parse(sent[1].options.body), {
     ids: ['9007199254740993', '9007199254740995']
   })
+  assert.equal(
+    sent[2].path,
+    '/api/admin/interactions?page=1&size=20&targetType=POST&targetId=9007199254740995'
+  )
+  assert.equal(sent[3].path, '/api/admin/interactions/sources')
 })
 
 test('admin replies reuse the unified interaction creation contract without captcha fields', async (context) => {

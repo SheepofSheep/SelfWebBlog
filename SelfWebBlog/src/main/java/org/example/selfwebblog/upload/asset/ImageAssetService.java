@@ -103,13 +103,21 @@ public class ImageAssetService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = IOException.class)
     public ImageAssetResponse storeArticleImage(MultipartFile file, Long uploaderId) throws IOException {
         if (uploaderId == null) throw new IllegalArgumentException("上传者身份无效");
         byte[] bytes = file.getBytes();
         String hash = sha256(bytes);
+        // SQLite has one writer: serialize the lookup/activation/insert with deletion too.
+        mapper.acquireWriteLock();
         ImageAsset reusable = mapper.findReusable(uploaderId, hash, "ARTICLE");
         if (reusable != null && Files.isRegularFile(pathForUrl(reusable.getOriginalPath()))) {
+            if (!"ACTIVE".equals(reusable.getReferenceStatus())) {
+                if (mapper.updateReferenceStatus(reusable.getId(), "ACTIVE") != 1) {
+                    throw new IllegalStateException("图片资产重新激活失败");
+                }
+                reusable.setReferenceStatus("ACTIVE");
+            }
             return ImageAssetResponse.from(reusable);
         }
 
@@ -121,6 +129,15 @@ public class ImageAssetService {
         List<Path> createdFiles = new ArrayList<>();
         createdFiles.add(originalFile);
         try {
+            if (reusable != null) {
+                // Preserve URLs already stored in articles when repairing a missing original.
+                Path restored = pathForUrl(reusable.getOriginalPath());
+                Files.createDirectories(restored.getParent());
+                Files.move(originalFile, restored, StandardCopyOption.REPLACE_EXISTING);
+                createdFiles.remove(originalFile);
+                originalFile = restored;
+                createdFiles.add(originalFile);
+            }
             ImageVariantService.VariantPaths variants = variantService.createVariants(image, originalFile);
             if (variants.small() != null) createdFiles.add(variants.small());
             if (variants.large() != null) createdFiles.add(variants.large());
@@ -128,7 +145,7 @@ public class ImageAssetService {
             ImageAsset asset = new ImageAsset();
             asset.setContentHash(hash);
             asset.setPurpose("ARTICLE");
-            asset.setOriginalPath(stored.url());
+            asset.setOriginalPath(urlFor(originalFile));
             asset.setSmallWebpPath(urlFor(variants.small()));
             asset.setLargeWebpPath(urlFor(variants.large()));
             asset.setOriginalMime(file.getContentType() == null ? "image/" + stored.extension() : file.getContentType());
@@ -139,7 +156,12 @@ public class ImageAssetService {
             asset.setReferenceStatus("ACTIVE");
             asset.setCreateTime(LocalDateTime.now());
             asset.setUpdateTime(LocalDateTime.now());
-            mapper.insertAsset(asset);
+            if (reusable == null) {
+                mapper.insertAsset(asset);
+            } else {
+                asset.setId(reusable.getId());
+                if (mapper.restoreAsset(asset) != 1) throw new IllegalStateException("图片资产修复失败");
+            }
             ImageAsset saved = mapper.findReusable(uploaderId, hash, "ARTICLE");
             if (saved == null) throw new IllegalStateException("图片资产保存失败");
             return ImageAssetResponse.from(saved);
@@ -253,8 +275,9 @@ public class ImageAssetService {
     }
 
     private int deleteOrphansInternal(List<Long> ids) throws IOException {
-        reconcileStagedDeletions();
         List<Long> normalizedIds = normalizeDeletionIds(ids);
+        mapper.acquireWriteLock();
+        reconcileStagedDeletions();
         List<ImageAsset> assets = normalizedIds.stream().map(id -> {
             ImageAsset asset = mapper.findById(id);
             if (asset == null) throw new IllegalArgumentException("图片资产不存在");

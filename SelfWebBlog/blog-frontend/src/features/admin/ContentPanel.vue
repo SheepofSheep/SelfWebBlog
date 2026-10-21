@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   Archive,
   ExternalLink,
@@ -17,7 +18,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AdminPager from './AdminPager.vue'
 import AdminToolbar from './AdminToolbar.vue'
 
-const status = ref('PUBLISHED')
+const route = useRoute()
+const status = ref(
+  ['PUBLISHED', 'DRAFT', 'ARCHIVED'].includes(route.query.status) ? route.query.status : 'PUBLISHED'
+)
 const keyword = ref('')
 const page = ref(1)
 const result = ref({ records: [], current: 1, pages: 1, total: 0 })

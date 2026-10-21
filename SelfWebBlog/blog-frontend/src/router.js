@@ -37,7 +37,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 })
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path === from.path) return false
+    return { top: 0 }
+  }
 })
 router.beforeEach((to) => {
   const legacyTarget = legacyRouteTarget(location.href)

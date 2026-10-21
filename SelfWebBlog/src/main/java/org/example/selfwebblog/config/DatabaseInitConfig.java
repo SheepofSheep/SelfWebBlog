@@ -7,7 +7,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 
@@ -26,19 +28,20 @@ public class DatabaseInitConfig {
     ) {
         return args -> {
             JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-            ensureAdminUser(jdbcTemplate, adminUsername, adminPassword);
-            ensureBlogInfo(jdbcTemplate);
+            new TransactionTemplate(new DataSourceTransactionManager(dataSource)).executeWithoutResult(status -> {
+                ensureAdminUser(jdbcTemplate, adminUsername, adminPassword);
+                ensureBlogInfo(jdbcTemplate);
+            });
         };
     }
 
     private void ensureAdminUser(JdbcTemplate jdbcTemplate, String adminUsername, String adminPassword) {
-        Integer adminCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM user WHERE username = ?",
-            Integer.class,
-            adminUsername
-        );
+        var credentials = jdbcTemplate.query(
+                "SELECT password, role FROM user WHERE username = ?",
+                (result, row) -> new AdminCredentials(result.getString("password"), result.getString("role")),
+                adminUsername);
 
-        if (adminCount == null || adminCount == 0) {
+        if (credentials.isEmpty()) {
             jdbcTemplate.update(
                 """
                     INSERT INTO user (username, password, email, avatar_url, role, nickname)
@@ -55,7 +58,16 @@ public class DatabaseInitConfig {
             return;
         }
 
-        jdbcTemplate.update("UPDATE user SET role = 'ADMIN' WHERE username = ?", adminUsername);
+        AdminCredentials existing = credentials.get(0);
+        boolean passwordChanged = !matchesConfiguredPassword(adminPassword, existing.password());
+        if (passwordChanged || !"ADMIN".equals(existing.role())) {
+            jdbcTemplate.update("""
+                    UPDATE user SET password = ?, role = 'ADMIN',
+                      token_version = COALESCE(token_version, 0) + 1
+                    WHERE username = ?
+                    """, passwordChanged ? encodePassword(adminPassword) : existing.password(), adminUsername);
+            log.info("管理员凭证已同步，旧会话已失效");
+        }
     }
 
     private void ensureBlogInfo(JdbcTemplate jdbcTemplate) {
@@ -87,4 +99,17 @@ public class DatabaseInitConfig {
         }
         return passwordEncoder.encode(configuredPassword);
     }
+
+    private boolean matchesConfiguredPassword(String configuredPassword, String storedPassword) {
+        if (configuredPassword == null || configuredPassword.isBlank()) {
+            return "".equals(storedPassword);
+        }
+        if (configuredPassword.startsWith("$2a$") || configuredPassword.startsWith("$2b$")
+                || configuredPassword.startsWith("$2y$")) {
+            return configuredPassword.equals(storedPassword);
+        }
+        return storedPassword != null && passwordEncoder.matches(configuredPassword, storedPassword);
+    }
+
+    private record AdminCredentials(String password, String role) {}
 }

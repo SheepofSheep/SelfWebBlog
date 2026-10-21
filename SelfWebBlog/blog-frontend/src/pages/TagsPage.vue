@@ -77,6 +77,12 @@ onBeforeUnmount(() => {
       </div>
       <EmptyState v-else />
     </section>
+    <EmptyState v-else-if="!tags.length" label="还没有标签"
+      ><RouterLink class="secondary-button" to="/articles">浏览全部文章</RouterLink></EmptyState
+    >
+    <EmptyState v-else-if="route.params.slug || route.query.tag" label="未找到这个标签"
+      ><RouterLink class="secondary-button" to="/tags">查看全部标签</RouterLink></EmptyState
+    >
   </div>
 </template>
 

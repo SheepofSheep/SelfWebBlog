@@ -1,94 +1,133 @@
 <script setup>
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import { Search, SunMoon, UserRound, PenLine, Menu, X } from 'lucide-vue-next'
+import {
+  Home,
+  BookOpen,
+  Archive,
+  MessagesSquare,
+  UserRound,
+  Tags,
+  Search,
+  SunMoon,
+  PenLine,
+  PanelLeftOpen,
+  PanelLeftClose
+} from 'lucide-vue-next'
 import SearchDialog from './SearchDialog.vue'
 import AppearanceControl from './AppearanceControl.vue'
 import AppAvatar from './AppAvatar.vue'
 import { appStore } from '@/stores/app.js'
-
-defineProps({ siteName: { type: String, default: '博客' } })
+defineProps({ siteName: { type: String, default: '我的博客' } })
 const searchOpen = ref(false)
 const appearanceOpen = ref(false)
-const mobileOpen = ref(false)
 const appearanceTrigger = ref(null)
 const nav = [
-  ['首页', '/'],
-  ['文章', '/articles'],
-  ['归档', '/archive'],
-  ['留言', '/guestbook'],
-  ['关于', '/about']
+  { label: '首页', path: '/', icon: Home },
+  { label: '文章', path: '/articles', icon: BookOpen },
+  { label: '归档', path: '/archive', icon: Archive },
+  { label: '标签', path: '/tags', icon: Tags },
+  { label: '留言', path: '/guestbook', icon: MessagesSquare },
+  { label: '关于', path: '/about', icon: UserRound }
 ]
-
 function openSearch() {
   appearanceOpen.value = false
-  mobileOpen.value = false
   searchOpen.value = true
 }
-
 function toggleAppearance() {
   searchOpen.value = false
-  mobileOpen.value = false
   appearanceOpen.value = !appearanceOpen.value
 }
 </script>
-
 <template>
-  <header class="site-header glass">
-    <RouterLink class="brand" to="/" aria-label="返回首页">
-      <AppAvatar :src="appStore.site?.avatarUrl" :name="siteName" :size="30" rounded />
-      <span>{{ siteName }}</span>
-    </RouterLink>
-    <nav :class="['main-nav', { open: mobileOpen }]" aria-label="主导航">
-      <RouterLink v-for="item in nav" :key="item[1]" :to="item[1]" @click="mobileOpen = false">{{
-        item[0]
-      }}</RouterLink>
-    </nav>
-    <div class="header-actions">
-      <button class="icon-button" aria-label="搜索" @click="openSearch">
-        <Search :size="19" />
-      </button>
-      <button
-        ref="appearanceTrigger"
-        class="icon-button appearance-trigger"
-        aria-label="外观"
-        :aria-expanded="appearanceOpen"
-        aria-haspopup="dialog"
-        @click="toggleAppearance"
+  <aside class="public-navigation glass" :class="{ expanded: appStore.navigationExpanded }">
+    <RouterLink class="navigation-mark" to="/" aria-label="返回首页" :title="siteName"
+      ><AppAvatar :src="appStore.site?.avatarUrl" :name="siteName" :size="40" rounded
+    /></RouterLink>
+    <nav id="public-main-nav" class="main-nav" aria-label="主导航">
+      <RouterLink
+        v-for="item in nav"
+        :key="item.path"
+        :to="item.path"
+        :title="item.label"
+        :aria-label="item.label"
+        :data-label="item.label"
+        ><component :is="item.icon" :size="22" :stroke-width="1.6" /><span>{{
+          item.label
+        }}</span></RouterLink
       >
-        <SunMoon :size="19" />
-      </button>
+    </nav>
+    <button
+      class="navigation-expand icon-button"
+      type="button"
+      :aria-label="appStore.navigationExpanded ? '收起导航' : '展开导航'"
+      :aria-expanded="appStore.navigationExpanded"
+      aria-controls="public-main-nav"
+      @click="appStore.navigationExpanded = !appStore.navigationExpanded"
+    >
+      <PanelLeftClose v-if="appStore.navigationExpanded" :size="20" />
+      <PanelLeftOpen v-else :size="20" />
+      <span aria-hidden="true">收起导航</span>
+    </button>
+    <RouterLink
+      class="navigation-account"
+      :to="appStore.user ? (appStore.user.role === 'ADMIN' ? '/admin' : '/me') : '/login'"
+      :aria-label="appStore.user?.role === 'ADMIN' ? '管理博客' : '登录博客'"
+      :title="appStore.user?.role === 'ADMIN' ? '管理博客' : '我的账户'"
+      ><UserRound :size="22"
+    /></RouterLink>
+  </aside>
+  <header class="site-header">
+    <RouterLink class="site-greeting" to="/"
+      ><span>{{ appStore.user ? '欢迎回来' : '欢迎来到' }}</span
+      ><strong>{{ siteName }}</strong></RouterLink
+    >
+    <div class="header-actions">
       <RouterLink
         v-if="appStore.user?.role === 'ADMIN'"
-        class="icon-button"
+        class="round-tool"
         to="/write"
         aria-label="写文章"
-        ><PenLine :size="19"
+        title="写文章"
+        ><PenLine :size="20"
       /></RouterLink>
+      <button
+        class="round-tool"
+        type="button"
+        aria-label="搜索"
+        title="搜索文章"
+        @click="openSearch"
+      >
+        <Search :size="20" />
+      </button>
+      <div class="appearance-anchor">
+        <button
+          ref="appearanceTrigger"
+          class="round-tool appearance-trigger"
+          type="button"
+          aria-label="外观"
+          title="外观"
+          :aria-expanded="appearanceOpen"
+          aria-haspopup="dialog"
+          @click="toggleAppearance"
+        >
+          <SunMoon :size="20" />
+        </button>
+        <AppearanceControl
+          v-if="appearanceOpen"
+          :trigger="appearanceTrigger"
+          @close="appearanceOpen = false"
+        />
+      </div>
       <RouterLink
-        class="icon-button"
+        class="round-tool account-tool"
         :to="appStore.user ? (appStore.user.role === 'ADMIN' ? '/admin' : '/me') : '/login'"
         aria-label="账户"
         ><AppAvatar
-          v-if="appStore.user"
-          :src="appStore.user.avatarUrl"
-          :name="appStore.user.nickname || appStore.user.username"
-          :size="30" /><UserRound v-else :size="19"
+          :src="appStore.user?.avatarUrl || appStore.site?.avatarUrl"
+          :name="appStore.user?.nickname || siteName"
+          :size="44"
       /></RouterLink>
-      <button
-        class="icon-button mobile-menu"
-        :aria-expanded="mobileOpen"
-        aria-label="菜单"
-        @click="mobileOpen = !mobileOpen"
-      >
-        <X v-if="mobileOpen" :size="20" /><Menu v-else :size="20" />
-      </button>
     </div>
-    <AppearanceControl
-      v-if="appearanceOpen"
-      :trigger="appearanceTrigger"
-      @close="appearanceOpen = false"
-    />
-    <SearchDialog v-if="searchOpen" @close="searchOpen = false" />
   </header>
+  <SearchDialog v-if="searchOpen" @close="searchOpen = false" />
 </template>

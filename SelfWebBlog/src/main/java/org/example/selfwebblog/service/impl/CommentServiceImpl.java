@@ -19,9 +19,18 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
         Page<Comment> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Comment> queryWrapper = new LambdaQueryWrapper<Comment>()
                 .eq(Comment::getPostId, postId)
+                .eq(Comment::getTargetType, "POST")
+                .eq(Comment::getTargetId, postId)
                 .eq(Comment::getStatus, "PUBLISHED")
+                .and(visible -> visible.isNull(Comment::getRootId).or().exists("""
+                        SELECT 1 FROM comment root
+                        WHERE root.id = comment.root_id AND root.root_id IS NULL
+                          AND root.status = 'PUBLISHED' AND root.target_type = 'POST'
+                          AND root.post_id = {0} AND root.target_id = {0}
+                        """, postId))
                 .orderByDesc(Comment::getPinned)
-                .orderByDesc(Comment::getCreateTime);
+                .orderByDesc(Comment::getCreateTime)
+                .orderByDesc(Comment::getId);
         return baseMapper.selectPage(page, queryWrapper);
     }
 
