@@ -42,8 +42,8 @@ onMounted(load)
   <div class="page narrow-page">
     <header class="page-title">
       <div>
-        <span>ARCHIVE</span>
         <h1>归档</h1>
+        <p v-if="!loading">共 {{ filtered.length }} 篇</p>
       </div>
       <label class="filter-input glass"
         ><Search :size="18" /><input

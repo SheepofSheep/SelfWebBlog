@@ -1,16 +1,44 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import SiteHeader from '@/components/SiteHeader.vue'
 import PointerTrail from '@/components/PointerTrail.vue'
 import { appStore } from '@/stores/app.js'
-import { siteBackgroundImage } from '@/core/siteAppearance.js'
+import { backgroundBlurRadius } from '@/core/backgroundBlur.js'
+import { softenBackgroundImage } from '@/core/softenBackground.js'
+import { siteBackgroundImage, siteBackgroundUrl } from '@/core/siteAppearance.js'
 const route = useRoute()
 const siteName = computed(() => appStore.site?.nickname || '我的博客')
 const immersive = computed(() => route.meta.immersive)
-const background = computed(() => siteBackgroundImage(appStore.site?.bgUrl))
+const backgroundUrl = computed(() => siteBackgroundUrl(appStore.site?.bgUrl))
+const background = ref(siteBackgroundImage(appStore.site?.bgUrl))
 const shellStyle = computed(() =>
   background.value ? { '--site-background-image': background.value } : undefined
+)
+let backgroundTicket = 0
+let backgroundBlurTimer = 0
+let lastBackgroundUrl = ''
+watch(
+  [backgroundUrl, () => appStore.backgroundBlur],
+  ([url, blur]) => {
+    const ticket = ++backgroundTicket
+    window.clearTimeout(backgroundBlurTimer)
+    if (url !== lastBackgroundUrl) {
+      lastBackgroundUrl = url
+      background.value = siteBackgroundImage(url)
+    }
+    if (!url) return
+    if (Number(blur) <= 0) {
+      background.value = siteBackgroundImage(url)
+      return
+    }
+    backgroundBlurTimer = window.setTimeout(async () => {
+      const softened = await softenBackgroundImage(url, { blur: backgroundBlurRadius(blur) })
+      if (ticket !== backgroundTicket || !softened) return
+      background.value = `url("${softened}")`
+    }, 90)
+  },
+  { immediate: true }
 )
 </script>
 <template>
@@ -18,7 +46,6 @@ const shellStyle = computed(() =>
     class="app-shell aurora-app"
     :class="{
       'workspace-shell': immersive,
-      'has-site-background': background,
       'navigation-expanded': appStore.navigationExpanded
     }"
     :style="shellStyle"

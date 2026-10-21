@@ -175,11 +175,11 @@ onBeforeUnmount(() => {
   <div v-else-if="post" class="page article-page">
     <div class="reading-progress" :style="{ width: `${progress}%` }" />
     <header
-      class="article-hero glass"
+      :class="['article-hero', 'glass', { 'has-cover': post.coverUrl || post.imageUrl }]"
       :style="
         post.coverUrl || post.imageUrl
           ? {
-              backgroundImage: `linear-gradient(180deg, transparent, rgba(5,16,32,.72)),url('${post.coverUrl || post.imageUrl}')`,
+              backgroundImage: `url('${post.coverUrl || post.imageUrl}')`,
               backgroundPosition: `${post.backgroundFocusX ?? 50}% ${post.backgroundFocusY ?? 50}%`
             }
           : {}

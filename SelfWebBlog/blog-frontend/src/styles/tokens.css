@@ -1,65 +1,86 @@
 /* Neutral adaptive materials: content surfaces stay calm; navigation floats above them. */
 :root {
   color-scheme: light;
-  --bg: #e5e7ec;
-  --bg-deep: #e8ebf0;
-  --ink: #202126;
-  --muted: #555b65;
-  --line: rgb(255 255 255 / 42%);
-  --glass: rgb(230 233 239 / 48%);
-  --glass-strong: rgb(235 238 244 / 94%);
-  --chrome: rgb(221 226 234 / 36%);
-  --surface-raised: rgb(238 241 246 / 28%);
-  --field: rgb(243 246 250 / 32%);
-  --accent: #006be0;
-  --accent-deep: #0059bd;
-  --accent-soft: rgb(0 112 240 / 9%);
+  --bg: #edf0f5;
+  --bg-deep: #e4e9f1;
+  --ink: #1b1e26;
+  --muted: #5b6270;
+  --line: rgb(39 55 84 / 14%);
+  --line-strong: rgb(39 55 84 / 22%);
+  --glass: rgb(255 255 255 / 78%);
+  --glass-strong: rgb(255 255 255 / 96%);
+  --chrome: rgb(248 250 253 / 90%);
+  --surface-raised: rgb(255 255 255 / 56%);
+  --field: rgb(245 247 251 / 78%);
+  --paper: rgb(250 251 254 / 96%);
+  --accent: #1f63e8;
+  --accent-deep: #164fc2;
+  --accent-soft: rgb(31 99 232 / 10%);
+  --accent-violet: #6f63d8;
+  --accent-mint: #2f9d8e;
   --primary-ink: #fff;
-  --danger: #ba283b;
-  --positive: #23764b;
-  --selection: rgb(0 122 255 / 19%);
-  --scrim: rgb(22 29 42 / 6%);
-  --scrim-bottom: rgb(28 35 48 / 9%);
+  --danger: #b4233a;
+  --danger-ink: #fff;
+  --positive: #1f7a4d;
+  --selection: rgb(31 99 232 / 18%);
+  --scrim: rgb(237 240 245 / 18%);
+  --scrim-bottom: rgb(237 240 245 / 28%);
+  --backdrop-veil: rgb(237 240 245 / 76%);
   --shadow:
-    0 10px 32px rgb(24 32 52 / 8%), inset 0 1px 1px rgb(255 255 255 / 56%),
-    inset 0 -1px 1px rgb(255 255 255 / 18%);
-  --shadow-hover: 0 14px 38px rgb(24 32 52 / 13%), inset 0 1px 1px #fff;
-  --radius-xl: 28px;
-  --radius-lg: 26px;
-  --radius-md: 16px;
+    0 1px 2px rgb(22 30 48 / 5%), 0 16px 40px -24px rgb(22 30 48 / 32%),
+    inset 0 1px 0 rgb(255 255 255 / 82%);
+  --shadow-hover:
+    0 2px 6px rgb(22 30 48 / 6%), 0 26px 58px -26px rgb(22 30 48 / 40%),
+    inset 0 1px 0 rgb(255 255 255 / 88%);
+  --radius-xl: 26px;
+  --radius-lg: 22px;
+  --radius-md: 14px;
   --font: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --font-display: 'Inter Tight', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-display: 'Inter Tight', 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   --canvas-gutter: clamp(24px, 3.1vw, 56px);
   --nav-width: 76px;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --chart-views: #006bd6;
-  --chart-interactions: #7358b7;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-slow: 420ms;
+  --chart-views: #1f63e8;
+  --chart-interactions: #6f63d8;
   --chart-posts: #a56a0a;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #16171b;
-  --bg-deep: #23252c;
-  --ink: #f4f5f8;
-  --muted: #c6c9d2;
-  --line: rgb(255 255 255 / 22%);
-  --glass: rgb(30 32 39 / 64%);
-  --glass-strong: rgb(35 37 45 / 94%);
-  --chrome: rgb(32 34 42 / 52%);
-  --surface-raised: rgb(255 255 255 / 10%);
-  --field: rgb(255 255 255 / 9%);
-  --accent: #8cbfff;
-  --accent-deep: #b3d5ff;
-  --accent-soft: rgb(100 169 255 / 16%);
-  --primary-ink: #12223c;
-  --danger: #ffb0ba;
-  --positive: #a5e4bd;
-  --selection: rgb(109 176 255 / 28%);
-  --scrim: rgb(0 0 0 / 22%);
-  --scrim-bottom: rgb(0 0 0 / 28%);
+  --bg: #101216;
+  --bg-deep: #171a20;
+  --ink: #f1f3f8;
+  --muted: #aab2bf;
+  --line: rgb(255 255 255 / 13%);
+  --line-strong: rgb(255 255 255 / 22%);
+  --glass: rgb(24 27 34 / 82%);
+  --glass-strong: rgb(28 31 39 / 96%);
+  --chrome: rgb(20 23 30 / 88%);
+  --surface-raised: rgb(255 255 255 / 9%);
+  --field: rgb(255 255 255 / 8%);
+  --paper: rgb(18 21 27 / 96%);
+  --accent: #8ab8ff;
+  --accent-deep: #b6d2ff;
+  --accent-soft: rgb(120 175 255 / 15%);
+  --accent-violet: #b8aaff;
+  --accent-mint: #8fe0cf;
+  --primary-ink: #0b1b33;
+  --danger: #ffb3bd;
+  --danger-ink: #2b0a10;
+  --positive: #9fe3bf;
+  --selection: rgb(120 175 255 / 24%);
+  --scrim: rgb(0 0 0 / 30%);
+  --scrim-bottom: rgb(0 0 0 / 38%);
+  --backdrop-veil: rgb(10 12 16 / 74%);
   --shadow:
-    0 10px 32px rgb(0 0 0 / 16%), inset 0 1px 1px rgb(255 255 255 / 24%),
-    inset 0 -1px 1px rgb(255 255 255 / 6%);
+    0 1px 2px rgb(0 0 0 / 24%), 0 20px 48px -24px rgb(0 0 0 / 58%),
+    inset 0 1px 0 rgb(255 255 255 / 13%);
+  --shadow-hover:
+    0 2px 6px rgb(0 0 0 / 28%), 0 28px 60px -26px rgb(0 0 0 / 66%),
+    inset 0 1px 0 rgb(255 255 255 / 18%);
   --chart-views: #9ac9ff;
   --chart-interactions: #cfbaff;
   --chart-posts: #ffdd9c;

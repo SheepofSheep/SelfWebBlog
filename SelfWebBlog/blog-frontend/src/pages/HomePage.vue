@@ -49,6 +49,7 @@ onBeforeUnmount(() => requestGate.begin())
 
 <template>
   <div class="page home-page">
+    <h1 v-if="!featured" class="sr-only">{{ appStore.site?.nickname || '博客' }}</h1>
     <div class="home-stage">
       <section class="home-intro">
         <p class="home-description">
@@ -117,8 +118,8 @@ onBeforeUnmount(() => requestGate.begin())
       <div v-if="loading" class="post-grid">
         <div v-for="i in 4" :key="i" class="skeleton-card glass" />
       </div>
-      <div v-else-if="posts.length > 1" class="post-grid">
-        <PostCard v-for="post in posts.slice(1)" :key="post.id" :post="post" />
+      <div v-else-if="posts.length > 1" class="latest-list">
+        <PostCard v-for="post in posts.slice(1)" :key="post.id" :post="post" row />
       </div>
       <EmptyState
         v-else

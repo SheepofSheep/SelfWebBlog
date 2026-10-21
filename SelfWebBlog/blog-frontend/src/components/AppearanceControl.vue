@@ -1,13 +1,18 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Monitor, Moon, Sparkles, Sun } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { CloudFog, Monitor, Moon, Sparkles, Sun } from 'lucide-vue-next'
 import { installAppearance } from '@/core/appearance.js'
+import { appStore, setBackgroundBlur } from '@/stores/app.js'
 
 const props = defineProps({ trigger: { type: Object, default: null } })
 const emit = defineEmits(['close'])
 const appearance = installAppearance()
 const selected = ref(appearance.current())
 const motion = ref(appearance.motion())
+const blur = computed({
+  get: () => appStore.backgroundBlur,
+  set: (value) => setBackgroundBlur(value)
+})
 const root = ref(null)
 let previousFocus = null
 const options = [
@@ -68,5 +73,18 @@ onBeforeUnmount(() => {
     <button @click="toggleMotion">
       <Sparkles :size="17" />{{ motion === 'full' ? '完整动效' : '减少动效' }}
     </button>
+    <label class="appearance-blur">
+      <span
+        ><CloudFog :size="17" />背景模糊 <output>{{ blur }}%</output></span
+      >
+      <input
+        v-model.number="blur"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        aria-label="背景模糊度"
+      />
+    </label>
   </div>
 </template>

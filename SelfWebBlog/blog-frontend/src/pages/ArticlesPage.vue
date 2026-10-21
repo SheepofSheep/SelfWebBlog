@@ -38,8 +38,8 @@ onMounted(load)
   <div class="page">
     <header class="page-title">
       <div>
-        <span>ARTICLES</span>
         <h1>文章</h1>
+        <p v-if="!loading">共 {{ filtered.length }} 篇</p>
       </div>
       <label class="filter-input glass">
         <Search :size="18" /><input
@@ -66,8 +66,8 @@ onMounted(load)
     </EmptyState>
     <template v-else-if="filtered.length">
       <p v-if="query.trim()" class="muted" aria-live="polite">找到 {{ filtered.length }} 篇文章</p>
-      <div class="post-grid articles-grid">
-        <PostCard v-for="post in filtered" :key="post.id" :post="post" />
+      <div class="latest-list articles-list">
+        <PostCard v-for="post in filtered" :key="post.id" :post="post" row />
       </div>
     </template>
     <EmptyState v-else :label="query.trim() ? '没有匹配的文章，换个关键词试试' : '还没有发布文章'">

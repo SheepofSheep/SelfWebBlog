@@ -9,7 +9,11 @@ import {
   postTitle
 } from '@/core/format.js'
 
-const props = defineProps({ post: { type: Object, required: true }, featured: Boolean })
+const props = defineProps({
+  post: { type: Object, required: true },
+  featured: Boolean,
+  row: Boolean
+})
 const tags = computed(() => postTags(props.post))
 const displayTitle = computed(() => postTitle(props.post))
 const bodyImage = computed(() => {
@@ -41,29 +45,24 @@ const background = computed(() => {
 const preset = computed(() =>
   props.post.backgroundMode === 'GRADIENT' ? `preset-${props.post.backgroundValue}` : ''
 )
+const hasArt = computed(() =>
+  Boolean(background.value.backgroundImage || background.value.backgroundColor || preset.value)
+)
 </script>
 
 <template>
   <RouterLink
     :to="`/post/${post.id}`"
-    :class="[
-      'post-card',
-      'glass',
-      { featured, 'has-art': background.backgroundImage || background.backgroundColor || preset }
-    ]"
+    :class="['post-card', 'glass', { featured, row, 'has-art': hasArt }]"
+    :data-category="post.category || ''"
   >
-    <div
-      v-if="background.backgroundImage || background.backgroundColor || preset"
-      :class="['post-art', preset]"
-      :style="background"
-      aria-hidden="true"
-    />
+    <div v-if="hasArt" :class="['post-art', preset]" :style="background" aria-hidden="true" />
     <div class="post-card-content">
       <div class="post-meta">
         <time>{{ formatDate(postPublicationTime(post)) }}</time
         ><span v-if="post.category">{{ post.category }}</span>
       </div>
-      <h2>{{ displayTitle }}</h2>
+      <component :is="featured ? 'h1' : 'h2'">{{ displayTitle }}</component>
       <p v-if="post.summary">{{ post.summary }}</p>
       <div class="post-card-foot">
         <div class="tag-row">

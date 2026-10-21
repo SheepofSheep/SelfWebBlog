@@ -5,7 +5,6 @@ import InteractionThread from '@/components/InteractionThread.vue'
   <div class="page narrow-page">
     <header class="page-title">
       <div>
-        <span>GUESTBOOK</span>
         <h1>留言</h1>
       </div>
     </header>

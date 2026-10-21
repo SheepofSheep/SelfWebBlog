@@ -49,7 +49,7 @@ defineEmits(['confirm', 'close'])
   padding: 10px 17px;
   border: 0;
   border-radius: 12px;
-  color: white;
+  color: var(--danger-ink);
   background: var(--danger);
   font-weight: 700;
 }

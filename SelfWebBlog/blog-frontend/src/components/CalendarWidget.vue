@@ -326,7 +326,7 @@ onMounted(load)
   place-items: center;
   border: 0;
   border-radius: 9px;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--ink) 76%, transparent);
   background: transparent;
   font-size: 11px;
 }
@@ -339,7 +339,7 @@ onMounted(load)
   background: var(--accent-soft);
 }
 .calendar-compact-grid button.marked {
-  color: white;
+  color: var(--primary-ink);
   background: var(--accent);
   box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 28%, transparent);
 }

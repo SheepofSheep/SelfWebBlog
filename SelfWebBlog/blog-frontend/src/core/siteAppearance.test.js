@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { siteBackgroundImage } from './siteAppearance.js'
+import { siteBackgroundImage, siteBackgroundUrl } from './siteAppearance.js'
+
+test('site background exposes the raw URL for local image processing', () => {
+  assert.equal(siteBackgroundUrl('/uploads/site/background.webp'), '/uploads/site/background.webp')
+  assert.equal(siteBackgroundUrl('javascript:alert(1)'), '')
+})
 
 test('site background accepts persisted HTTPS and local media paths', () => {
   assert.equal(

@@ -107,3 +107,12 @@ releases/
 # Optional local IP geolocation databases
 SelfWebBlog/src/main/resources/ip-data/*.xdb
 !SelfWebBlog/src/main/resources/ip-data/.gitkeep
+
+# Local visual review artifacts (never publish personal blog data)
+.live-data/
+.live-cache/
+.live-logs/
+.live-shots/
+.live-chrome*/
+.build-check/
+SelfWebBlog/blog-frontend/vite.preview.config.js

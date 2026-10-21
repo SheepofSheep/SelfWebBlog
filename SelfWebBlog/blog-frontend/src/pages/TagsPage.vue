@@ -48,8 +48,8 @@ onBeforeUnmount(() => {
   <div class="page">
     <header class="page-title">
       <div>
-        <span>TAGS</span>
         <h1>标签</h1>
+        <p v-if="!loading">共 {{ tags.length }} 个标签</p>
       </div>
     </header>
     <div class="tag-directory glass">
@@ -72,8 +72,8 @@ onBeforeUnmount(() => {
       <div class="section-heading">
         <h2>{{ active?.name || '标签' }}</h2>
       </div>
-      <div v-if="posts.length" class="post-grid">
-        <PostCard v-for="post in posts" :key="post.id" :post="post" />
+      <div v-if="posts.length" class="latest-list">
+        <PostCard v-for="post in posts" :key="post.id" :post="post" row />
       </div>
       <EmptyState v-else />
     </section>

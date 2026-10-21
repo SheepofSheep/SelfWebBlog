@@ -84,7 +84,6 @@ async function logout() {
         <input type="file" accept="image/*" hidden :disabled="busy" @change="changeAvatar" />
       </label>
       <div class="profile-details">
-        <span class="eyebrow">ACCOUNT</span>
         <h1>{{ appStore.user.nickname || appStore.user.username }}</h1>
         <span
           v-if="appStore.user.titleName"
