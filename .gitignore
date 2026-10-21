@@ -116,3 +116,5 @@ SelfWebBlog/src/main/resources/ip-data/*.xdb
 .live-chrome*/
 .build-check/
 SelfWebBlog/blog-frontend/vite.preview.config.js
+.deploy/
+.deploy-*
